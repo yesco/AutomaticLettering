@@ -25,7 +25,23 @@ span:nth-child(4n+0) { color: tomato; }
 span:nth-child(4n+1) { color: deepskyblue; }
 span:nth-child(4n+2) { color: lawngreen; }
 span:nth-child(4n+3) { color: gold; }
- 	
+.fun {
+    display: inline-block;
+    text-align: left;
+    border: 5px solid green;
+    padding: 3px;
+    margin: 3px;
+}
+.args {
+    position; relative;
+    top: 0px;
+    display: inline-block;
+    text-align: left;
+    border: 5px solid red;
+    padding: 3px;
+    margin: 3px;
+    margin-left: 1em;
+}
 </style>
 
 </head>
@@ -38,45 +54,164 @@ span:nth-child(4n+3) { color: gold; }
   function dom(id) {
       return document.getElementById(id);
   }
-  function message(id, ...rest){
+  function domPrint(id, ...rest){
       let d = dom(id);
       if (rest.length == 0)
 	  d.innerText = '';
       else
 	  d.innerText = JSON.stringify(rest);
   }
+  function message(...rest) {
+      return domPrint('message', ...rest);
+  }
+  function doError(e, ...rest) {
+      return domPrint('message', 'Error: ' + e, ...rest);
+  }
   aaa += '2';
   aaa += '3';
 </script>
 <script>
   aaa += '4';
+
+  // http://stackoverflow.com/questions/11076975/insert-text-into-textarea-at-cursor-position-javascript
+
+  function insertAtCursor(f, v) {
+      if (f.selectionStart || f.selectionStart == '0') {
+          var s = f.selectionStart;
+          var e = f.selectionEnd;
+          f.value = f.value.substring(0, s)
+              + v
+              + f.value.substring(e, f.value.length);
+          f.selectionStart = s + v.length;
+          f.selectionEnd = s + v.length;
+      }
+  }
+  // https://stackoverflow.com/questions/4767848/get-caret-cursor-position-in-contenteditable-area-containing-html-content
+  function getCaretPosition (node) {
+      var range = window.getSelection().getRangeAt(0),
+          preCaretRange = range.cloneRange(),
+          caretPosition,
+          tmp = document.createElement("div");
+
+      preCaretRange.selectNodeContents(node);
+      preCaretRange.setEnd(range.endContainer, range.endOffset);
+      tmp.appendChild(preCaretRange.cloneContents());
+      caretPosition = tmp.innerHTML.length;
+      return caretPosition;
+  }
+
+  // autofocus	boolean: Returns / Sets the element's autofocus attribute, indicating that the control should have input focus when the page loads
+
+  // setRangeText
+
   function doKey(e) {
-      message('message', 'event='+e, 'c='+e.ctrlKey, 'key='+e.key);
+      message('event='+e, e, 'c='+e.ctrlKey, 'key='+e.key);
       // some browsers don't implement
       if (e.ctrlKey && e.key == 'r')
 	  window.location.reload();
+
+      if (e.ctrlKey && e.key == 'e')
+	  example();
+
+      // insert box for function
+      if (e.key == '(')
+	  ;
+      // skip forward to after
+      if (e.key == ')')
+	  ;
       return true;
   }
   aaa += '5';
+  function save() {
+      message('saved');
+  }
+  function load() {
+      message('loaded');
+  }
+  document.addEventListener('visibilitychange', function doVis(e) {
+      if (document.visibilityState == 'visible') {
+	  // most browser focus, not opera
+	  // this  still doesn't do anything
+	  dom('exp').focus();
+	  load();
+      } else {
+	  save();
+      }
+  }, false);
+    
 </script>
-<body onkeydown='doKey(event);' onerror='doError(error);'>
+<body onkeydown='doKey(event);' onerror='doError(error);' onload='dom("exp").focus();'>
 
-<div id=message style='text-align:left;'></div>
-aaa=
-<br/><button id=aaa onclick='showAAA('></button>
+<!-- set some overflow so it doesn't resize window-->
+<div id=message style='text-align:left; font-size:0.5em;'></div>
+<br/><button id=aaa></button>
 
 <script>
   aaa += '6';
   tick = 0;
-  function showAAA() {
+  function dbg() {
       tick++;
-      dom('aaa').innerHTML = '' + aaa + ', tick=' + tick;
+      let x;
+      try  {
+	  x = document.hasFocus();
+      } catch(e) {
+	  x = 'ERROR: ' + e;
+      }
+      let h = document.visibilityState;
+      dom('aaa').innerHTML = '' + aaa + ', tick=' + tick + ' focus=' + x + ' vis=' + h + 'caretPos=' + getCaretPosition(dom('exp'));
+//      dom("exp").focus();
   }
   aaa += '7';
-  setInterval(showAAA, 1000);
+  setInterval(dbg, 1000);
 </script>
 
+<script>
+  function code2html(code) {
+      const delim = '[\\(\\[\\{ \\}\\]\\)]';
+      if (!code.length) return '';
+      let i = code.search(delim);
+      if (i < 0) return code; // just element
+      if (i != 0) i--;
+      let c = code.substring(0, i+1);
+      let r = code.substring(i+1);
+      let o = c;
+      if (c=='(' || c=='[' || c=='{') {
+	  // c+f = '(fun'
+	  let j = r.search(delim);
+	  let f = r.substring(0, j);
+	  r = r.substring(j+1);
+	  o = '<span class=fun>' +
+	      c + f +
+	      '<span class=args>';
+      } else if (c==')' || c==']' || c=='}') {
+	  o = '</span>' + c + '</span>';
+      }
+      return o + code2html(r);
+  }
+  
+  var examples = {
+      math: '(+ 11111 (* 2222 3333 4444) (- 55555 666))',
+      foobar: '(foo 3 (bar 4 3) "foobar")',
+      fac: '{fac^n (product (iota 1 n))}',
+  }
+  function example(name) {
+      aaa += 'A';
+      let code = examples.fac;
+      try {
+	  dom('exp').innerHTML = code2html(code);
+	  aaa += 'B';
+      } catch(e) {
+	  aaa += 'E';
+	  doError(e);
+      }
+  }
+</script>
+  
+
 <h1>Automatic Lettering</h1>
+
+<div style='width:100%; text-align:justify;'>
+  a b c d e f</div>
 
 <div style='width:100%; text-align:justify;'>
   <button>history</button>
@@ -85,21 +220,25 @@ aaa=
   <button>send</button>
   <button>download</button>
   <button>comm</button>
+  <button onclick='example()'>example</button>
 </div>
 
-<div style='position:absolute; width:100%; height:100%'>
-<span id=exp name=exp contenteditable='true' style='margin:0; position:absolute; top:50%; left:50%; transform:translate(-50%, -50%);'>
+<div style='position:absolute; width:100%; height:80%'>
+<span id=exp autofocus contenteditable='true' style='margin:0; position:absolute; top:50%; left:50%; transform:translate(-50%, -50%);'>
 
-<span><span>{</span><span>fac</span><span>^</span><span>n</span>
-<span><span>(</span><span>prod</span>
-<span><span>(</span><span>iota</span>
-<span>1</span>
-<span>n</span></span><span>)</span></span><span>)</span></span><span>}</span>
-
+  <div class='fun'>(foo<div class='args'>
+      3
+      <div class='fun'>(bar<div class='args'>
+	  4
+	  3
+	</div>)</div>
+      "foobar"
+    </div>)</div>
+  
 </span>
 </div>
 
-<footer style='font-size: 0.5em'><center>(c) Alienna Automatic Lettering Corporation</center></footer>
+<footer style='font-size:0.5em'>(c) Alienna Automatic Lettering Corporation</footer>
 
 </body>
 </html>
