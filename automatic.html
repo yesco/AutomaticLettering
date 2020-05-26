@@ -29,13 +29,56 @@ span:nth-child(4n+3) { color: gold; }
 </style>
 
 </head>
-<body>
+
+<script>
+  aaa = '0';
+</script>
+<script>
+  aaa += '1';
+  function dom(id) {
+      return document.getElementById(id);
+  }
+  function message(id, ...rest){
+      let d = dom(id);
+      if (rest.length == 0)
+	  d.innerText = '';
+      else
+	  d.innerText = JSON.stringify(rest);
+  }
+  aaa += '2';
+  aaa += '3';
+</script>
+<script>
+  aaa += '4';
+  function doKey(e) {
+      message('message', 'event='+e, 'c='+e.ctrlKey, 'key='+e.key);
+      // some browsers don't implement
+      if (e.ctrlKey && e.key == 'r')
+	  window.location.reload();
+      return true;
+  }
+  aaa += '5';
+</script>
+<body onkeydown='doKey(event);' onerror='doError(error);'>
+
+<div id=message style='text-align:left;'></div>
+aaa=
+<br/><button id=aaa onclick='showAAA('></button>
+
+<script>
+  aaa += '6';
+  tick = 0;
+  function showAAA() {
+      tick++;
+      dom('aaa').innerHTML = '' + aaa + ', tick=' + tick;
+  }
+  aaa += '7';
+  setInterval(showAAA, 1000);
+</script>
 
 <h1>Automatic Lettering</h1>
 
-<span id=exp name=exp contenteditable="true">
-
-<div>
+<div style='width:100%; text-align:justify;'>
   <button>history</button>
   <button>list</button>
   <button>fact</button>
@@ -44,9 +87,8 @@ span:nth-child(4n+3) { color: gold; }
   <button>comm</button>
 </div>
 
-<div bgcolor='yellow' style='width=100%'>
-  &nbsp;
-</div>
+<div style='position:absolute; width:100%; height:100%'>
+<span id=exp name=exp contenteditable='true' style='margin:0; position:absolute; top:50%; left:50%; transform:translate(-50%, -50%);'>
 
 <span><span>{</span><span>fac</span><span>^</span><span>n</span>
 <span><span>(</span><span>prod</span>
@@ -55,9 +97,9 @@ span:nth-child(4n+3) { color: gold; }
 <span>n</span></span><span>)</span></span><span>)</span></span><span>}</span>
 
 </span>
+</div>
 
-<div>
-<footer style="font-size: 0.5em"><center>(c) Alienna Automatic Lettering Corporation</center></footer>
+<footer style='font-size: 0.5em'><center>(c) Alienna Automatic Lettering Corporation</center></footer>
 
 </body>
 </html>
