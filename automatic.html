@@ -13,14 +13,27 @@ body {
 }
 h1 { font-size: 1em; text-align: right; }
 button {
-    font-size: 1em;
+    font-size: 0.7em;
     background: black;
     border-radius: 40px;
     color: white;
     border-style: dotted;
     border-color: white;
+    margin: 0.3em;
+    padding: 0.5em;
 }
+
+input,
+textarea,
+[contenteditable] {
+    /* not very big :-( */
+    caret-color: red;
+}
+
 footer { font-size: 0.5em; text-align: center; position: absolute; bottom:0; z-index:1030;}
+
+/* pretend were having color language */
+
 span:nth-child(4n+0) { color: tomato; }
 span:nth-child(4n+1) { color: deepskyblue; }
 span:nth-child(4n+2) { color: lawngreen; }
@@ -33,7 +46,7 @@ span:nth-child(4n+3) { color: gold; }
     margin: 3px;
 }
 .args {
-    position; relative;
+    position: relative;
     top: 0px;
     display: inline-block;
     text-align: left;
@@ -49,17 +62,25 @@ span:nth-child(4n+3) { color: gold; }
 <script>
   aaa = '0';
 </script>
+
 <script>
   aaa += '1';
   function dom(id) {
       return document.getElementById(id);
   }
+  // TODO: make a loggable mode
   function domPrint(id, ...rest){
       let d = dom(id);
       if (rest.length == 0)
 	  d.innerText = '';
+      else if (rest.length == 1)
+	  d.innerText = '' + rest[0];
       else
-	  d.innerText = JSON.stringify(rest);
+	  d.innerText = rest.join(' ');
+//	  d.innerText = d.innerText + JSON.stringify(rest);
+      // TODO: add better pretty printer
+      // especially for special objects
+      // like: event, error, dom
   }
   function message(...rest) {
       return domPrint('message', ...rest);
@@ -70,39 +91,10 @@ span:nth-child(4n+3) { color: gold; }
   aaa += '2';
   aaa += '3';
 </script>
+
 <script>
   aaa += '4';
 
-  // http://stackoverflow.com/questions/11076975/insert-text-into-textarea-at-cursor-position-javascript
-
-  function insertAtCursor(f, v) {
-      if (f.selectionStart || f.selectionStart == '0') {
-          var s = f.selectionStart;
-          var e = f.selectionEnd;
-          f.value = f.value.substring(0, s)
-              + v
-              + f.value.substring(e, f.value.length);
-          f.selectionStart = s + v.length;
-          f.selectionEnd = s + v.length;
-      }
-  }
-  // https://stackoverflow.com/questions/4767848/get-caret-cursor-position-in-contenteditable-area-containing-html-content
-  function getCaretPosition (node) {
-      var range = window.getSelection().getRangeAt(0),
-          preCaretRange = range.cloneRange(),
-          caretPosition,
-          tmp = document.createElement("div");
-
-      preCaretRange.selectNodeContents(node);
-      preCaretRange.setEnd(range.endContainer, range.endOffset);
-      tmp.appendChild(preCaretRange.cloneContents());
-      caretPosition = tmp.innerHTML.length;
-      return caretPosition;
-  }
-
-  // autofocus	boolean: Returns / Sets the element's autofocus attribute, indicating that the control should have input focus when the page loads
-
-  // setRangeText
 
   function doKey(e) {
       message('event='+e, e, 'c='+e.ctrlKey, 'key='+e.key);
@@ -122,6 +114,26 @@ span:nth-child(4n+3) { color: gold; }
       return true;
   }
   aaa += '5';
+  // TODO: add concept of
+  // user
+  // - user. {
+  //     fullname, email, we-blink, namespaces,
+  //     default-namespace, init-namespace}
+  // - user.namespace {
+  //     name, functions-list}
+  //     namespace should really just be
+  //     a function that "includes"/set path
+  // - user.namespace.function { current-def, 
+  //     name, history count?, history intries
+  // - user.namespace.function~000VER
+  //     when a fun is updated, it's
+  //     logged + add new version + update current
+  // - user.namespace.log.stardate[.user]
+  //     
+  
+  // store using window.localStorage
+  // (window.sessionStorage)
+  // (could stor inside webpage, load/save)
   function save() {
       message('saved');
   }
@@ -143,8 +155,13 @@ span:nth-child(4n+3) { color: gold; }
 <body onkeydown='doKey(event);' onerror='doError(error);' onload='dom("exp").focus();'>
 
 <!-- set some overflow so it doesn't resize window-->
+<div id=old style='color: white; position: absolute; top: 0; right: 0'>
+OLD
+</div>
+
 <div id=message style='text-align:left; font-size:0.5em;'></div>
-<br/><button id=aaa></button>
+<br/>
+<button id=aaa></button>
 
 <script>
   aaa += '6';
@@ -158,7 +175,7 @@ span:nth-child(4n+3) { color: gold; }
 	  x = 'ERROR: ' + e;
       }
       let h = document.visibilityState;
-      dom('aaa').innerHTML = '' + aaa + ', tick=' + tick + ' focus=' + x + ' vis=' + h + 'caretPos=' + getCaretPosition(dom('exp'));
+      dom('aaa').innerHTML = '' + aaa + ', tick=' + tick + ' focus=' + x + ' vis=' + h;
 //      dom("exp").focus();
   }
   aaa += '7';
@@ -175,30 +192,32 @@ span:nth-child(4n+3) { color: gold; }
       let c = code.substring(0, i+1);
       let r = code.substring(i+1);
       let o = c;
-      if (c=='(' || c=='[' || c=='{') {
+      if ('([{'.indexOf(c) >= 0) {
 	  // c+f = '(fun'
 	  let j = r.search(delim);
 	  let f = r.substring(0, j);
 	  r = r.substring(j+1);
 	  o = '<span class=fun>' +
-	      c + f +
+	      c + c + f +
 	      '<span class=args>';
-      } else if (c==')' || c==']' || c=='}') {
-	  o = '</span>' + c + '</span>';
+      } else if (')]}'.indexOf(c)) {
+	  o = '</span>' + c + c + '</span>';
       }
       return o + code2html(r);
   }
   
+  var example_default = 'fac';
+  var example_choice = 'math';
   var examples = {
+      fac: '{fac^n (product (iota 1 n))}',
       math: '(+ 11111 (* 2222 3333 4444) (- 55555 666))',
       foobar: '(foo 3 (bar 4 3) "foobar")',
-      fac: '{fac^n (product (iota 1 n))}',
   }
   function example(name) {
       aaa += 'A';
-      let code = examples.fac;
+      let code = examples[name];
       try {
-	  dom('exp').innerHTML = code2html(code);
+	  dom('exp').innerHTML = '<span class=fun>span</span><div class=fun>div</div>' + code2html(code);
 	  aaa += 'B';
       } catch(e) {
 	  aaa += 'E';
@@ -211,21 +230,21 @@ span:nth-child(4n+3) { color: gold; }
 <h1>Automatic Lettering</h1>
 
 <div style='width:100%; text-align:justify;'>
-  a b c d e f</div>
-
-<div style='width:100%; text-align:justify;'>
   <button>history</button>
   <button>list</button>
   <button>fact</button>
   <button>send</button>
   <button>download</button>
   <button>comm</button>
-  <button onclick='example()'>example</button>
+  <button onclick='example(example_choice)'>example</button>
 </div>
 
 <div style='position:absolute; width:100%; height:80%'>
 <span id=exp autofocus contenteditable='true' style='margin:0; position:absolute; top:50%; left:50%; transform:translate(-50%, -50%);'>
+</span>
+</span>
 
+<span>extra:
   <div class='fun'>(foo<div class='args'>
       3
       <div class='fun'>(bar<div class='args'>
@@ -234,11 +253,49 @@ span:nth-child(4n+3) { color: gold; }
 	</div>)</div>
       "foobar"
     </div>)</div>
-  
 </span>
-</div>
+
+<script>
+  example(example_default);
+</script>
 
 <footer style='font-size:0.5em'>(c) Alienna Automatic Lettering Corporation</footer>
+
+<script id=lastscript src='lastmodified.js'>
+</script>
+
+<script>
+  var lastmodified;
+  setInterval(()=>{
+      // delayed setup until browser ready
+      if (!lastmodified
+	  && typeof(getLastModified) == 'function') {
+	  aaa += 'U';
+	  lastmodified = getLastModified();
+      }
+      if (!lastmodified) return;
+
+      let s = Date.now()/1000 - lastmodified;
+	      
+      // TODO: give user reload button
+      let txt = Math.round(s) + 's';
+      if (getLastModified() > lastmodified) {
+	  let old = Date.now()/1000 - getLastModified();
+	  txt = 'Outdated by ' + Math.round(old) + 's ' + txt;
+      }
+      domPrint('old', txt);
+  }, 1000);
+
+  // poll for change
+  setInterval(()=>{
+      let o = document.getElementById('lastscript');
+      o.parentNode.removeChild(o);
+      let s = document.createElement('script');
+      s.id = 'lastscript';
+      s.src = 'lastmodified.js?' + Date.now();
+      document.body.appendChild(s);
+  }, 1000);
+</script>
 
 </body>
 </html>
