@@ -198,10 +198,10 @@ OLD
 	  let f = r.substring(0, j);
 	  r = r.substring(j+1);
 	  o = '<span class=fun>' +
-	      c + c + f +
+	      c + f +
 	      '<span class=args>';
       } else if (')]}'.indexOf(c)) {
-	  o = '</span>' + c + c + '</span>';
+	  o = '</span>' + c + '</span>';
       }
       return o + code2html(r);
   }
