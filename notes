@@ -1,0 +1,45 @@
+https://github.com/apm1467/jQuery.Custom-Caret/blob/master/README.md
+
+https://benfrain.com/creating-a-custom-input-cursorcaret/
+
+https://davidbstein.com/source-code-viewer.html#/assets/2015/rich_input/example7.html
+
+-about ranges...
+https://davidbstein.com/programming/2015/12/22/rich-input.html
+checking which elements have focus.
+
+Range.startContainer, Range.startOffset, Range.endContainer, Range.endOffset
+
+
+
+
+  // http://stackoverflow.com/questions/11076975/insert-text-into-textarea-at-cursor-position-javascript
+
+  function insertAtCursor(f, v) {
+      if (f.selectionStart || f.selectionStart == '0') {
+          var s = f.selectionStart;
+          var e = f.selectionEnd;
+          f.value = f.value.substring(0, s)
+              + v
+              + f.value.substring(e, f.value.length);
+          f.selectionStart = s + v.length;
+          f.selectionEnd = s + v.length;
+      }
+  }
+  // https://stackoverflow.com/questions/4767848/get-caret-cursor-position-in-contenteditable-area-containing-html-content
+  function getCaretPosition (node) {
+      var range = window.getSelection().getRangeAt(0),
+          preCaretRange = range.cloneRange(),
+          caretPosition,
+          tmp = document.createElement("div");
+
+      preCaretRange.selectNodeContents(node);
+      preCaretRange.setEnd(range.endContainer, range.endOffset);
+      tmp.appendChild(preCaretRange.cloneContents());
+      caretPosition = tmp.innerHTML.length;
+      return caretPosition;
+  }
+
+  // autofocus	boolean: Returns / Sets the element's autofocus attribute, indicating that the control should have input focus when the page loads
+
+  // setRangeText

@@ -1,1 +1,30 @@
-cp automatic.html WWW
+# simple script to copy all files as they changes to a WWW directory (symlink)
+
+set -m
+
+# kill background processes when EaXIT
+trap "kill 0" EXIT
+
+# this traps ^C, errors and exits
+#trap "exit" INT TERM ERR
+
+echo
+echo "[--------------------------------------]"
+./isodate "[run script restarted!]"
+
+# copy all files
+./isodate "cp * => WWW"
+echo `cp * WWW &>/dev/null` >/dev/null
+
+./isodate "[run waiting...]"
+# set up notify: as any  file changes, copy it
+(inotifywait -q -m -e CLOSE_WRITE --format "%f" . | xargs -I {} cp -v {} WWW | xargs -I {} ./isodate cp {} | xargs -I {} ./update-lastmodified {}) &
+
+# restart itself if edited!
+inotifywait -q -e CLOSE_WRITE ./run
+echo "`./isodate` [run changed: restarting...]"
+
+# kill the child - so friggin difficult!
+jobs -p | xargs -r -n1 -I {} kill -SIGINT -{} >/dev/null 2>/dev/null
+
+exec ./run $*

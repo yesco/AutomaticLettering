@@ -1,0 +1,4 @@
+# create some time content
+cat lastmodified-template.js| sed "s/<DATE>/`date +'%s.%N'`/" > WWW/lastmodified.js
+echo "$*"
+
