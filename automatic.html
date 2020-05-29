@@ -23,13 +23,6 @@ button {
     padding: 0.5em;
 }
 
-input,
-textarea,
-[contenteditable] {
-    /* not very big :-( */
-    caret-color: red;
-}
-
 footer { font-size: 0.5em; text-align: center; position: absolute; bottom:0; z-index:1030;}
 
 /* pretend were having color language */
@@ -111,11 +104,29 @@ span:nth-child(4n+3) { color: gold; }
   
 <script>
   aaa += '1';
-  function dom(id) {
-      return document.getElementById(id);
+  function dom(id, optData, opt) {
+      let d = (typeof id == 'string') ?
+	  document.getElementById(id) : id;
+      if (optData === undefined) return d;
+
+      let w = d;
+      let append = opt && opt.indexOf('a') >= 0;
+      if (append)
+	  w = document.createElement('div');
+
+      if (opt.indexOf('h') >= 0) {
+	  w.innerHTML = optData;
+      } else {
+	  w.innerText = optData;
+      }
+
+      if (append)
+	  d.appendChild(w);
+
+      return d;
   }
   // TODO: make a loggable mode
-  function domPrint(id, ...rest){
+  function domT(id, ...rest){
       let d = dom(id);
       if (rest.length == 0)
 	  d.innerText = '';
@@ -129,10 +140,10 @@ span:nth-child(4n+3) { color: gold; }
       // like: event, error, dom
   }
   function message(...rest) {
-      return domPrint('message', ...rest);
+      return domT('message', ...rest);
   }
   function doError(e, ...rest) {
-      return domPrint('message', 'Error: ' + e, ...rest);
+      return domT('message', 'Error: ' + e, ...rest);
   }
   aaa += '2';
   aaa += '3';
@@ -143,21 +154,40 @@ span:nth-child(4n+3) { color: gold; }
 
 
   function doKey(e) {
-      message('event='+e, e, 'c='+e.ctrlKey, 'key='+e.key);
-      // some browsers don't implement
-      if (e.ctrlKey && e.key == 'r')
-	  window.location.reload();
+      let a = e.altKey;
+      let c = e.ctrlKey;
+      let k = e.key;
+      message('event='+e, e, 'c='+c, 'alt='+a, 'key='+e.key);
 
-      if (e.ctrlKey && e.key == 'e')
+      // some browsers don't implement
+      if (c && k == 'r')
+	  window.location.reload();
+      if (c && k  == 'e')
 	  example();
 
+      // debugger!
+      if (a && c  && k == 'd') {
+	  // TODO: move to DBG
+	  if (DBG.out.style.display == 'block') {
+	      DBG.out.style.display = 'none';
+	      //alert(document.activeElement == DBG.cmd);
+	      // restore old position1
+	      dom('exp').focus();
+	  } else {
+	      DBG.cmd.focus();
+	      DBG.out.style.display = 'block';
+	  }
+	  // DBG.run();
+      }
+
       // insert box for function
-      if (e.key == '(')
-	  ;
+      if (k == '(')
+	  message('open paren');
       // skip forward to after
-      if (e.key == ')')
-	  ;
-      return true;
+      if (k == ')')
+	  message('close paren');
+
+      return false;
   }
   aaa += '5';
   // TODO: add concept of
@@ -275,7 +305,7 @@ OLD
 	  let old = Date.now()/1000 - getLastModified();
 	  txt = 'Outdated by ' + Math.round(old) + 's ' + txt;
       }
-      domPrint('old', txt);
+      domT('old', txt);
   }, 1000);
 
   // poll for change
@@ -287,6 +317,9 @@ OLD
       s.src = 'lastmodified.js?' + Date.now();
       document.body.appendChild(s);
   }, 1000);
+</script>
+
+<script id=lastscript src='jsconsole.js'>
 </script>
 
 </body>
