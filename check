@@ -1,0 +1,5 @@
+ls *.html | xargs -I {} ./checkjs {}
+ls *.js | xargs -I {} ./checkjs {}
+
+
+
