@@ -3,7 +3,7 @@
 // $ ./update-lastmodified
 
 function getLastModified() {
-    return <DATE>;
+    return DATE;
 }
 
 

@@ -16,8 +16,7 @@
 
 (add-hook 'after-save-hook 'AL-check)
 
+;; (AL-check)
 
-(AL-check)
-
-(add-hook 'after-save-hook #'AL-check)
+;; (add-hook 'after-save-hook #'AL-check)
 

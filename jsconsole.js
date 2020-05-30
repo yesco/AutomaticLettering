@@ -11,51 +11,66 @@ function DBG() {
     x.style.fontFamily = 'Ariel';
     x.style.textAlign = 'left';
     x.style.maxWidth = '100%';
-    x.style.overflow = 'hidden';
+    // this prevents automatic zoomoing, and one
+    // can drag sideways, and no wrap so things
+    // take up many lines!
+    x.style.overflowX = 'scroll';
     x.style.padding = '0.2em';
-    x.style.paddingLeft = '0.5em';
+    x.style.paddingLeft = '0.3em';
     x.style.position = 'absolute';
     x.style.top = '0';
     x.style.left = '0';
     x.accesskey = 'd'; // not working?
-    x.innerHTML = '<input id="DBGcmd" style="background-color:black; color: white; font-size:1em; width:100%;"/></hr><div id="DBGout"></div>';
+    x.innerHTML = '<div style="display:flex; align-items:stretch; max-width:100%;"><span id=DBGhelpbutton href="#" style="border: 0.2em black solid; color:white; background-color:black;"><b>DBG</b>&gt;</span>&nbsp;<input id=DBGcmd style="background-color:black; color: white; font-size:1em;"/></div><div id=DBGhelp><div id=DBGout></div>';
     document.body.appendChild(x);
-    let cmd = dom('DBGcmd');
-    cmd.onchange = x=>{
-	// hmmm, utility function not here...
-	dom(cmd, cmd.value, 'at');
-    };
+
     // store static data in 'function'
+    // TODO: DBGcmdbutton, DBGhelp
     DBG.dom = x;
-    DBG.cmd = cmd;
+    DBG.cmd = dom('DBGcmd');
     DBG.cmd.onkeypress = function(k) {
 	if (k.keyCode == 13) DBG.run();
     };
     DBG.out = dom('DBGout');
 aaa += 'e1';
+    DBG.clear = function() {
+	return DBGout.innerText = '';
+    }
     DBG.run = function(x){
-	if (x === undefined) x = cmd.value;
-	if (x === 'clear')
-	    return DBGout.innerText = '';
+	if (x === undefined) x = DBG.cmd.value;
+	if (x === 'clear') return DBG.clear();
 	
-	// evaluate js expression
 	dom('DBGout', '<b>&gt;' + x + '</b>', 'ha');
-	let r;
+
+	// evaluate js expression
 	try {
-	    r = eval(x);
+	    // put () around to make it expression, it otherwise expects statement
+	    let r = eval('(' + x + ')');
+	    // TODO: how to print if dom/html?
+	    // want to click to inspect
+	    // One click handler is enough? make these run commands clickable -> copy to cmd.value
+	    // TODO: our own pretty printer?
+	    // -> give links to transfor cmd and run
+	    // - Object.keys(x)
+	    // - JSON.stringify(x) parse?
+	    // - option to wrap displayed container
+	    // - copy current comman to cmd
+	    // - popup inspector?
+	    dom('DBGout', [''+r], 'ta', 'color:#606060');
 	} catch(e) {
-	    r = e;
+	    dom('DBGout', [''+e], 'ta', 'color:red');
 	}
 	
-	dom('DBGout', r, 'ha');
-	cmd.value = x;
+	// TODO: do we really want this?
+	//DBG.cmd.value = x;
     };
 aaa += 'e2';
     function print(args, style) {
 	dom('DBGout', args, 'tal', style);
     }
     console.log = function(...args) {
-	print(args);
+	// do we want timestamp?
+	dom('DBGout', args, 'ta', 'color: black');
     }
     console.error = function(...args) {
 	// TODO: count errors and show them even if visualized, zero at view
@@ -66,17 +81,6 @@ aaa += 'e2';
     }
     console.warn = function(...args) {
 	print(args, 'color: #ff9968;');
-    }
-    if (DBG.debug) {
-	aaa += 'e3';
-	console.log('log', 1, {a: 11, b: 22}, "foo", console.log);
-	aaa += 'e4';
-	console.info('info');
-	aaa += 'e5';
-	console.warn('warn');
-	aaa += 'e6';
-	console.error('error');
-	aaa += 'e7';
     }
 
     DBG.visible = true;
@@ -112,6 +116,9 @@ aaa += 'e2';
     document.addEventListener('keydown', function(k) {
 	if (k.altKey && k.ctrlKey && k.key == 'd')
 	    DBG.toggle();
+	
+	if (k.ctrlKey && k.key == 'c')
+	    DBG.clear();
     });
     
 aaa += 'e8';
@@ -129,9 +136,22 @@ aaa += 'e8';
 	    // if minimized, show red counter, don't auto-show
 	    DBG.toggle('on');
 	} catch(ee) {
-	    dom('DBGout', ''+ee, 'tal');
+	    dom('DBGout', ['dom function error', ''+ee], 't');
 	}
     });
+    
+    if (0 || DBG.debug) {
+	aaa += 'e3';
+	console.log('log', 1, {a: 11, b: 22}, "foo", console.log);
+	aaa += 'e4';
+	console.info('info');
+	aaa += 'e5';
+	console.warn('warn');
+	aaa += 'e6';
+	console.error('error');
+	aaa += 'e7';
+    }
+    aaa += 'e9';
 }
 
 DBG();

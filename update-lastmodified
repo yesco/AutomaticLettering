@@ -1,5 +1,5 @@
 # create some time content
 # TODO: only update if automatic.html changed?
-cat lastmodified-template.js| sed "s/<DATE>/`date +'%s.%N'`/" > WWW/lastmodified.js
+cat lastmodified-template.js| sed "s/DATE/`date +'%s.%N'`/" > WWW/lastmodified.js
 echo "$*"
 

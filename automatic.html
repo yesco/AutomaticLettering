@@ -65,10 +65,7 @@ span:nth-child(4n+3) { color: gold; }
 	  //prefix += new Date().toISOString();
 	  prefix += new Date().toTimeString().substring(0, 8);;
       }
-      if (prefix != '')
-	  prefix += ': ';
-      else
-	  prefix = undefined;
+      if (prefix != '') prefix += ': ';
   
       let w = d;
       let append = opt && opt.indexOf('a') >= 0;
@@ -81,16 +78,20 @@ span:nth-child(4n+3) { color: gold; }
 
       // TODO: this needs a pretty printer!
       if (opt.indexOf('h') >= 0) {
-	  if (prefix)
-	      w.appendChild(document.createTextNode(prefix));
+	  // TODO: smaller font?
+	  if (prefix == '')
+	      d.appendChild(document.createTextNode(prefix));
 	  w.innerHTML = optData;
       } else {
 	  w.innerText = prefix+optData;
       }
 
+      try {
       if (append)
 	  d.appendChild(w);
-
+      } catch (e) {
+	  alert('d=' + d + ' e=' + ' stack=' + e.stack);
+      }
       return d;
   }
   // TODO: replace by dom
