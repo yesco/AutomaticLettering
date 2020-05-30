@@ -1,6 +1,8 @@
 <html>
 
-<head><style>
+<head>
+
+<style>
 body {
   overflow: auto;
   background-color: black;
@@ -54,6 +56,57 @@ span:nth-child(4n+3) { color: gold; }
 
 <script>
   aaa = '0';
+  function dom(id, optData, opt, optStyle) {
+      let d = (typeof id == 'string') ?
+	  document.getElementById(id) : id;
+      if (optData === undefined) return d;
+      let prefix = '';
+      if (dom.log || opt.indexOf('l') >= 0) {
+	  //prefix += new Date().toISOString();
+	  prefix += new Date().toTimeString().substring(0, 8);;
+      }
+      if (prefix != '')
+	  prefix += ': ';
+      else
+	  prefix = undefined;
+  
+      let w = d;
+      let append = opt && opt.indexOf('a') >= 0;
+      if (append) {
+	  w = document.createElement('div');
+	  w.style = optStyle;
+      } else if (optStyle) {
+	  w.style = optStyle;
+      }
+
+      // TODO: this needs a pretty printer!
+      if (opt.indexOf('h') >= 0) {
+	  if (prefix)
+	      w.appendChild(document.createTextNode(prefix));
+	  w.innerHTML = optData;
+      } else {
+	  w.innerText = prefix+optData;
+      }
+
+      if (append)
+	  d.appendChild(w);
+
+      return d;
+  }
+  // TODO: replace by dom
+  function domT(id, ...rest){
+      let d = dom(id);
+      if (rest.length == 0)
+	  d.innerText = '';
+      else if (rest.length == 1)
+	  d.innerText = '' + rest[0];
+      else
+	  d.innerText = rest.join(' ');
+//	  d.innerText = d.innerText + JSON.stringify(rest);
+      // TODO: add better pretty printer
+      // especially for special objects
+      // like: event, error, dom
+  }
 </script>
 
 <script>
@@ -104,41 +157,6 @@ span:nth-child(4n+3) { color: gold; }
   
 <script>
   aaa += '1';
-  function dom(id, optData, opt) {
-      let d = (typeof id == 'string') ?
-	  document.getElementById(id) : id;
-      if (optData === undefined) return d;
-
-      let w = d;
-      let append = opt && opt.indexOf('a') >= 0;
-      if (append)
-	  w = document.createElement('div');
-
-      if (opt.indexOf('h') >= 0) {
-	  w.innerHTML = optData;
-      } else {
-	  w.innerText = optData;
-      }
-
-      if (append)
-	  d.appendChild(w);
-
-      return d;
-  }
-  // TODO: make a loggable mode
-  function domT(id, ...rest){
-      let d = dom(id);
-      if (rest.length == 0)
-	  d.innerText = '';
-      else if (rest.length == 1)
-	  d.innerText = '' + rest[0];
-      else
-	  d.innerText = rest.join(' ');
-//	  d.innerText = d.innerText + JSON.stringify(rest);
-      // TODO: add better pretty printer
-      // especially for special objects
-      // like: event, error, dom
-  }
   function message(...rest) {
       return domT('message', ...rest);
   }
@@ -151,8 +169,6 @@ span:nth-child(4n+3) { color: gold; }
 
 <script>
   aaa += '4';
-
-
   function doKey(e) {
       let a = e.altKey;
       let c = e.ctrlKey;
@@ -164,22 +180,7 @@ span:nth-child(4n+3) { color: gold; }
 	  window.location.reload();
       if (c && k  == 'e')
 	  example();
-
-      // debugger!
-      if (a && c  && k == 'd') {
-	  // TODO: move to DBG
-	  if (DBG.out.style.display == 'block') {
-	      DBG.out.style.display = 'none';
-	      //alert(document.activeElement == DBG.cmd);
-	      // restore old position1
-	      dom('exp').focus();
-	  } else {
-	      DBG.cmd.focus();
-	      DBG.out.style.display = 'block';
-	  }
-	  // DBG.run();
-      }
-
+ 
       // insert box for function
       if (k == '(')
 	  message('open paren');
@@ -319,6 +320,7 @@ OLD
   }, 1000);
 </script>
 
+<!-- TODO: move this up to top, but it requires, dom function, should it provide it, or an util library? -->
 <script id=lastscript src='jsconsole.js'>
 </script>
 
