@@ -1,3 +1,4 @@
+echo "--- checkhtmljs: $1 ---"
 cat $1 | perl extract-code.pl | ./checkjsnode  $1
 
 

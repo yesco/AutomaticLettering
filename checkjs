@@ -1,4 +1,4 @@
-echo "--- checkjs $1 ---"
+echo "--- checkjs: $1 ---"
 cat $1 | ./checkjsnode $1
 
 

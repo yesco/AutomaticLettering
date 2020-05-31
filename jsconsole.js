@@ -1,6 +1,23 @@
 // poor mans mobile browser console
 aaa += 'C';
 
+// TODO: consider adding configurations
+// - position: top/bottom/last left/right
+// - restore: callback when minimizing
+// - key: 'ca-d' or list for help/clear/
+
+// toggle hide/show a given id or dom element
+// optShow if true/false will show/hide
+// returns true if it is shown
+function toggle(idom, optShow) {
+    let d = dom(idom);
+    console.assert(!d);
+    if (!d) alert('toggle() dom id=' + idom + ' not found!');
+
+    d.hidden = !(typeof(optShow) == 'boolean' ? optShow : d.hidden);
+    return !d.hidden;
+}
+
 function DBG() {
     let x = document.createElement('div');
     x.id = 'DBG';
@@ -18,20 +35,58 @@ function DBG() {
     x.style.padding = '0.2em';
     x.style.paddingLeft = '0.3em';
     x.style.position = 'absolute';
-    x.style.top = '0';
+
+    // TODO: make configurable by parameter
+    // - top right corner
+    // - top left corner
+    //    x.style.top = '0';
+    // - "after" the current page, fixed pos
+    let h = document.body.scrollHeight;
+    x.style.top = h + 200;
+    // - "last" add as last dom elemeent
+
     x.style.left = '0';
     x.accesskey = 'd'; // not working?
-    x.innerHTML = '<div style="display:flex; align-items:stretch; max-width:100%;"><span id=DBGhelpbutton href="#" style="border: 0.2em black solid; color:white; background-color:black;"><b>DBG</b>&gt;</span>&nbsp;<input id=DBGcmd style="background-color:black; color: white; font-size:1em;"/></div><div id=DBGhelp><div id=DBGout></div>';
+    x.innerHTML = `
+<div id=DBG style="max-width:100%; text-size:0.8em;">
+  <div style="display:flex; align-items:stretch; max-width:100%;">
+    <span id=DBGhelpbutton style="border:0.2em black solid; color:white; background-color:#595959"><b>DBG</b>&gt;</span>
+    &nbsp;
+    <input id=DBGcmd style="background-color:black; color: white; font-size:1em;"/>
+  </div>
+  <div id=DBGhelp></div>
+  <div id=DBGout style='font-size:0.8em'></div>
+</div>
+`;
     document.body.appendChild(x);
 
     // store static data in 'function'
     // TODO: DBGcmdbutton, DBGhelp
+    dom('DBGhelpbutton').onclick = function() {
+	toggle('DBGhelp');
+    }
+    dom('DBGhelp').innerHTML = `
+<div style='font-size:0.6em;font-family:Ariel;'>
+<center><div style='font-size:2em;'>DBG HELP</div>
+<div style='font-size:0.5em'>(poor mans mobile debug console)</div>
+[DBG] - button will toggle help</br>
+ctrl-alt-<b>D</b> - toggle the DBG pane</br>
+ctrl-alt-<B>H</b> - toggle the DBG help</br>
+ctrl-alt-<b>L</b> - clear the DBG log</br>
+ctrl-<b>U</b> - clear the command</br>
+enter - run the command</br>
+scroll -  by sliding</br>
+</center>
+</div>
+<hr noshade/>
+`;
     DBG.dom = x;
     DBG.cmd = dom('DBGcmd');
     DBG.cmd.onkeypress = function(k) {
 	if (k.keyCode == 13) DBG.run();
     };
     DBG.out = dom('DBGout');
+aaa += 'e1';
 aaa += 'e1';
     DBG.clear = function() {
 	return DBGout.innerText = '';
@@ -87,56 +142,50 @@ aaa += 'e2';
 
     DBG.visible = true;
     DBG.toggle = function(optState) {
-	// default is toggle
-	DBG.visible = !DBG.visible;
-	// unless 'off' or any true string
-	if (optState) {
-	    if (optState == 'off')
-		DBG.visible = false;
-	    else
-		DBG.visible = true;
-	}
-
-    	if (DBG.visible) {
-	    DBG.dom.style.display = 'block';
-	    DBG.oldFocus = document.activeElement;
-	    DBG.oldCaretPos = window.getSelection();
+	if (toggle('DBG', optState)) { // shonw
+	    // TODO: save old scrollpos
+	    // TODO: save focus
+	    // TODO: save caret
+	    // TODO: save selection
+	    // TODO: alt, DBG( { restore: }
+//	    DBG.oldFocus = document.activeElement;
+//	    DBG.oldCaretPos = window.getSelection();
 	    DBG.cmd.focus();
+//	    dom('DBGcmd').focus();
 	} else {
-	    DBG.dom.style.display = 'none';
-	    //alert(document.activeElement == DBG.cmd);
-	    // restore old position before
-	    // https://stackoverflow.com/questions/6190143/javascript-set-window-selection
-	    // no such function - window.setSelection(DBG.oldCaretPos);
-	    
+	    // TODO: restore cursor
 	    dom('exp').focus();
 	}
+	return;
     }
-    DBG.toggle('off');
+    DBG.toggle(false);
 
     // set up key stroke activate/hide
-    document.addEventListener('keydown', function(k) {
-	if (k.altKey && k.ctrlKey && k.key == 'd')
-	    DBG.toggle();
-	
-	if (k.ctrlKey && k.key == 'c')
-	    DBG.clear();
+    document.addEventListener('keydown', function(e) {
+	let c = e.ctrlKey, a = e.altKey, k = e.key;
+	if (c && k == 'u') DBG.cmd.value = '';
+	if (!c && !a) return;
+	// CTRL-ALT-
+	if (k == 'd') DBG.toggle();
+	if (k == 'l') DBG.clear();
+	if (k == 'h') toggle('DBGhelp');
     });
     
 aaa += 'e8';
     window.addEventListener('error', function(e) {
 	let base = window.location.href.replace(/\/[^\/]*$/, '/');
+
 	let fn = e.filename.replace(base, '').
 	    replace(/\/*([^\/]*)$/, function(x) {
 		return "<b>" + x + "</b>";
 	    });
 	try {
-	    dom('DBGout', [fn + '<b>:' + e.lineno + '</b>:' + e.colno + ': ' + e.message, '' + e.error],
-	    'hal', 'color: red;');
+	    dom('DBGout', [e.target, e.currentTarget, e.deepPath, fn + '<b>:' + e.lineno + '</b>:' + e.colno + ': ' + e.message, '' + e.error],
+		'hal', 'color: red;');
 	    // TODO: make this default during load
 	    // and then, later, each time minimized reset counter to 0
 	    // if minimized, show red counter, don't auto-show
-	    DBG.toggle('on');
+	    DBG.toggle(true);
 	} catch(ee) {
 	    dom('DBGout', ['dom function error', ''+ee], 't');
 	}

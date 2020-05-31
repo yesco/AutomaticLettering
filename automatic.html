@@ -59,6 +59,7 @@ span:nth-child(4n+3) { color: gold; }
   function dom(id, optData, opt, optStyle) {
       let d = (typeof id == 'string') ?
 	  document.getElementById(id) : id;
+      if (!d) alert('dom(): no such dom id='+id);
       if (optData === undefined) return d;
       let prefix = '';
       if (dom.log || opt.indexOf('l') >= 0) {
@@ -69,7 +70,8 @@ span:nth-child(4n+3) { color: gold; }
   
       let w = d;
       let append = opt && opt.indexOf('a') >= 0;
-      if (append) {
+      let prepend = opt && opt.indexOf('p') >= 0;
+      if (append || prepend) {
 	  w = document.createElement('div');
 	  w.style = optStyle;
       } else if (optStyle) {
@@ -86,12 +88,11 @@ span:nth-child(4n+3) { color: gold; }
 	  w.innerText = prefix+optData;
       }
 
-      try {
+      if (prepend)
+	  d.insertAdjacentElement('afterbegin', w);
       if (append)
 	  d.appendChild(w);
-      } catch (e) {
-	  alert('d=' + d + ' e=' + ' stack=' + e.stack);
-      }
+
       return d;
   }
   // TODO: replace by dom
@@ -222,7 +223,7 @@ span:nth-child(4n+3) { color: gold; }
       if (document.visibilityState == 'visible') {
 	  // most browser focus, not opera
 	  // this  still doesn't do anything
-	  dom('exp').focus();
+//	  dom('exp').focus();
 	  load();
       } else {
 	  save();
@@ -231,7 +232,7 @@ span:nth-child(4n+3) { color: gold; }
     
 </script>
 
-<body spellcheck=false onkeydown='doKey(event);' onerror='doError(error);' onload='dom("exp").focus();'>
+<body spellcheck=false onkeydown='doKey(event);' onerror='doError(error);' onload='//xdom("exp").focus();'>
 
 <!-- set some overflow so it doesn't resize window-->
 <div id=old style='color: white; position: absolute; top: 0; right: 0'>
@@ -324,6 +325,20 @@ OLD
 <!-- TODO: move this up to top, but it requires, dom function, should it provide it, or an util library? -->
 <script id=lastscript src='jsconsole.js'>
 </script>
+
+<script src="https://cdn.jsdelivr.net/npm/idb-keyval@3/dist/idb-keyval-iife.js">
+</script>
+
+<script>
+  var db=idbKeyval;
+  console.log('db1');
+  db.set('hello', 'world');
+  console.log('db2');
+// gives error:
+//  db.get('hello', 'world').then(
+//      val => console.log('val=', val));
+  console.log('db4');
+</script> 
 
 </body>
 </html>
