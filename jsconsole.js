@@ -44,8 +44,10 @@ aaa += 'e1';
 
 	// evaluate js expression
 	try {
-	    // put () around to make it expression, it otherwise expects statement
-	    let r = eval('(' + x + ')');
+	    let r = x.endsWith(';') ?
+		eval(x) :
+	    	eval('(' + x + ')');
+
 	    // TODO: how to print if dom/html?
 	    // want to click to inspect
 	    // One click handler is enough? make these run commands clickable -> copy to cmd.value
