@@ -115,8 +115,11 @@ span:nth-child(4n+3) { color: gold; }
 <script>
   function code2html(code) {
       // https://stackoverflow.com/questions/1496826/check-if-a-single-character-is-a-whitespace
-      let whitespace = ' \f\n\r\t\v\u00A0\u2028\u2029';
-      let breakchars = whitespace + '{[()]}';
+      let whitespace = ' \f\n\r\t\v\u00A0\u2028\u2029',
+	  openparen = '{[(',
+	  closeparen = ')]}',
+	  breakchars = whitespace + openparen + closeparen;
+
       if (!code.length) return code;
       let c = code[0], r = code.substring(1);
       if ('{[('.indexOf(c) >= 0) {
@@ -140,12 +143,27 @@ span:nth-child(4n+3) { color: gold; }
 	  return '</span>' + c +
 	      '</span>' +
 	      code2html(r);
-      } else if (false || c == '"') {
+      } else if (c == '"') {
 	  let i = 1;
 	  while (i < code.length &&
 		 code[i] != '"')
 	      i++;
-	  c = code.substring(0, i);
+	  i++; // include the quote
+	  // include any space
+	  while (whitespace.indexOf(code[i]) >= 0) i++;
+	  c = '<span class=fun>' + code.substring(0, i) + '</span>'
+	  r = code.substring(i);
+//      } else if (true) {
+      } else if (false) {
+	  let i = 1;
+	  while (i < code.length &&
+		 breakchars.indexOf(code[i]) < 0)
+	      i++;
+	  // i is now at unwanted char
+	  // include any space
+	  while (whitespace.indexOf(code[i]) >= 0) i++;
+	  i--; 
+	  c = '<span class=fun>' + code.substring(0, i) + '</span>'
 	  r = code.substring(i);
       }
       //return '_'+c+'-' + code2html(r)
