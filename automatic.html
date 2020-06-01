@@ -64,7 +64,8 @@ span:nth-child(4n+3) { color: gold; }
       let prefix = '';
       if (dom.log || opt && opt.indexOf('l') >= 0) {
 	  //prefix += new Date().toISOString();
-	  prefix += new Date().toTimeString().substring(0, 8);;
+	  // TODO: want ms?
+	  prefix += new Date().toTimeString().substring(0, 8);
       }
       if (prefix != '') prefix += ': ';
   
@@ -120,12 +121,15 @@ span:nth-child(4n+3) { color: gold; }
 	  let i = 1;
 	  while (i < code.length &&
 		 ' {[()]}'.indexOf(code[i]) < 0)
+	  {
+	      console.log('ch>'+code[i]+'<');
 	      i++;
+	  }
+	  if  (code[i] == ' ') i--;
 	  // include any space
-	  while (code[i] == ' ') i++;
 	  let f = code.substring(0, i);
 	  let r = code.substring(i);
-	  //alert('f='+f + ' r='+r);
+	  console.log('--- i='+i + 'f>'+f + '< r>'+'<');
 	  return '<span class=fun>' + f +
 	      '<span class=args>' +
 	      code2html(r);
@@ -134,6 +138,7 @@ span:nth-child(4n+3) { color: gold; }
 	      '</span>' +
 	      code2html(r);
       }
+      //return '_'+c+'-' + code2html(r)
       return c + code2html(r)
   }
 					 

@@ -135,6 +135,7 @@ aaa += 'e2';
     console.error = function(...args) {
 	// TODO: count errors and show them even if visualized, zero at view
 	print(args, 'color: red;');
+	toggle('DBG', true);
     }
     console.info = function(...args) {
 	print(args, 'color: blue;');
