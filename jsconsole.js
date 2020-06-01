@@ -39,10 +39,10 @@ function DBG() {
     // TODO: make configurable by parameter
     // - top right corner
     // - top left corner
-    //    x.style.top = '0';
+    x.style.top = '0';
     // - "after" the current page, fixed pos
-    let h = document.body.scrollHeight;
-    x.style.top = h + 200;
+    //let h = document.body.scrollHeight;
+    //x.style.top = h + 200;
     // - "last" add as last dom elemeent
 
     x.style.left = '0';
@@ -98,6 +98,9 @@ aaa += 'e1';
 	dom('DBGout', '<b>&gt;' + x + '</b>', 'ha');
 
 	// evaluate js expression
+	// TODO: var f=function(x){ return x+x; {
+	// f(3) doesn't work
+	// but var f; .. f=func...; and f(3) does!?
 	try {
 	    let r = x.endsWith(';') ?
 		eval(x) :
