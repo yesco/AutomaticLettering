@@ -114,19 +114,22 @@ span:nth-child(4n+3) { color: gold; }
 
 <script>
   function code2html(code) {
+      // https://stackoverflow.com/questions/1496826/check-if-a-single-character-is-a-whitespace
+      let whitespace = ' \f\n\r\t\v\u00A0\u2028\u2029';
+      let breakchars = whitespace + '{[()]}';
       if (!code.length) return code;
       let c = code[0], r = code.substring(1);
       if ('{[('.indexOf(c) >= 0) {
 	  // find posittion after breakchar
 	  let i = 1;
 	  while (i < code.length &&
-		 ' {[()]}'.indexOf(code[i]) < 0)
+		 breakchars.indexOf(code[i]) < 0)
 	  {
-	      console.log('ch>'+code[i]+'<');
+	      console.log('ch>'+code[i]+'< code=' + code[i].charCodeAt(0));
 	      i++;
 	  }
-	  if  (code[i] == ' ') i--;
 	  // include any space
+	  while (whitespace.indexOf(code[i]) >= 0) i++;
 	  let f = code.substring(0, i);
 	  let r = code.substring(i);
 	  console.log('--- i='+i + 'f>'+f + '< r>'+'<');
@@ -137,6 +140,13 @@ span:nth-child(4n+3) { color: gold; }
 	  return '</span>' + c +
 	      '</span>' +
 	      code2html(r);
+      } else if (false || c == '"') {
+	  let i = 1;
+	  while (i < code.length &&
+		 code[i] != '"')
+	      i++;
+	  c = code.substring(0, i);
+	  r = code.substring(i);
       }
       //return '_'+c+'-' + code2html(r)
       return c + code2html(r)
