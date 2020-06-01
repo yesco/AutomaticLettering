@@ -62,7 +62,7 @@ span:nth-child(4n+3) { color: gold; }
       if (!d) alert('dom(): no such dom id='+id);
       if (optData === undefined) return d;
       let prefix = '';
-      if (dom.log || opt.indexOf('l') >= 0) {
+      if (dom.log || opt && opt.indexOf('l') >= 0) {
 	  //prefix += new Date().toISOString();
 	  prefix += new Date().toTimeString().substring(0, 8);;
       }
@@ -79,7 +79,7 @@ span:nth-child(4n+3) { color: gold; }
       }
 
       // TODO: this needs a pretty printer!
-      if (opt.indexOf('h') >= 0) {
+      if (opt && opt.indexOf('h') >= 0) {
 	  // TODO: smaller font?
 	  if (prefix == '')
 	      d.appendChild(document.createTextNode(prefix));
@@ -113,28 +113,34 @@ span:nth-child(4n+3) { color: gold; }
 
 <script>
   function code2html(code) {
-      const delim = '[\\(\\[\\{ \\}\\]\\)]';
-      if (!code.length) return '';
-      let i = code.search(delim);
-      if (i < 0) return code; // just element
-      if (i != 0) i--; // ???
-      let c = code.substring(0, i+1);
-      let r = code.substring(i+1);
-      if ('([{'.indexOf(c) >= 0) {
-	  // c+f = '(fun'
-	  let j = r.search(delim);
-	  let f = r.substring(0, j);
-	  r = r.substring(j+1);
-	  return '<span class=fun>' +
-	      c + f +
+      if (!code.length) return code;
+      let c = code[0], r = code.substring(1);
+      if ('{[('.indexOf(c) >= 0) {
+	  // find posittion after breakchar
+	  let i = 1;
+	  while (i < code.length &&
+		 ' {[()]}'.indexOf(code[i]) < 0)
+	      i++;
+	  // include any space
+	  while (code[i] == ' ') i++;
+	  let f = code.substring(0, i);
+	  let r = code.substring(i);
+	  //alert('f='+f + ' r='+r);
+	  return '<span class=fun>' + f +
 	      '<span class=args>' +
 	      code2html(r);
-      } else if (')]}'.indexOf(c) >= 0) {
-	  return '</span>' + c + '</span>' +
+      } else if ('}])'.indexOf(c) >= 0) {
+	  return '</span>' + c +
+	      '</span>' +
 	      code2html(r);
-      } else {
-	  return '' + c + code2html(r);
       }
+      return c + code2html(r)
+  }
+					 
+  // basically just take all the text!
+  function dom2code(idom) {
+      idom = dom(idom);
+      return idom.innerText;
   }
   
   var example_default = 'fac';
@@ -213,13 +219,29 @@ span:nth-child(4n+3) { color: gold; }
   // store using window.localStorage
   // (window.sessionStorage)
   // (could stor inside webpage, load/save)
+
+  function put(n, v) {
+      return localStorage.setItem(n, v);
+  }
+  function get(n) {
+      return localStorage.getItem(n);
+  }
+
   function save() {
+      let x = dom2code('exp');
+      put('exp', x);
+
       message('saved');
   }
   function load() {
+      let x = get('exp');
+      if (x != null)
+	  dom('exp', x, 'h');
+
       message('loaded');
   }
   document.addEventListener('visibilitychange', function doVis(e) {
+      return;
       if (document.visibilityState == 'visible') {
 	  // most browser focus, not opera
 	  // this  still doesn't do anything
@@ -271,6 +293,10 @@ OLD
   <button>send</button>
   <button>download</button>
   <button>comm</button>
+  <button onclick='save();'>save</button>
+  <button onclick='load();'>load</button>
+  <button onclick='dom("exp").innerHTML=code2html(dom("exp").innerText);'>prettyprint</button>
+  <button onclick='dom("exp", dom2code("exp"));'>unpretty</button>
   <button onclick='example(example_choice)'>example</button>
 </div>
 
