@@ -17,16 +17,28 @@ xgu {
 </style>
 
 <script>
-  setTimeout(function() {
-      window.location.reload(true);
+  function getNum() {
+      let h = window.location.href;
+      let q = h.indexOf('?');
+      let n = +h.substring(q+1);
+      return (n > 0) ? n : 0;
+  }
+  
+  setInterval(function() {
+      if (document.visibilityState == 'visible') {
+	  let h = window.location.href;
+	  h = h.replace(/\\?.*/, '?' + (getNum()+1));
+	  //window.location.reload(true);
+	  window.location.href = h;
+      }
   }, 3000);
 </script>
 
   </head>
   <body>
 
-<h1>Lettering Font</h1>
-<div id='time'></div>
+<h1>Lettering Font (<div id='time'></div>)</h1>
+
 
 <style>
 path {
@@ -276,7 +288,7 @@ Z = closepath
   </body>
 
 <script>
-document.getElementById('time').innerText = '' + (new Date).getTime();
+  document.getElementById('time').innerText = 'num=' + getNum() + '  time=' + (new Date).getTime();
 </script>
 
 </html>
