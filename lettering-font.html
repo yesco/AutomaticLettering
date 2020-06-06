@@ -5,10 +5,19 @@
     
 body {
     background-image: 
-x	url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10'><circle color='yello' cx='5' cy='5' r='5'/></svg>");
+	x	url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10'><circle color='yello' cx='5' cy='5' r='5'/></svg>");
 }
 
-xxx {
+.xxx {
+    display: inline-block;
+    width: 100px;
+    height: 100px;
+    max-width: 100px;
+    max-height: 100px;
+    padding: 0px;
+    margin: 0px;
+    background-image: 
+	url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100'><circle color='yello' cx='50' cy='50' r='50'/></svg>");
 }
 
 xgu {
@@ -25,7 +34,10 @@ xgu {
   }
   
   setInterval(function() {
+      return;
       if (document.visibilityState == 'visible') {
+	  let n = getNum();
+	  if (n < 0) return;
 	  let h = window.location.href;
 	  h = h.replace(/\\?.*/, '?' + (getNum()+1));
 	  //window.location.reload(true);
@@ -37,7 +49,32 @@ xgu {
   </head>
   <body>
 
-<h1>Lettering Font (<div id='time'></div>)</h1>
+    <div contenteditable="true" style='font-size: 100px;'>
+      bb: foo<b>bold</b>foo<b></b><b></b>bar</br>
+      b: foo<b class=xxx></b>foo<b class=xxx></b><b class=xxx></b>bar</br>
+      br: foo<br class=xxx/>bar</br>
+      xxx.xxx: foo<xxx class=xxx></xxx>foo<xxx class=xxx></xxx><xxx class=xxx></xxx>bar</br>
+1      span.xxx: fie<span class=xxx></span>fum<span class=xxx></span><span class=xxx></span>fum</br>
+      div.xxx: friggin<div class=xxx></div>hell</br><div class=xxx></div><div class=xxx></div>hell</br>
+      svg.xxx: svg<svg class=xxx></svg>hello<svg class=xxx></svg><svg class=xxx></svg></br>
+      img.class: img<img class=xxx/>hell<img class=xxx/><img class=xxx/>bar</br>
+
+wspace:
+  <svg height="100" width="100"><path st
+roke="red" d="M15 15L15 50L85 50 "/></svg>
+  <svg height="100" width="100"><path stroke="blue" d="M85 15L50 15L50 85"/></svg>
+  <svg height="100" width="100"><path stroke="red" d="M15 15L15 50L85 50 "/></svg>
+  <svg height="100" width="100"><path stroke="blue" d="M85 15L50 15L50 85"/></svg>
+  <svg height="100" width="100"><path stroke="red" d="M15 15L15 50L85 50 "/></svg>
+  <svg height="100" width="100"><path stroke="blue" d="M85 15L50 15L50 85"/></svg>
+
+nspace:
+  <svg height="100" width="100"><path st
+roke="red" d="M15 15L15 50L85 50 "/></svg><svg height="100" width="100"><path stroke="blue" d="M85 15L50 15L50 85"/></svg><svg height="100" width="100"><path stroke="red" d="M15 15L15 50L85 50 "/></svg><svg height="100" width="100"><path stroke="blue" d="M85 15L50 15L50 85"/></svg><svg height="100" width="100"><path stroke="red" d="M15 15L15 50L85 50 "/></svg><svg height="100" width="100"><path stroke="blue" d="M85 15L50 15L50 85"/></svg>must have text after!
+
+    </div>
+    
+<h1>Lettering Font (<div id='time'></div>)<checkbox id=off text=off>Off</checkbox></h1>
 
 
 <style>
@@ -288,7 +325,7 @@ Z = closepath
   </body>
 
 <script>
-  document.getElementById('time').innerText = 'num=' + getNum() + '  time=' + (new Date).getTime();
+      document.getElementById('time').innerText = 'num=' + getNum() + '  time=' + (new Date).getTime();
 </script>
 
 </html>
