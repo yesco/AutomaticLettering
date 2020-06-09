@@ -113,6 +113,10 @@ span:nth-child(4n+3) { color: gold; }
 </script>
 
 <script>
+  function hardspaces(code) {
+      let whitespace = ' \f\n\r\t\v\u00A0\u2028\u2029';
+      return code.replace('['+whitespace+']', '\u00A0');
+  }
   function code2html(code) {
       // https://stackoverflow.com/questions/1496826/check-if-a-single-character-is-a-whitespace
       let whitespace = ' \f\n\r\t\v\u00A0\u2028\u2029',
@@ -140,9 +144,14 @@ span:nth-child(4n+3) { color: gold; }
 	      '<span class=args>' +
 	      code2html(r);
       } else if ('}])'.indexOf(c) >= 0) {
-	  return '</span>' + c +
-	      '</span>' +
-	      code2html(r);
+	  let i = 1;
+	  // include any space
+	  while (whitespace.indexOf(code[i]) >= 0) i++;
+	  c = '</span>' + code.substring(0, i) + '</span>'
+	  r = code.substring(i);
+//	  return '</span>' + c +
+//	      '</span>' +
+//	      code2html(r);
       } else if (c == '"') {
 	  let i = 1;
 	  while (i < code.length &&
@@ -153,16 +162,15 @@ span:nth-child(4n+3) { color: gold; }
 	  while (whitespace.indexOf(code[i]) >= 0) i++;
 	  c = '<span class=fun>' + code.substring(0, i) + '</span>'
 	  r = code.substring(i);
-//      } else if (true) {
-      } else if (false) {
+//      } else if (false) {
+      } else if (true) {
+	  // this cause problem: 'a b' -> 'ab', trailing white space is removed
 	  let i = 1;
 	  while (i < code.length &&
 		 breakchars.indexOf(code[i]) < 0)
 	      i++;
 	  // i is now at unwanted char
-	  // include any space
-	  while (whitespace.indexOf(code[i]) >= 0) i++;
-	  i--; 
+	  // now points at non-white, or unwanted
 	  c = '<span class=fun>' + code.substring(0, i) + '</span>'
 	  r = code.substring(i);
       }
@@ -173,7 +181,7 @@ span:nth-child(4n+3) { color: gold; }
   // basically just take all the text!
   function dom2code(idom) {
       idom = dom(idom);
-      return idom.innerText;
+      return hardspaces(idom.innerText);
   }
   
   var example_default = 'fac';
@@ -328,7 +336,7 @@ OLD
   <button>comm</button>
   <button onclick='save();'>save</button>
   <button onclick='load();'>load</button>
-  <button onclick='dom("exp").innerHTML=code2html(dom("exp").innerText);'>prettyprint</button>
+  <button onclick='dom("exp").innerHTML=code2html(hardspaces(dom("exp").innerText));'>prettyprint</button>
   <button onclick='dom("exp", dom2code("exp"));'>unpretty</button>
   <button onclick='example(example_choice)'>example</button>
 </div>
