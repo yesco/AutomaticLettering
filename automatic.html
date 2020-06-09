@@ -407,5 +407,77 @@ OLD
   console.log('db4');
 </script> 
 
+<script id='prettyprint'>
+  function pprint(o, klass) {
+    // these don't work??? wtf?
+    switch (typeof(o)) {
+    case undefined:
+    case 'number':
+    case 'boolean': return '' + o;
+    case 'bigint': return '' + o + 'n';
+    case 'string': return '"' + o + '"'; // TODO: quote "
+    case 'symbol': {
+      let s = o.toString();
+      let f = Symbol.keyFor(o);
+      return ':' + (f === s ? ':' : '') + s;
+    }
+    case 'function': return o.toString();
+      // .length .name .parameters?
+      // 
+    }
+
+    // now assumed to be object
+
+    if (o === null) return '' + o;
+
+    if (Array.isArray(o)) {
+      // TODO: make it not print num
+      let r = pprintprops(o, klass);
+      let l = o.length;
+      for(let i=0; i<l; i++) {
+	r += pprint(o[i], klass) + ', ';
+      }
+      return r;
+    }
+
+    // TODO: arguments ... args.callee
+    // TODO: date
+    // TODO: regexp
+
+    // object
+    return pprintprops(o, klass);
+  }
+
+  function pprintprops(o, klass) {
+    // .prototype  .name == objtype?
+    // constructor?
+    // Function.getOwnProperties
+    // .getProperties()
+
+/*
+    var fooSym = Symbol('foo');
+var myObj = {};
+myObj['foo'] = 'bar';
+myObj[fooSym] = 'baz';
+Object.keys(myObj); // -> [ 'foo' ]
+Object.getOwnPropertyNames(myObj); // -> [ 'foo' ]
+Object.getOwnPropertySymbols(myObj); // -> [ Symbol(foo) ]
+    assert(Object.getOwnPropertySymbols(myObj)[0] === fooSym);
+    getOwnSymbols
+    for (let x of o) ???
+*/
+    
+    return "PROPS";
+  }
+
+  console.log(pprint(3));
+  console.log(pprint('foo'));
+  console.log(pprint(3n));
+  console.log(pprint(undefined));
+  console.log(pprint(function plus(a,b){ return a+b; }));
+  console.log(pprint({a: 3, b: 4}));
+  console.log(pprint([3, 4]));
+
+</script>
 </body>
 </html>

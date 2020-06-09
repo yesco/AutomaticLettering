@@ -101,6 +101,7 @@ aaa += 'e1';
 	// TODO: var f=function(x){ return x+x; {
 	// f(3) doesn't work
 	// but var f; .. f=func...; and f(3) does!?
+	// TODO: quote it before 'h' printing...
 	try {
 	    let r = x.endsWith(';') ?
 		eval(x) :
