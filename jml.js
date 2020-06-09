@@ -1,11 +1,12 @@
-function jml(x) {
+function jml(x, trace) {
   if (typeof jml.init === 'undefined')jml_init();
   if (typeof x === undefined) return;
   if (typeof x !== 'string') x = '' + x;
   
   //let r = x.match(/\[([^\[\]]+?)\]/);
-  let n = 1;
+  let n = 1, p = 0, t = 0;
   while (n > 0) {
+    p++;
     n = 0;
     x = x.replace(/\[([^\[\]]*?)\s*\]/g, function(all, inside) {
       n++;
@@ -15,17 +16,47 @@ function jml(x) {
       if (!fun) return '[error ' + inside + ']';
       return '' + fun.apply(undefined, args);
     });
-    console.log(n, '!', x);
+    if (trace) console.info(n, '!', x);
+    t += n;
   }
 
   return x;
 }
 
-function x(x) {
-  console.log(">", x);
-  console.log(jml(x));
+function x(x, test) {
+  let xr = x.match(/^(pass: |fail: )(.*?) -> (.*?)(| (expected:) (.*?))$/);
+  if (xr) {
+    let [all, outcome, exp, result, hasExpected, expectWord, expected] = xr;
+    //console.log('---');
+    //console.log('xr', xr);
+    x = exp;
+    test = expected ? expected : result;
+  } 
+  
+  let r = test ? test : jml(x);
+  return xx(x, r);
 }
 
+function xx(x, test) {
+  if (test) {
+    let r = jml(x);
+    let e = (r !== test);
+    let es = e ? 'fail' : 'pass';
+    // if error, write both to err and out if capturing to file...
+    if (e) {
+      console.error(`r=>${r}< test=>${test}< ===${r==test}`);
+    }
+    if (e) r += ' expected: ' + test;
+    if (e)
+      console.error(`${es}: ${x} -> ${r}`);
+    console.log(`x${es}: ${x} -> ${r}`);
+  } else { // interactive
+    console.log(">", x);
+    console.log(jml(x));
+  }
+}
+
+if (0) {
 x('3');
 x('3+4='+jml.f.plus('3','4'));
 x('3*4='+jml.f.times('3','4'));
@@ -101,6 +132,26 @@ x('[or 1 0]');
 x('[or 1 1]');
 x('[or 0 0 1]');
 x('[or 0 0 0]');
+
+x('[or 0 0 0]', '0');
+x('[or 0 0 1]', '1');
+x('[or 1 1 1]', '0');
+}
+
+var readline = require('readline');
+var rl = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout,
+  terminal: false,
+//  terminal: true,
+});
+
+rl.on('line', function(line){
+  x(line);
+  //console.log(line);
+})
+
+//jml_tests('jml.test');
 
 function jml_init() {
   jml.f = {};
