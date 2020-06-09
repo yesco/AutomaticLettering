@@ -169,7 +169,7 @@ aaa += 'e2';
     document.addEventListener('keydown', function(e) {
 	let c = e.ctrlKey, a = e.altKey, k = e.key;
 	if (c && k == 'u') DBG.cmd.value = '';
-	if (!c && !a) return;
+	if (!c || !a) return;
 	// CTRL-ALT-
 	if (k == 'd') DBG.toggle();
 	if (k == 'l') DBG.clear();

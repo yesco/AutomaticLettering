@@ -132,7 +132,7 @@ span:nth-child(4n+3) { color: gold; }
 	  while (i < code.length &&
 		 breakchars.indexOf(code[i]) < 0)
 	  {
-	      console.log('ch>'+code[i]+'< code=' + code[i].charCodeAt(0));
+//	      console.log('ch>'+code[i]+'< code=' + code[i].charCodeAt(0));
 	      i++;
 	  }
 	  // include any space
@@ -219,25 +219,34 @@ span:nth-child(4n+3) { color: gold; }
 <script>
   aaa += '4';
   function doKey(e) {
-      let a = e.altKey;
-      let c = e.ctrlKey;
-      let k = e.key;
-      message('event='+e, e, 'c='+c, 'alt='+a, 'key='+e.key);
+    let a = e.altKey;
+    let c = e.ctrlKey;
+    let k = e.key;
+    message('event='+e, e, 'c='+c, 'alt='+a, 'key='+e.key);
 
-      // some browsers don't implement
-      if (c && k == 'r')
-	  window.location.reload();
-      if (c && k  == 'e')
-	  example();
- 
-      // insert box for function
-      if (k == '(')
-	  message('open paren');
-      // skip forward to after
-      if (k == ')')
-	  message('close paren');
+    // some browsers don't implement
+    if (c && !a && k=='r') window.location.reload();
+    if (c && !a && k=='e') example();
 
-      return false;
+    // save load
+    if (c && a && k=='s') save();
+    if (c && a && k=='l') load();
+
+    // executing
+    if (c && !a && k=='x') run();
+    if (c && !a && k=='e') run('pass');
+    if (c && !a && k=='s') run('step'); 
+    if (c && !a && k=='t') run('step');
+    if (c && !a && k=='b') run('back');
+
+
+    // TODO: structure editor
+    // TODO: insert box for function
+    if (k == '(') message('open paren');
+    // TODO: skip forward to after
+    if (k == ')') message('close paren');
+
+    return false;
   }
   aaa += '5';
   // TODO: add concept of
@@ -479,5 +488,51 @@ Object.getOwnPropertySymbols(myObj); // -> [ Symbol(foo) ]
   console.log(pprint([3, 4]));
 
 </script>
+
+<script src='jml.js'>
+</script>
+
+<script>
+  function expEdited() {
+    let d = dom('exp');
+    let t = d.innerText;
+    expEdited.changed = (expEdited.last !== t);
+    expEdited.last = d.innerText;
+    if (expEdited.changed)
+      run.lastvalue = undefined;
+  }
+  dom('exp').onkeydown = expEdited;
+
+  // how: normal all, 'step', 'tick'
+  function run(how) {
+    if (!run.undo) run.undo = [];
+    if (how == 'back') {
+      let r = run.undo.pop();
+      if (!r) return;
+      dom('exp').innerHTML = code2html(r);
+      dom('exp').lastvalue = r;
+      return;
+    }
+
+    let x = dom('exp').lastvalue;
+
+    // edited, so clear 'undo'
+    if (!how || !x) {
+      expEdited.changed = false;
+      run.undo = [];
+      console.log('undo cleared');
+    }
+    
+    // TODO: bad hack, because unprettyfy doesn't work! it looses spaces!
+    if (!x) x = dom2code('exp');
+
+    let r = jml(x, how);
+    dom('exp').innerHTML = code2html(r);
+    dom('exp').lastvalue = r;
+    
+    run.undo.push(x);
+  }
+</script>
+
 </body>
 </html>

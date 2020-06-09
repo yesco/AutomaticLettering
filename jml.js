@@ -1,14 +1,23 @@
-function jml(x, trace) {
+function jml(x, opts) {
+  if (opts) {
+    // can't be let ;)
+    var oPass = opts.match(/pass/);
+    var oStep = opts.match(/step/);
+    var oTrace = opts.match(/trace/);
+  }
+
   if (typeof jml.init === 'undefined')jml_init();
   if (typeof x === undefined) return;
   if (typeof x !== 'string') x = '' + x;
-  
-  //let r = x.match(/\[([^\[\]]+?)\]/);
+    
+  let regexp = oStep ?
+      /\[([^\[\]]*?)\s*\]/ :
+      /\[([^\[\]]*?)\s*\]/g ;
   let n = 1, p = 0, t = 0;
   while (n > 0) {
     p++;
     n = 0;
-    x = x.replace(/\[([^\[\]]*?)\s*\]/g, function(all, inside) {
+    x = x.replace(regexp, function(all, inside) {
       n++;
       let args = inside.split(/\s+/g);
       let f = args.shift();
@@ -16,8 +25,9 @@ function jml(x, trace) {
       if (!fun) return '[error ' + inside + ']';
       return '' + fun.apply(undefined, args);
     });
-    if (trace) console.info(n, '!', x);
+    if (oTrace) console.info(n, '!', x);
     t += n;
+    if (oPass || oStep) break;
   }
 
   return x;
@@ -49,7 +59,7 @@ function xx(x, test) {
     if (e) r += ' expected: ' + test;
     if (e)
       console.error(`${es}: ${x} -> ${r}`);
-    console.log(`x${es}: ${x} -> ${r}`);
+    console.log(`${es}: ${x} -> ${r}`);
   } else { // interactive
     console.log(">", x);
     console.log(jml(x));
@@ -138,18 +148,21 @@ x('[or 0 0 1]', '1');
 x('[or 1 1 1]', '0');
 }
 
-var readline = require('readline');
-var rl = readline.createInterface({
-  input: process.stdin,
-  output: process.stdout,
-  terminal: false,
-//  terminal: true,
-});
+// if run from nodejs make it interactive
+if (typeof require !== 'undefined') {
+    var readline = require('readline');
+    var rl = readline.createInterface({
+	input: process.stdin,
+	output: process.stdout,
+	terminal: false,
+	//  terminal: true,
+    });
 
-rl.on('line', function(line){
-  x(line);
-  //console.log(line);
-})
+    rl.on('line', function(line){
+	x(line);
+	//console.log(line);
+    })
+}
 
 //jml_tests('jml.test');
 
