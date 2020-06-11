@@ -205,6 +205,24 @@ function jml_init() {
   jml.f.or = (...args)=>`[not [not ${args.join(' ')}]]`;
   jml.f.mor = ()=>`[not [not ${this}]]`;
 
+  function mkArray(n, func) {
+    return [...Array(n)].map(func);
+  }
+
+  // html
+  jml.f['make-table'] = (rows, cols, func, ...data)=>{
+    let d = data.join(' ');
+    return '<table border=1><tr><td>' +
+      mkArray(
+	+rows,
+	(_, r)=>mkArray(
+	  +cols,
+	  (_, c)=>`[${func} ${r} ${c} ${d}]`
+	).join('</td><td>')
+      ).join('</td></tr><tr><td>') +
+    '</td></tr></table>';
+  };
+
   // system
   jml.f.error = function(f, ...args) {
 //    console.error('jml.ERROR: no such function: ', f, ' args=', args);

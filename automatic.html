@@ -3,16 +3,24 @@
 <head>
 
 <style>
-body {
+body, table, tr, td, th {
   overflow: auto;
   background-color: black;
   color: navajowhite;
   font-weight: bold;
-  font-size: 3em;
+  font-size: 3rem;
   text-align: center;
   height: 100%;
   padding-bottom: 0.5em;
 }
+
+/*table { display: flex; flex-wrap: wrap; width: 100%; max-width: 100%; }
+td { box-sizing: border-box; flex-grow: 1; width: 100%; padding: 0.3rem; over-flow: hidden; font-size: 1vw; }
+*/
+table { width: 100%; }
+tr {width: 100%; }
+td {font-size: 0.9vw; flex-grow: 1; }
+
 h1 { font-size: 1em; text-align: right; }
 button {
     font-size: 0.7em;
@@ -350,10 +358,12 @@ OLD
   <button onclick='example(example_choice)'>example</button>
 </div>
 
-<div style='position:absolute; width:100%; height:80%'>
+<div id=exp contenteditable='true' style='position:absolute; width:100%; height:80% disply: flex;'>
+</div>
+<!--
 <span id=exp autofocus contenteditable='true' style='margin:0; position:absolute; top:50%; left:50%; transform:translate(-50%, -50%);'>
 </span>
-</span>
+-->
 
 <script>
   example(example_default);
@@ -522,32 +532,48 @@ OLD
 
   // how: normal all, 'step', 'tick'
   function run(how) {
+
+    // format code
+    function Formatupdate(r) {
+      dom('exp').innerHTML = code2html(r);
+      dom('exp').lastvalue = r;
+    }
+
+    // raw set html
+    function update(r) {
+      dom('exp').innerHTML = r;
+      dom('exp').lastvalue = r;
+    }
+
     if (!run.undo) run.undo = [];
     if (how == 'back') {
       let r = run.undo.pop();
+      if (run.undo.length==0 && r)
+	run.undo.push(r);
       if (!r) return;
-      dom('exp').innerHTML = code2html(r);
-      dom('exp').lastvalue = r;
+      update(r);
       return;
     }
 
     let x = dom('exp').lastvalue;
 
     // edited, so clear 'undo'
-    if (!how || !x) {
+    if (false  && (!how || !x)) {
       expEdited.changed = false;
       run.undo = [];
       console.log('undo cleared');
     }
     
-    // TODO: bad hack, because unprettyfy doesn't work! it looses spaces!
+    // TODO: bad hack, because unprettyfy doe6sn't work! it looses spaces!
     if (!x) x = dom2code('exp');
 
     let r = jml(x, how);
-    dom('exp').innerHTML = code2html(r);
-    dom('exp').lastvalue = r;
+    update(r);
     
-    run.undo.push(x);
+    if (!run.undo.length
+	|| run.undo[run.undo.length-1] !== x) {
+      run.undo.push(x);
+    }
   }
 </script>
 
