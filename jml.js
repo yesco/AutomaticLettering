@@ -1,10 +1,23 @@
+// 2020 (c) jsk@yesco.org
+// A tiny implementation of JML
+// Jolly Macro Language
+// - It's totally functional
+// - No variables!
+// - Everything is strings
+// - It's live extensible inside itself
+// - Only state is external
+// - Database: keyword put/get usng localStorage
 function jml(x, opts) {
   if (opts) {
     // can't be let ;)
     var oPass = opts.match(/pass/);
     var oStep = opts.match(/step/);
     var oTrace = opts.match(/trace/);
+    var oTick = opts.match(/tick/);
+    // TODO: ultimately for 'tick' we let it run about 5ms, then yielding back to the browser, thereby not blocking it's interactivity!
+    if (oTick) oStep = true;
   }
+  let start = Date.now();
 
   if (typeof jml.init === 'undefined')jml_init();
   if (typeof x === undefined) return;
@@ -22,6 +35,19 @@ function jml(x, opts) {
       let args = inside.split(/\s+/g);
       let f = args.shift();
       let fun = jml.f[f];
+      let ff = f;
+      // TODO: move out - too long!
+      // if no fun backtrack:
+      //     [foo-bar-fie-3 4 5]  becomes
+      //  => [foo-bar-fie 3 4 5] a.s.o.
+      while (!fun && ff.indexOf('-') >= 0) {
+	ff = ff.replace(/-([^\-]*)$/, (a)=>{
+	  args.unshift(a);
+	  return '';
+	});
+	console.error(`%%FUN: ${f} ${ff}`);
+	fun = jml.f[ff];
+      }
       if (!fun) return '[error ' + inside + ']';
       return '' + fun.apply(undefined, args);
     });
@@ -205,12 +231,24 @@ function jml_init() {
   jml.f.or = (...args)=>`[not [not ${args.join(' ')}]]`;
   jml.f.mor = ()=>`[not [not ${this}]]`;
 
+  jml.f['en'] = (x, y)=>`[en-word-${x} ${y}]`;
+  jml.f['en-word-3'] = (y)=>'three:'+y;
+  jml.f['en-word-2'] = (y)=>'two'+y;
+  jml.f['en-word-1'] = (y)=>'one'+y;
+  jml.f['en-word'] = (x, y)=>'NO: '+y;
+
   function mkArray(n, func) {
     return [...Array(n)].map(func);
+  }
+  
+  function quoteHTML(h) {
+    return h.replace(/([<>\[\]])/g, x=>`&#${x.charCodeAt(0)};`);
   }
 
   // html
   jml.f['make-table'] = (rows, cols, func, ...data)=>{
+    // DOC: makes a table each call defined by [func r c ...data]
+    // EX: [make-table 6 6 times]
     let d = data.join(' ');
     return '<table border=1><tr><td>' +
       mkArray(
@@ -228,5 +266,5 @@ function jml_init() {
 //    console.error('jml.ERROR: no such function: ', f, ' args=', args);
     return '<%%ERROR:' + f + ' ' + args + '%%>';
   };
-
+  jml.f.fun = (n)=>'<pre style="text-align:let;">'+quoteHTML(''+jml.f[n])+'</pre>';
 }

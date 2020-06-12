@@ -9,9 +9,12 @@ body, table, tr, td, th {
   color: navajowhite;
   font-weight: bold;
   font-size: 3rem;
-  text-align: center;
   height: 100%;
   padding-bottom: 0.5em;
+}
+
+table, tr, td, th {
+    text-align: center;
 }
 
 /*table { display: flex; flex-wrap: wrap; width: 100%; max-width: 100%; }
@@ -244,9 +247,10 @@ span:nth-child(4n+3) { color: gold; }
     if (c && !a && k=='x') run();
     if (c && !a && k=='e') run('pass');
     if (c && !a && k=='s') run('step'); 
-    if (c && !a && k=='t') run('step');
+    if (c && !a && k=='t') run('ticker');
+    if (c && !a && k=='c') run('break');
     if (c && !a && k=='b') run('back');
-
+    if (c && a && k=='b') run('beginning');
 
     // TODO: structure editor
     // TODO: insert box for function
@@ -358,7 +362,7 @@ OLD
   <button onclick='example(example_choice)'>example</button>
 </div>
 
-<div id=exp contenteditable='true' style='position:absolute; width:100%; height:80% disply: flex;'>
+<div id=exp contenteditable='true' style='white-space:pre; position:absolute; width:100%; height:80% disply:flex;'>
 </div>
 <!--
 <span id=exp autofocus contenteditable='true' style='margin:0; position:absolute; top:50%; left:50%; transform:translate(-50%, -50%);'>
@@ -530,9 +534,8 @@ OLD
   }
   dom('exp').onkeydown = expEdited;
 
-  // how: normal all, 'step', 'tick'
+  // how: normal all, 'step', 'tick', 'break', 'ticker'
   function run(how) {
-
     // format code
     function Formatupdate(r) {
       dom('exp').innerHTML = code2html(r);
@@ -545,6 +548,7 @@ OLD
       dom('exp').lastvalue = r;
     }
 
+    // undo
     if (!run.undo) run.undo = [];
     if (how == 'back') {
       let r = run.undo.pop();
@@ -552,6 +556,28 @@ OLD
 	run.undo.push(r);
       if (!r) return;
       update(r);
+      return;
+    }
+    if (how == 'beginning') {
+      if (!run.undo.length) return;
+      let r = run.undo[0];
+      run.undo.length = 1;
+      if (!r) return;
+      update(r);
+      return;
+    }
+
+    // break ^c
+    if (how == 'break'
+	|| (how != 'tick' && run.ticker)) {
+      clearInterval(run.ticker);
+      run.ticker = 0;
+      return;
+    }
+    // ticker ^t
+    if (how == 'ticker') {
+      run.ticker = setInterval(
+	_=>run('tick'), 0);
       return;
     }
 
@@ -568,10 +594,17 @@ OLD
     if (!x) x = dom2code('exp');
 
     let r = jml(x, how);
-    update(r);
+    if (r === x) {
+      // finished
+      run('break');
+    } else {
+      update(r);
+    }
     
     if (!run.undo.length
 	|| run.undo[run.undo.length-1] !== x) {
+      // TODO: avoid if too big!
+      // TODO: if edited, do special save that doesn't get deleted easy
       run.undo.push(x);
     }
   }
