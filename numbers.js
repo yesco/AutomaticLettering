@@ -168,15 +168,17 @@ function search(n) {
   return [n, shortest, best];
 }
 
-
-for(let i=0; i<64; i++) {
-  let x = n2a_x(i);
-  let xn = a2n(x);
-  let m = n2a_m(i)
-  let mn = a2n(m);
-  let s = search(i);
-  console.log(`${i}\t= ${x} = ${xn}`);
-  //console.log(`\t  ${m} = ${mn}`);
-  console.log(i, 'BEST ', s[1]);
-  console.log(s, "\n");
+// only run inside node
+if (typeof required !== 'undefined') {
+  for(let i=0; i<64; i++) {
+    let x = n2a_x(i);
+    let xn = a2n(x);
+    let m = n2a_m(i)
+    let mn = a2n(m);
+    let s = search(i);
+    console.log(`${i}\t= ${x} = ${xn}`);
+    //console.log(`\t  ${m} = ${mn}`);
+    console.log(i, 'BEST ', s[1]);
+    console.log(s, "\n");
+  }
 }

@@ -8,6 +8,8 @@
 // - Only state is external
 // - Database: keyword put/get usng localStorage
 function jml(x, opts) {
+  // TODO: if called with a dom element
+  //   traverse it and run on whole TextNodes
   if (opts) {
     // can't be let ;)
     var oPass = opts.match(/pass/);
@@ -23,6 +25,7 @@ function jml(x, opts) {
   if (typeof x === undefined) return;
   if (typeof x !== 'string') x = '' + x;
     
+  // TODO: make sure newlines are ok
   let regexp = oStep ?
       /\[([^\[\]]*?)\s*\]/ :
       /\[([^\[\]]*?)\s*\]/g ;
@@ -32,6 +35,7 @@ function jml(x, opts) {
     n = 0;
     x = x.replace(regexp, function(all, inside) {
       n++;
+      // TODO: can spaces be retained?
       let args = inside.split(/\s+/g);
       let f = args.shift();
       let fun = jml.f[f];

@@ -20,3 +20,14 @@
 
 ;; (add-hook 'after-save-hook #'AL-check)
 
+(setq c-basic-offset 2)
+(setq js-indent-level 2)
+(setq wrap-prefix "\t\t\-\\\\")
+
+(defun my-next-error
+   (orig-fun &rest args)
+   (ignore-errors
+     (apply orig-fun args)))
+     
+(advice-add 'next-error :around
+	    #'my-next-error)

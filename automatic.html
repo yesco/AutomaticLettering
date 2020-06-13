@@ -3,6 +3,18 @@
 <head>
 
 <style>
+#message { 
+    background: black;
+    color: black;
+    transition: color 2s linear 2s;
+}
+#message:empty {
+    background: black;
+    color: white;
+    content: '  --  #' attr(id) ' haha!';
+    transition: none;
+}
+
 body, table, tr, td, th {
   overflow: auto;
   background-color: black;
@@ -44,23 +56,27 @@ span:nth-child(4n+0) { color: tomato; }
 span:nth-child(4n+1) { color: deepskyblue; }
 span:nth-child(4n+2) { color: lawngreen; }
 span:nth-child(4n+3) { color: gold; }
-.fun {
+
+/* color of pretty code layout boxes */
+.fun, .args {
     display: inline-block;
     text-align: left;
-    border: 5px solid green;
     padding: 3px;
     margin: 3px;
+    border: 3px solid white;
+}
+
+.fun {
+    border-color: green;
 }
 .args {
+    border-color: red;
     position: relative;
     top: 0px;
-    display: inline-block;
-    text-align: left;
-    border: 5px solid red;
-    padding: 3px;
-    margin: 3px;
     margin-left: 1em;
+
 }
+
 </style>
 
 </head>
@@ -218,10 +234,24 @@ span:nth-child(4n+3) { color: gold; }
 <script>
   aaa += '1';
   function message(...rest) {
-      return domT('message', ...rest);
+    if (message.clear) {
+      message.clear();
+      message.clear == undefined;
+    }
+    dom('message').innerHTML = '';
+    clearTimeout(message.timer);
+    message.timer = setTimeout(x=>domT('message', ...rest));
   }
   function doError(e, ...rest) {
-      return domT('message', 'Error: ' + e, ...rest);
+    let s = dom('message').style;
+    // reset colors next time message is called
+    message.clear = _=>{
+      s.backgroundColor = '';
+      s.color = '';
+    }
+    s.backgroundColor='red';
+    s.color='white';
+    domT('message', 'Error: ' +e, ...rest);
   }
   aaa += '2';
   aaa += '3';
@@ -233,7 +263,7 @@ span:nth-child(4n+3) { color: gold; }
     let a = e.altKey;
     let c = e.ctrlKey;
     let k = e.key;
-    message('event='+e, e, 'c='+c, 'alt='+a, 'key='+e.key);
+    //message('event='+e, e, 'c='+c, 'alt='+a, 'key='+e.key);
 
     // some browsers don't implement
     if (c && !a && k=='r') window.location.reload();
@@ -316,14 +346,24 @@ span:nth-child(4n+3) { color: gold; }
     
 </script>
 
-<body spellcheck=false onkeydown='doKey(event);' onerror='doError(error);' onload='//xdom("exp").focus();'>
+<body spellcheck=false onkeydown='doKey(event);'>
+<script>
+  window.onerror = function(message, url, line, col, errorObj) {
+    console.error(`WINDOW.ONERROR!
+message  : ${message}
+url      : ${url}
+line     : ${line}
+col      : ${col}
+errorObj : ${errorObj}
+`);
+  }
+ </script>
 
 <!-- set some overflow so it doesn't resize window-->
 <div id=old style='color: white; position: absolute; top: 0; right: 0'>
 OLD
 </div>
 
-<div id=message style='text-align:left; font-size:0.5em;'></div>
 <br/>
 <button id=aaa></button>
 
@@ -362,7 +402,7 @@ OLD
   <button onclick='example(example_choice)'>example</button>
 </div>
 
-<div id=exp contenteditable='true' style='white-space:pre; position:absolute; width:100%; height:80% disply:flex;'>
+<div id=exp contenteditable='true' style='white-space:pre; position:absolute; width:100%; height:80% disply:flex; text-align:center;'>
 </div>
 <!--
 <span id=exp autofocus contenteditable='true' style='margin:0; position:absolute; top:50%; left:50%; transform:translate(-50%, -50%);'>
@@ -420,14 +460,16 @@ OLD
 </script>
 
 <script>
-  var db=idbKeyval;
-  console.log('db1');
-  db.set('hello', 'world');
-  console.log('db2');
+  if (0) {
+    var db=idbKeyval;
+    console.log('db1');
+    db.set('hello', 'world');
+    console.log('db2');
 // gives error:
 //  db.get('hello', 'world').then(
 //      val => console.log('val=', val));
-  console.log('db4');
+    console.log('db4');
+  }
 </script> 
 
 <script id='prettyprint'>
@@ -511,13 +553,15 @@ OLD
     return `{${ra.join(', ')}}`;
   }
   
-  console.log(pprint(3));
-  console.log(pprint('foo'));
-  console.log(pprint(3n));
-  console.log(pprint(undefined));
-  console.log(pprint(function plus(a,b){ return a+b; }));
-  console.log(pprint({a: 3, b: 4}));
-  console.log(pprint([3, 4]));
+  if (0) {
+    console.log(pprint(3));
+    console.log(pprint('foo'));
+    console.log(pprint(3n));
+    console.log(pprint(undefined));
+    console.log(pprint(function plus(a,b){ return a+b; }));
+    console.log(pprint({a: 3, b: 4}));
+    console.log(pprint([3, 4]));
+  }
 </script>
 
 <script src='jml.js'>
@@ -546,12 +590,15 @@ OLD
     function update(r) {
       dom('exp').innerHTML = r;
       dom('exp').lastvalue = r;
+      let z = new Blob(run.undo).size;
+      message(`run.undo ${run.undo.length} items of ${z} bytes`);
     }
 
     // undo
     if (!run.undo) run.undo = [];
     if (how == 'back') {
       let r = run.undo.pop();
+      // never remove first
       if (run.undo.length==0 && r)
 	run.undo.push(r);
       if (!r) return;
@@ -567,7 +614,7 @@ OLD
       return;
     }
 
-    // break ^c
+    // break ^c (or any other key!)
     if (how == 'break'
 	|| (how != 'tick' && run.ticker)) {
       clearInterval(run.ticker);
@@ -581,6 +628,9 @@ OLD
       return;
     }
 
+    // TODO: make a more efficient variant
+    // that how='run' that only process
+    // TextNodes!
     let x = dom('exp').lastvalue;
 
     // edited, so clear 'undo'
@@ -606,12 +656,20 @@ OLD
       // TODO: avoid if too big!
       // TODO: if edited, do special save that doesn't get deleted easy
       run.undo.push(x);
+      let z = new Blob(run.undo).size;
+      // remove old (but not first) entries if if log too big
+      while ((z > run.MAX_UNDO_BYTES ||
+	      run.undo.length > run.MAX_UNDO_LEN+1)
+	     && run.undo.length > 3) {
+	run.undo.splice(1,2, '%UNDO:s REMOVED!%');
+      }
     }
   }
+  run.MAX_UNDO_BYTES = 10241024;
+  run.MAX_UNDO_LEN = 1024;
 </script>
 
-<script src='numbers.js'>
-</script>
-
+<!-- anyway to see status on a script tag?-->
+<!-- todo: provide a loadScript() function...-->
 </body>
 </html>

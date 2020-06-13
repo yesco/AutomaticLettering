@@ -54,7 +54,7 @@ function DBG() {
     &nbsp;
     <input id=DBGcmd style="background-color:black; color: white; font-size:1em;"/>
   </div>
-  <div id=DBGhelp></div>
+  <div id=DBGhelp hidden=true></div>
   <div id=DBGout style='font-size:0.8em'></div>
 </div>
 `;
