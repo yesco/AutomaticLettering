@@ -4,6 +4,9 @@
 
 <style>
 #message { 
+    position: absolute;
+    top: 0;
+    left: 0;
     background: black;
     color: black;
     transition: color 2s linear 2s;
@@ -360,6 +363,7 @@ errorObj : ${errorObj}
  </script>
 
 <!-- set some overflow so it doesn't resize window-->
+<div id=message></div>
 <div id=old style='color: white; position: absolute; top: 0; right: 0'>
 OLD
 </div>
