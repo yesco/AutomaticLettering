@@ -21,7 +21,7 @@ function OnStart() {
   app.AddLayout(lay);
 
   ws = app.CreateWebServer(8080, 'Upload,ListDir');
-  ws.SetFolder('/sdcard/DroidScript');
+  ws.SetFolder('/sdcard/DroidScript/ALd');
   ws.AddServlet('/message',  onMessage);
   ws.AddServlet('/get', onGet);
   ws.AddServlet('/put', onPut);
