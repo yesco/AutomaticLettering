@@ -77,74 +77,101 @@ console.log('....', l[2]);
 console.log('l=', l);
 console.log('sortable=', sortable(l));
 console.log('ordered=', sortableOrdered(l));
-console.log('l.stringify=', stringify(l));
+console.log('l.lexify=', lexify(l));
 
-let sparse = Array(20);
-sparse[13] = 'thirteen'
-sparse[19] = 19;
-console.log('sparse.stringify=', stringify(sparse));
+// debug number
+if (0) {
+  let sparse = Array(20);
+  sparse[13] = 'thirteen'
+  sparse[19] = 19;
+  console.log('sparse.lexify=', lexify(sparse));
   
-let aprops = [1,2,3];
-aprops['foo'] = 'bar:fie:fum';
-console.log('aprops.stringify=', stringify(aprops));
+  let aprops = [1,2,3];
+  aprops['foo'] = 'bar:fie:fum';
+  console.log('aprops.lexify=', lexify(aprops));
 
-let nums = [0,0.0001,0.1,0.11,0.9,1,2,2.1,2.2,3,9,10,11,20,99,100,101,200,1000,2000,1e4,1e9,1e42,1e123,1/0,];
-nums = nums.concat([0,0.1,0.01,1e-42,1e-123,3e-123,2e-124,1,2,10,1e3,1e9,1e42,2e42,2.1e42,1e123,3e123]);
+  let nums = [0,0.0001,0.1,0.11,0.9,1,2,2.1,2.2,3,9,10,11,20,99,100,101,200,1000,2000,1e4,1e9,1e42,1e123,1/0,];
+  nums = nums.concat([0,0.1,0.01,1e-42,1e-123,3e-123,2e-124,1,2,10,1e3,1e9,1e42,2e42,2.1e42,1e123,3e123]);
 
-nums.unshift(NaN);
+  nums.unshift(NaN);
 
-console.log('nums', nums);
-nums = Array.from(nums).reverse().map(n=>-n).concat(nums);
-console.log('nums w minus', nums);
+  console.log('nums', nums);
+  nums = Array.from(nums).reverse().map(n=>-n).concat(nums);
+  console.log('nums w minus', nums);
 
-nums.sort((a,b)=>a-b);
+  nums.sort((a,b)=>a-b);
 
-nums.forEach(
-  n=>console.log(`${n}\t${sortable(n)}`)
-);
+  nums.forEach(
+    n=>console.log(`${n}\t${sortable(n)}`)
+  );
 
-// we prefer NaN < -Inf js: undefined
-nums = nums.filter(n=>Number.isFinite(n));
+  // we prefer NaN < -Inf js: undefined
+  nums = nums.filter(n=>Number.isFinite(n));
 
-let snums = nums.map(sortable);
-let sno = Array.from(snums).sort();
+  let snums = nums.map(sortable);
+  let sno = Array.from(snums).sort();
 
-function unsortable(s) {
-  if (s[0] === '-') {
-    s = s.replace(/\d/g, d=>9-d)
-  }
-  s = s.replace(/^(.*#)/, '');
-  s = s.replace('_', '');
-  
-  console.log('...........', s);
-  return +s;
+  let snou = sno.map(unsortable);
+
+  for(let i=0; i<nums.length; i++)
+    console.log(i, nums[i], snums[i], sno[i], snou[i]);
 }
 
-let snou = sno.map(unsortable);
-
-for(let i=0; i<nums.length; i++)
-  console.log(i, nums[i], snums[i], sno[i], snou[i]);
-
-function stringify(v) {
-  console.log(`  stringify: >${v}< ${typeof(v)}`);
+// lexify(o) -> s
+//
+// makes a sortable string from JSON style structure
+// this can be directly and correctly sorted
+// lexically by unix sort, or any ordered
+// key-value store
+//
+// arrays are collated with maps
+// but minimizes size [1,2,3] => (1 2 3)
+// sparse arrays becomes only key:value
+//
+// other datatypes are onverted as follows:
+//   n12#99      - [99]
+//   n13#100     - notice how it's ascii>[99]
+//   sfoo!20bar  - no spaces inside string
+//
+// ' ' ( ) { } [] are quoted == safe strings
+//
+// numbers: NaN < -INF < -x < 0 < x < +INF
+// lists < numbers < strings
+function lexify(v) {
+  console.log(`  lexify: >${v}< ${typeof(v)}`);
   let t = typeof(v);
   if (t === 'object') {
-//    if (Array.isArray(v))
-//      return '( ' + v.map(stringify).join(' ') + ' )';
-//    else {
-      let keys = Object.keys(v);
-      return '(' + keys.map(
-	(k,i)=>{
-	  let n=+k;
-	  return `${i===n?'':stringify(n?n:k)+':'}${stringify(v[k])}`;
-	}).join(' ') + ')';
-//    }
+    let keys = Object.keys(v);
+    return '(' + keys.map(
+      (k,i)=>{
+	let n=+k;
+	return `${i===n?'':lexify(n?n:k)+':'}${lexify(v[k])}`;
+      }).join(' ') + ')';
   }
   if (t === 'string') return 's' + sortable(v);
   if (t === 'number') return 'n' + sortable(v);
   return '' + v;
 }
   
+// TODO: for more types!
+  function unsortable(s) {
+    if (s[0] === '-') {
+      s = s.replace(/\d/g, d=>9-d)
+    }
+    s = s.replace(/^(.*#)/, '');
+    s = s.replace('_', '');
+    
+    console.log('...........', s);
+    return +s;
+  }
+
+
+// The idea was to give he result of this to
+// JSON.lexify but it's not handling keys
+// the right well and too much quotes
+// use and rename lexify instead
+//
+// TODO: simplify and handle only simple values
 function sortable(v) {
   return sortable_internal(v, sortable, false);
 }
