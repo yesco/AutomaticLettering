@@ -10,7 +10,7 @@ function safeQuote(s) {
   }
   
   return s.replace(
-    /[\x00-\x19 %&\$'"<=>\?\\\(\)\{\}\[\]\|\/\+\=\*\`\~\!]/g,
+    /[\x00-\x19 %&\$'"<=>\?\\\(\)\{\}\[\]\|\/\+\=\*\`\~\!\:\;]/g,
     bangxx);
 }
 
@@ -66,11 +66,85 @@ if (typeof require != 'undefined') {
   test(['b', 'a']);
 }
 
-let l = [1, 'foo bar', {c: 1, b: 'fie!fum', a:3}, 4];
-console.log(l);
-console.log(sortable(l));
-console.log(sortableOrdered(l));
+let l = [1, 'foo bar', {c: 1, b: 'fie!fum', a:3, 1: 99, 0:42}, 4, [], [[]]];
 
+l[2][-1]=33;
+l[2][-2]=22;
+l[2][-99]=77;
+l[2][-9]=77;
+l[2][-3]=22;
+console.log('....', l[2]);
+console.log('l=', l);
+console.log('sortable=', sortable(l));
+console.log('ordered=', sortableOrdered(l));
+console.log('l.stringify=', stringify(l));
+
+let sparse = Array(20);
+sparse[13] = 'thirteen'
+sparse[19] = 19;
+console.log('sparse.stringify=', stringify(sparse));
+  
+let aprops = [1,2,3];
+aprops['foo'] = 'bar:fie:fum';
+console.log('aprops.stringify=', stringify(aprops));
+
+let nums = [0,0.0001,0.1,0.11,0.9,1,2,2.1,2.2,3,9,10,11,20,99,100,101,200,1000,2000,1e4,1e9,1e42,1e123,1/0,];
+nums = nums.concat([0,0.1,0.01,1e-42,1e-123,3e-123,2e-124,1,2,10,1e3,1e9,1e42,2e42,2.1e42,1e123,3e123]);
+
+nums.unshift(NaN);
+
+console.log('nums', nums);
+nums = Array.from(nums).reverse().map(n=>-n).concat(nums);
+console.log('nums w minus', nums);
+
+nums.sort((a,b)=>a-b);
+
+nums.forEach(
+  n=>console.log(`${n}\t${sortable(n)}`)
+);
+
+// we prefer NaN < -Inf js: undefined
+nums = nums.filter(n=>Number.isFinite(n));
+
+let snums = nums.map(sortable);
+let sno = Array.from(snums).sort();
+
+function unsortable(s) {
+  if (s[0] === '-') {
+    s = s.replace(/\d/g, d=>9-d)
+  }
+  s = s.replace(/^(.*#)/, '');
+  s = s.replace('_', '');
+  
+  console.log('...........', s);
+  return +s;
+}
+
+let snou = sno.map(unsortable);
+
+for(let i=0; i<nums.length; i++)
+  console.log(i, nums[i], snums[i], sno[i], snou[i]);
+
+function stringify(v) {
+  console.log(`  stringify: >${v}< ${typeof(v)}`);
+  let t = typeof(v);
+  if (t === 'object') {
+//    if (Array.isArray(v))
+//      return '( ' + v.map(stringify).join(' ') + ' )';
+//    else {
+      let keys = Object.keys(v);
+      return '(' + keys.map(
+	(k,i)=>{
+	  let n=+k;
+	  return `${i===n?'':stringify(n?n:k)+':'}${stringify(v[k])}`;
+	}).join(' ') + ')';
+//    }
+  }
+  if (t === 'string') return 's' + sortable(v);
+  if (t === 'number') return 'n' + sortable(v);
+  return '' + v;
+}
+  
 function sortable(v) {
   return sortable_internal(v, sortable, false);
 }
@@ -97,6 +171,14 @@ function sortable_internal(v, rec, doSortKeys) {
     return v.map(rec);
 
   if (t === 'object') {
+    if (doSortKeys) {
+      let r = {};
+      for (let k in v) {
+	r[k] = v[k];
+      }
+      return r;
+    }
+
     let r = {};
     let keys = [...Object.keys(v)];
     if (doSortKeys) keys.sort();
@@ -104,14 +186,49 @@ function sortable_internal(v, rec, doSortKeys) {
     return r;
   }
   
-  return v;
-  
-  // node is 
-  return new Map(Array.from(
-    v.entries(),
-    ([k, v])=>
-      [k, rec(v)] ));
-  
+  if (t === 'number') {
+    return num2sortable(v);
+    
+    function num2sortable(v) {
+      if (!Number.isFinite(v)) {
+	if (Number.isNaN(v)) return '!NaN';
+	if (v === Number.NEGATIVE_INFINITY) return '--INF';
+	if (v === Number.POSITIVE_INFINITY) return 'INF';
+      }
+
+      if (v < 0) {
+	let s = pos2s(-v)
+	    .replace(/\d/g, d=>9-d);
+	return '-' + s + '_';
+      } else
+	return pos2s(v);
+    }
+    
+    function pos2s(v) {
+      if (v === 0) return '0';
+      let s = v.toString();
+      let e = s.indexOf('e');
+      let p = s.indexOf('.');
+      if (e >= 0) {
+	e = +s.substring(e+1);
+	if (e < 0)
+	  return '0' + num2sortable(e) + '#' + v;
+	p = e > 0 ? e+1 : e-1;
+      } else
+	if (p < 0) p = s.length;
+      let r = '';
+      do {
+	p = '' + p;
+	r += p;
+	p = p.length;
+      } while (p > 10);
+      return p + r + '#' + s;
+    }
+
+      
+  }
+
+  // TODO: bignums!
 
   // - numbers, bignums, floats
     // - assocs (hash but w sorted keys)
