@@ -260,6 +260,9 @@ span:nth-child(4n+3) { color: gold; }
   aaa += '3';
 </script>
 
+<script src='sortables.js'>
+</script>
+
 <script>
   aaa += '4';
   function doKey(e) {
@@ -315,26 +318,249 @@ span:nth-child(4n+3) { color: gold; }
   // (window.sessionStorage)
   // (could stor inside webpage, load/save)
 
-  function put(n, v) {
-      return localStorage.setItem(n, v);
+  // internal functions
+  function iput(n, v) {
+    return localStorage.setItem(n, v);
   }
-  function get(n) {
-      return localStorage.getItem(n);
+  function iget(n) {
+    return localStorage.getItem(n);
+  }
+  function ilist(a, b, p) {
+  }
+
+  function isearch(a, b) {
+  }
+
+  function dump() {
+    let ls = localStorage;
+    for(let i=0; i<ls.length; i++) {
+      let k = ls.key(i);
+      //console.log(`${i}\t${k}\t${ls.getItem(k)}`);
+      console.log(`i=${i}\nkey=${k}<\ndata=${ls.getItem(k)}<`);
+    }
+  }
+
+  var user = '';
+  // 16 char hash prefix with 'h'
+  var huser = 'hdeadbeefdeadbeef'; 
+
+  function hash(s, optPrecision) {
+    // TODO: use XTEA
+    //throw "hash: not implemented!"
+    h = 'DEADBEEFDEADBEEF';
+    return 'h' + h.substr(-(optPrecision || 16));
+  }
+  
+  // tHEX of fixed length
+  function timestamp(optT) {
+    if (optT === undefined) {
+      optT = Date.now();
+      // make sure unique (PER USER),
+      // (then should add machine id...)
+      // if too much data
+      // means timestamp is "fake"
+      // should we mark it, or add extra
+      // digit? considering that most browsers
+      // only give in resolution of 20-100ms
+      // maybe it's ok...
+      if (optT <= timestamp.last)
+	optT = ++timestamp.last;
+    }
+    return 't' +
+      (
+	'0000000000000000' + optT.toString(16)
+      ).substr(-16);
+  }
+  
+  function get(n, space) {
+    let t = timestamp();
+    let hs = space ? hash(space) : huser;
+    let kc = `${hs} ${n} current`;
+    let kt = `${hs} ${n} timestamp`;
+    let ot = iget(kt);
+    let o = iget(kc);
+
+    // if we have it, assume it's latest
+    if (o) {
+      return o;
+    }
+    // We don't know if it exists
+
+    // check replication update authority
+    // TODO: where the user got the ID from?
+    // guessing?
+    return `[load-get ${t} ${n} ${hs}]`;
+  }
+  // [load-get TS N HSPACE]
+  //   sends request and register callback
+  //   [wait TS 100 3000 get-wait TS N HSPACE]
+  // [wait TS MS LEFTMS FUN ARGS]
+  //   checks if UUID available, if not,
+  //   and not other jml evals, wait MS time.
+  //   when data received call:
+  //     [FUN ARGS]
+  //   if error/timeout call:
+  //     [FUN/error-timeout MSG ID FUN ARGS]
+  //   which if not exists will call:
+  //     [FUN/error CODE MSG ID FUN ARGS]
+  //   or, which most likely is bad:
+  //     [error FUN/error-timeout CODE MSG ID FUN ARGS]
+      
+  var hREPL = 'h0000000000000000'; // broadcast
+
+  // Sync can use lastStorage.length
+  // and compare, but order keeps changing
+  // so need to look at keys
+  // = search prefix and then sort
+
+  //  key: hSPACE NAME nTIMESTAMP
+  // data: hREST nOLDTIMESTAMP hUSER ... - VALUE
+
+  // replication log
+  
+  // -------- FORMAT:
+  //  hspace hts name: hcheck hots huser - data
+
+
+
+
+  // -----------------EMAIL------------------
+  // consider separating mail, msg, chat
+
+  // notifications: there is no reason we could
+  //   not notify about any ID! (like wiki update)
+  
+  // --------notify
+  //  hspace hts name: hcheck hots huser - data
+
+  // --------email
+
+  //    FROM: hFrom
+  //    DATE: ts
+  //      TO: hTo
+  // SUBJECT: ?
+  // msg
+  // >
+  
+  // --- use for messaging?
+  //  key: hREPL tTIMESTAMP hSPACE NAME
+  //         0        ts      to  'mail'
+  // data: hREST nOLDTIMESTAMP hUSER ... - VALUE
+  //         cs      pts       from        msg
+  // send email
+  //   put('mail', 'msg', 'to') user = from
+  //   => means versioned messages,
+  //      need to load
+  //
+  // How to mark read/unread?
+  // could possibly use 'pts' for new version
+  // but then each msg should have uniqe id
+  //   mail-hFROM-sSUBJECT
+  // for threading to work
+  //   mail-hSUBJECT-hFROM
+  // or just msgid
+  //   mail-hTS-hFROM-hSUBJECT
+  // groups should be their own "inbox"
+  //   but means, user read data need to be
+  //   stored per READER!
+
+  // msg-tTS-hFrom
+  // msg-tTS-hFrom-tTS-hFrom (a reply)
+  // msg-tTS-hFrom-read
+
+  // t15 jsk sends mail to peter
+  //   hjsk: msg-t15-hjsk -> MSG
+  //   hjsk: msg-t15-hjsk-status sent
+
+  // hpeter: msg-t15-hjsk -> MSG
+  // hpeter: msg-t15-hjsk-status -> unread
+
+  // t16 peter reads
+  // hpeter: msg-t15-hjsk-status -> read
+
+
+  // t17 peter replies
+  // hpeter: msg-t15-hjsk-status -> reply
+  // hpeter: msg-t15-hjsk-status-t17-hpeter -> MSG2
+
+  // hpeter: msg-t15-hjsk-status -> reply
+  //   hjsk: msg-t15-hjsk-status-t17-hpeter -> MSG2
+  //   hjsk: msg-t15-hjsk-status-t17-hpeter-status -> unread
+
+  // t18 jsk replies
+  // HMMMM?
+  //   hjsk: msg-t15-hjsk-status-t17-hpeter-status -> reply
+  //   hjsk: msg-t15-hjsk-status-t18-hjsk -> MSG3
+  //   hjsk: msg-t15-hjsk-status-t18-hjsk-status -> sent
+
+  // hpeter: msg-t15-hjsk-status-t18-hjsk -> MSG3
+  // hpeter: msg-t15-hjsk-status-t17-hjsk-status > unread
+
+  // doesn't able to retrieve children, only closure
+  
+  
+  // user facing
+  function put(n, v, space) {
+    // TODO: begin, identical to "get"
+    let t = timestamp();
+    let hs = space ? hash(space) : huser;
+    let kc = `${hs} ${n} current`;
+    let kt = `${hs} ${n} timestamp`;
+    let ot = iget(kt);
+    let o = iget(kc);
+    // TODO: end "merge" by helper?
+
+
+    // almost same as iget('hs n lex(ot)') after '- '
+    // if not found, we don't know if it's on server
+    // but it's an uninformed put meaning it's based
+    // on timestamp 0 information. Works well for
+    // creating unique messages.
+    if (ot === null) {
+      ot = timestamp(0);
+    }
+    
+    // - create value as a ledger
+    //   key: hSPACE NAME nTIMESTAMP
+    let kn = `${hs} ${n} ${t}`;
+    // if it's ever extended, add BEFORE ' - '
+    let d = `${ot} ${huser} - ${v}`;
+    //   data: hREST nOLDTIMESTAMP hUSER ... - VALUE
+    let data = `${hash(d, 8)} ${d}`;
+    //    key: hREPL tTIMESTAMP hSPACE NAME
+    let kr = `${hREPL} ${t} ${hs} ${n}`;
+
+    // update versioned store
+    // TODO: make transacational/atomic/recover
+    // - replication log
+    iput(kr, data);
+    // - local cache
+    iput(kn, data);
+    // - fast access current value
+    iput(kc, v);
+    iput(kt, t);
+  }
+  
+  function list(a, b, p) {
+  }
+  function search(a, b, q) {
   }
 
   function save() {
-      let x = dom2code('exp');
-      put('exp', x);
+    let x = dom2code('exp');
+    put('exp', x);
 
-      message('saved');
+    message('saved');
   }
   function load() {
-      let x = get('exp');
-      if (x != null)
-	  dom('exp', x, 'h');
-
-      message('loaded');
+    let x = get('exp');
+    if (x != null)
+      dom('exp', x, 'h');
+    
+    message('loaded');
   }
+
+
   document.addEventListener('visibilitychange', function doVis(e) {
       return;
       if (document.visibilityState == 'visible') {

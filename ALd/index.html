@@ -48,7 +48,7 @@
       // reset button color after awhile
       setTimeout(_=>bgcol(''), 3000);
     }
-    cbOK = cbOK || (t=>show(t, 'green'));
+    cbOK = cbOK || (t=>show('', 'green'));
     cbFail = cbFail || (t=>show(`(err ${r.status})<br/>${t}`, 'red'));
 
     r.onreadystatechange =

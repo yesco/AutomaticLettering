@@ -41,11 +41,19 @@ function jml(x, opts) {
       let fun = jml.f[f];
       let ff = f;
       // TODO: move out - too long!
+      //
       // if no fun backtrack:
       //     [foo-bar-fie-3 4 5]  becomes
-      //  => [foo-bar-fie 3 4 5] a.s.o.
-      while (!fun && ff.indexOf('-') >= 0) {
-	ff = ff.replace(/-([^\-]*)$/, (a)=>{
+      //  => [foo-bar fie 3 4 5] a.s.o.
+      //  => [foo bar fie 3 4 5] a.s.o.
+      //  => [error foo-bar-fie 3 4 5] a.s.o.
+      //
+      //  if have '/' in  path, don't go past
+      //     [foo-bar/fie-fum 3 4 5]
+      //  => [foo-bar/fie fum 3 4 5]
+      //  => [error foo-bar/fie-fum 3 4 5]
+      while (!fun && ff.match(/-[\/]*$/)) {
+	ff = ff.replace(/-([^\-\/]*)$/, (a)=>{
 	  args.unshift(a);
 	  return '';
 	});
@@ -265,10 +273,189 @@ function jml_init() {
     '</td></tr></table>';
   };
 
-  // system
-  jml.f.error = function(f, ...args) {
-//    console.error('jml.ERROR: no such function: ', f, ' args=', args);
-    return '<%%ERROR:' + f + ' ' + args + '%%>';
+  // IO
+
+  // TODO: same/similar function inside ALd/index.html
+  // send a request with id TID to URL path WHAT with DATA encoded as query parameters ('?')
+  //   TID    typically 'tXXXX...' a unique id
+  //   URL    like 'http://yesco.org/'
+  //   WHAT   like 'get' or ''
+  //   DATA   {a: 45, b:'foo'}
+  //   cbOK   optional called when recieved answer
+  //   cbFail optional called at error
+
+  //     cb(resptext, resp)
+  function sendjsonp(tid, url, what, data, cbOK, cbFail) {
+    sendjsonp[tid] = {
+      tid: tid,
+      url: url,
+      what: what,
+      data: data,
+      cbOK: cbOK,
+      cbFail: cbFail
+    };
+
+    function show(status) {
+      console.info(`send: ${status} for ${tid} of ${what} ${data}`);
+    }
+    cbOK = cbOK || (t=>show(t));
+    cbFail = cbFail || (t=>show(`(err ${r.status}) ${t}`, 'red'));
+
+    let r = document.createElement('script');
+    sendjsonp[tid].scriptdom = r;
+
+    // build url
+    let u = new URL(url + what);
+    if (data) 
+      for (const k in data)
+	u.searchParams.append(k, data[k]);
+
+    if (!u.searchParams.get('jsonp')) {
+      u.searchParams.append('jsonp', 'window.jmlrecvjsonp');
+    }
+
+    // ask for it
+    r.src = u.href;
+    document.body.appendChild(r);
+  }
+  
+  window.jmlrecvjsonp = function recvjsonp(tid, data) {
+    alert(`recvjsonp: ${tid} data=${data}<`);
+    let req = sendjsonp[tid];
+    console.info(`recvjsonp: ${tid} ${data}`);
+
+    let cbOK = req.cbOK;
+    cbOK(data, { status: '200' });
+
+    // TODO: how to detect error?
+    // cbFail(data, { status: '404' });
+
+    // cleanup - remove script tag
+    let r = req.scriptdom;
+    r.parentNode.removeChild(r);
+    delete sendjsonp[tid];
+
+    return data;
+  }
+
+
+  function send(tid, url, what, data, cbOK, cbFail) {
+    send[tid] = {
+      tid: tid,
+      url: url,
+      what: what,
+      data: data,
+      cbOK: cbOK,
+      cbFail: cbFail
+    };
+
+    let r = new XMLHttpRequest();
+    function show(status) {
+      console.info(`send: ${status} for ${tid} of ${what} ${data}`);
+    }
+    cbOK = cbOK || (t=>show(t));
+    cbFail = cbFail || (t=>show(`(err ${r.status}) ${t}`, 'red'));
+
+    r.onreadystatechange =
+      function() {
+	if (r.readyState==4) {
+	  // TODO: handle redirects?
+	  if (r.status==200)
+	    cbOK(r.responseText, r);
+	  else
+	    cbFail(r.responseText, r);
+	}
+      };
+
+    // build url
+    let u = new URL(url + what);
+    if (data) 
+      for (const k in data)
+	u.searchParams.append(k, data[k]);
+
+    // ask for it
+    r.open('GET', u.href, true);
+
+    // xhr.onload = function () {
+    // Request finished. Do processing here.
+    // };
+
+    // xhr.timeout = 2000; // time in milliseconds
+    // xhr.ontimeout = function (e) {
+    // XMLHttpRequest timed out. Do something here.
+    // };
+    
+    // send data to server
+    // r.setRequestHeader('Content-Type', 'text/xml');
+    // r.send(xml); // also concludes request
+    try {
+      let res = r.send(null);
+      console.info("send: result", res);
+    } catch (e) {
+      console.error("send: error", e);
+    }
+  }
+
+  
+  function wakeup(tid) {
+    // call when id resolved
+  }
+  
+  let wait_result = {}; // tid -> result
+
+  jml.f.send = function(tid, url, fun, ...args) {
+    return sendinternal(send, tid, url, fun, ...args);
+  }
+
+  jml.f.sendjsonp = function(tid, url, fun, ...args) {
+    return sendinternal(sendjsonp, tid, url, fun, ...args);
+  }
+
+  function sendinternal(sender, tid, url, fun, ...args) {
+
+    let ARGS = args.join(' ');
+    if (!fun) fun = 'identity';
+    console.info(`[send ${tid} ${url} ${fun} ${ARGS}]`);
+    sender(tid, url, '', null,
+	 (txt,res)=>{
+	   wait_result[tid] = `[${fun} ${ARGS} ${txt}]`;
+	   wakeup(tid);
+	 },
+	 (err,res)=>{
+	   wait_result[tid] = `[${fun}/error ${ARGS} ${err}]`;
+	   wakeup(tid);
+	 }
+	);
+    return `[wait ${tid} 0 ${fun} ${ARGS}]`;
   };
+  jml.f.wait = function(tid, count, fun, ...args) {
+    let r = wait_result[tid];
+
+    // update
+    if (r !== null && r !== undefined) {
+      wait_result[tid] == '';
+      return r;
+    }
+    
+    // wait more again
+    let ARGS = args.join(' ');
+    count++;
+    return `[wait ${tid} ${count} ${fun} ${ARGS}]`;
+  };
+  
+  // -- library
+  jml.f.ignore = _=>'';
+  jml.f.identity= (...args)=>args.join(' ');
+  
+  // -- system
+  function error(f, args) {
+    let r = '<%%ERROR:' + f + ' ' + args + '%%>';
+    console.error('JML:', r);
+    return r;
+  }
+  jml.f.error = function(f, ...args) {
+    error(f, args);
+  };
+
   jml.f.fun = (n)=>'<pre style="text-align:let;">'+quoteHTML(''+jml.f[n])+'</pre>';
 }
