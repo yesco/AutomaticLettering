@@ -133,6 +133,10 @@ aaa += 'e2';
 	// do we want timestamp?
 	dom('DBGout', args, 'ta', 'color: black');
     }
+    console.html = function(...args) {
+	// do we want timestamp?
+	dom('DBGout', args, 'hta', 'color: black');
+    }
     console.error = function(...args) {
 	// TODO: count errors and show them even if visualized, zero at view
 	print(args, 'color: red;');

@@ -288,6 +288,10 @@ span:nth-child(4n+3) { color: gold; }
     if (c && !a && k=='b') run('back');
     if (c && a && k=='b') run('beginning');
 
+    if (c && !a && k=='l') {
+      DBG.toggle('DBG', true);
+      dump();
+    }
     // TODO: structure editor
     // TODO: insert box for function
     if (k == '(') message('open paren');
@@ -333,11 +337,47 @@ span:nth-child(4n+3) { color: gold; }
 
   function dump() {
     let ls = localStorage;
-    for(let i=0; i<ls.length; i++) {
-      let k = ls.key(i);
-      //console.log(`${i}\t${k}\t${ls.getItem(k)}`);
-      console.log(`i=${i}\nkey=${k}<\ndata=${ls.getItem(k)}<`);
-    }
+    let keys = [];
+    for(let i=0; i<ls.length; i++)
+      keys.push(ls.key(i))
+    keys.sort();
+
+    let r = '<pre>';
+    let last;
+    keys.forEach(key=>{
+      let data = ls.getItem(key);
+      let s = key + ' ' + data.replace(/ - (.*)/, (_,x)=>x.replace(/ /g, '+'));;
+      let a = s.split(' ');
+
+      if (last && a.length != last.length)
+	last = undefined;
+
+      if (!last) {
+	r += `<b>${key}</b> ${data}\n`;
+      } else {
+	for(let i=0; i<a.length; i++) {
+	  if (a[i] === last[i])
+	    r += `[${i}] `;
+	  else {
+	    //if (i == 0) r += `\n${i}A:${a[i]}\n${i}B:${last[i]}\n`;
+	    let found = false;
+	    for(let j=0; j<a.length; j++) {
+	      if (a[i] === last[j]) {
+		r += `[${j}] `;
+		found = true;
+		break;
+	      }
+	    }
+	    if (!found) r += a[i] + ' ';
+	  }
+	}
+	r += '\n';
+      }
+      last = a;
+    });
+    
+    let n = r.length;
+    console.html(r+`</pre>\n${n} bytes<br/>`);
   }
 
   var user = '';
@@ -375,8 +415,8 @@ span:nth-child(4n+3) { color: gold; }
   function get(n, space, tid) {
     tid = tid || timestamp();
     let hs = space ? hash(space) : huser;
-    let kc = `${hs} ${n} current`;
-    let kt = `${hs} ${n} timestamp`;
+    let kc = `${hs} ${n} current value`;
+    let kt = `${hs} ${n} current timestamp`;
     let ot = iget(kt);
     let o = iget(kc);
 
@@ -530,8 +570,8 @@ span:nth-child(4n+3) { color: gold; }
     // TODO: begin, identical to "get"
     let tid = timestamp();
     let hs = space ? hash(space) : huser;
-    let kc = `${hs} ${n} current`;
-    let kt = `${hs} ${n} timestamp`;
+    let kc = `${hs} ${n} current value`;
+    let kt = `${hs} ${n} current timestamp`;
     let ot = iget(kt);
     let o = iget(kc);
     // TODO: end "merge" by helper?
@@ -556,6 +596,8 @@ span:nth-child(4n+3) { color: gold; }
     //    key: hREPL tTIMESTAMP hSPACE NAME
     let kr = `${hREPL} ${tid} ${hs} ${n}`;
 
+    // TODO: handle overflow
+    // https://developer.mozilla.org/en-US/docs/Web/API/Web_Storage_API/Using_the_Web_Storage_API
     // update versioned store
     // TODO: make transacational/atomic/recover
     // - replication log
