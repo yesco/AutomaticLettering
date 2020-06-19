@@ -343,6 +343,33 @@ span:nth-child(4n+3) { color: gold; }
     keys.sort();
 
     let r = '<pre>';
+    let last, cur;
+    keys.forEach(key=>{
+      let a = (last || '').split(' ');
+      last = cur;
+
+      let data = ls.getItem(key);
+      cur = key + ': ' + data;
+
+      last && a && a.forEach((x,i)=>{
+	cur = cur.replace(x, `[${i}]`);
+      });
+
+      r += cur;
+    });
+
+    let n = r.length;
+    console.html(r+`</pre>\n${n} bytes<br/>`);
+  }
+
+  function olddump() {
+    let ls = localStorage;
+    let keys = [];
+    for(let i=0; i<ls.length; i++)
+      keys.push(ls.key(i))
+    keys.sort();
+
+    let r = '<pre>';
     let last;
     keys.forEach(key=>{
       let data = ls.getItem(key);
