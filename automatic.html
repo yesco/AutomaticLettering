@@ -372,8 +372,8 @@ span:nth-child(4n+3) { color: gold; }
       ).substr(-16);
   }
   
-  function get(n, space) {
-    let t = timestamp();
+  function get(n, space, tid) {
+    tid = tid || timestamp();
     let hs = space ? hash(space) : huser;
     let kc = `${hs} ${n} current`;
     let kt = `${hs} ${n} timestamp`;
@@ -389,8 +389,9 @@ span:nth-child(4n+3) { color: gold; }
     // check replication update authority
     // TODO: where the user got the ID from?
     // guessing?
-    return `[load-get ${t} ${n} ${hs}]`;
+    return `[loadget ${tid} ${hs} ${n}]`;
   }
+
   // [load-get TS N HSPACE]
   //   sends request and register callback
   //   [wait TS 100 3000 get-wait TS N HSPACE]
@@ -413,15 +414,40 @@ span:nth-child(4n+3) { color: gold; }
   // so need to look at keys
   // = search prefix and then sort
 
-  //  key: hSPACE NAME nTIMESTAMP
-  // data: hREST nOLDTIMESTAMP hUSER ... - VALUE
+  // - Public Spaces
+  // hUsers hUSER name: Your Name
+  // hUsers hUSER address: address
+  // hUsers hUSER address: address
 
-  // replication log
+  // - Space
+  // hSPACE NAME current: VALUE
+  // hSPACE NAME timestamp: nTS
+  // hSPACE NAME nTS: DATA
+  //   (DATA = hREST nOLDTS hUSER ... - VALUE)
+
+  // ---- Workspace (configuration)
+  // hSPACE work WORK exp: VALUE
+  // hSPACE work WORK bases: WORK ...
+  // hSPACE work WORK join: hSPACE1 hjsk ...
+  // hSPACE work WORK join: [space SPACE1] [space jsk] ...
+  // hSPACE work WORK define pet: hpeter
+  // hSPACE work WORK define a: haronsson
+  //   [haronsson:fac ..]
+  //   [a;fac ..]
+
+  //   [hpeter:fac ..]
+  //   [pet:fac ...]p
+
+  //   [fac ...] is either hSPACE1 hjsk ...
+  //   [hSPACE:fac ...]
+  //   [hSPACE1:fac ...]
+  //   [hjsk:fac ...]
   
+  // - Replication/Messaging
+  // R hREPL tTS hSPACE NAME : DATA
+  
+
   // -------- FORMAT:
-  //  hspace hts name: hcheck hots huser - data
-
-
 
 
   // -----------------EMAIL------------------
@@ -502,7 +528,7 @@ span:nth-child(4n+3) { color: gold; }
   // user facing
   function put(n, v, space) {
     // TODO: begin, identical to "get"
-    let t = timestamp();
+    let tid = timestamp();
     let hs = space ? hash(space) : huser;
     let kc = `${hs} ${n} current`;
     let kt = `${hs} ${n} timestamp`;
@@ -522,13 +548,13 @@ span:nth-child(4n+3) { color: gold; }
     
     // - create value as a ledger
     //   key: hSPACE NAME nTIMESTAMP
-    let kn = `${hs} ${n} ${t}`;
+    let kn = `${hs} ${n} ${tid}`;
     // if it's ever extended, add BEFORE ' - '
     let d = `${ot} ${huser} - ${v}`;
     //   data: hREST nOLDTIMESTAMP hUSER ... - VALUE
     let data = `${hash(d, 8)} ${d}`;
     //    key: hREPL tTIMESTAMP hSPACE NAME
-    let kr = `${hREPL} ${t} ${hs} ${n}`;
+    let kr = `${hREPL} ${tid} ${hs} ${n}`;
 
     // update versioned store
     // TODO: make transacational/atomic/recover
@@ -539,6 +565,7 @@ span:nth-child(4n+3) { color: gold; }
     // - fast access current value
     iput(kc, v);
     iput(kt, t);
+    return '[storeput ${tid} ${hs} ${n} ${v}]';
   }
   
   function list(a, b, p) {

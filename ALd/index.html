@@ -15,12 +15,12 @@
        {msg: msg, user: user});
   }
   function sendGet(id, user) {
-    alert(`get: ${id} ${user}`);
+    //alert(`get: ${id} ${user}`);
     send('get',
        {id: id, user: user});
   }
   function sendPut(id, data, user) {
-    alert(`put: ${id} ${data} ${user}`);
+    //alert(`put: ${id} ${data} ${user}`);
     send('put',
        {id: id, data: data, user: user});
   }
@@ -48,7 +48,7 @@
       // reset button color after awhile
       setTimeout(_=>bgcol(''), 3000);
     }
-    cbOK = cbOK || (t=>show('', 'green'));
+    cbOK = cbOK || (t=>show(t, 'green'));
     cbFail = cbFail || (t=>show(`(err ${r.status})<br/>${t}`, 'red'));
 
     r.onreadystatechange =
@@ -61,7 +61,8 @@
 	}
       };
 
-    let u = new URL(location.href+what);
+    let u = new URL(location.href);
+    u.pathname = what;
     for (const k in data)
       u.searchParams.append(k, data[k]);
 

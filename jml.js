@@ -275,6 +275,26 @@ function jml_init() {
 
   // IO
 
+  // TOOO: make better
+  function qqq(s) {
+    return s.replace(/\s/g, '+')
+      .replace(/"/g, '\\"');
+  }
+
+  jml.f['authoritive-source'] = 'http://192.168.44.1:8080';
+  jml.f.loadget = (tid, hs, n)=>`[sendjsonp ${tid} hs [authoritive-source]/get?hs=${hs}&id=${n}]`;
+  // TODO: need quote v
+  jml.f.storeput = (tid, hs, n, ...v)=>`[sendjsonp ${tid} hs [authoritive-source]/pu?hs=${hs}&id=${n}&data={v.join('+')}]`;
+
+  jml.f.get = get;
+  jml.f.put = put;
+  jml.f.list = ()=>`[sendjsonp t0 http://192.168.44.1:8080/list?]`;
+  
+  //jml.f.get = (n)=>`[sendjsonp t0 http://192.168.44.1:8080/get?id=${n}]`;
+  //jml.f.put = (n,...v)=>`[sendjsonp t0 http://192.168.44.1:8080/put?id=${n}&data=${qqq(v.join(' '))}]`;
+  //jml.f.list = ()=>`[sendjsonp t0 http://192.168.44.1:8080/list?]`;
+
+
   // TODO: same/similar function inside ALd/index.html
   // send a request with id TID to URL path WHAT with DATA encoded as query parameters ('?')
   //   TID    typically 'tXXXX...' a unique id
@@ -285,8 +305,9 @@ function jml_init() {
   //   cbFail optional called at error
 
   //     cb(resptext, resp)
-  function sendjsonp(tid, url, what, data, cbOK, cbFail) {
-    sendjsonp[tid] = {
+  function isendjsonp(tid, url, what, data, cbOK, cbFail) {
+    console.log('isendjsonp: 1');
+    isendjsonp[tid] = {
       tid: tid,
       url: url,
       what: what,
@@ -302,7 +323,8 @@ function jml_init() {
     cbFail = cbFail || (t=>show(`(err ${r.status}) ${t}`, 'red'));
 
     let r = document.createElement('script');
-    sendjsonp[tid].scriptdom = r;
+    isendjsonp[tid].scriptdom = r;
+    console.log('isendjsonp: 2');
 
     // build url
     let u = new URL(url + what);
@@ -310,18 +332,24 @@ function jml_init() {
       for (const k in data)
 	u.searchParams.append(k, data[k]);
 
+    console.log('isendjsonp: 3', u.href);
     if (!u.searchParams.get('jsonp')) {
       u.searchParams.append('jsonp', 'window.jmlrecvjsonp');
     }
+    console.log('isendjsonp: 4', u.href);
+    if (!u.searchParams.get('tid')) {
+      u.searchParams.append('tid', tid);
+    }
 
+    console.log('isendjsonp: 5', u.href);
     // ask for it
     r.src = u.href;
     document.body.appendChild(r);
+    console.log('isendjsonp: 6', u.href);
   }
   
   window.jmlrecvjsonp = function recvjsonp(tid, data) {
-    alert(`recvjsonp: ${tid} data=${data}<`);
-    let req = sendjsonp[tid];
+    let req = isendjsonp[tid];
     console.info(`recvjsonp: ${tid} ${data}`);
 
     let cbOK = req.cbOK;
@@ -333,13 +361,13 @@ function jml_init() {
     // cleanup - remove script tag
     let r = req.scriptdom;
     r.parentNode.removeChild(r);
-    delete sendjsonp[tid];
+    delete isendjsonp[tid];
 
     return data;
   }
 
 
-  function send(tid, url, what, data, cbOK, cbFail) {
+  function isend(tid, url, what, data, cbOK, cbFail) {
     send[tid] = {
       tid: tid,
       url: url,
@@ -373,6 +401,10 @@ function jml_init() {
       for (const k in data)
 	u.searchParams.append(k, data[k]);
 
+    if (tid && !u.searchParams.get('tid')) {
+      u.searchParams.append('tid', tid);
+    }
+
     // ask for it
     r.open('GET', u.href, true);
 
@@ -404,28 +436,42 @@ function jml_init() {
   let wait_result = {}; // tid -> result
 
   jml.f.send = function(tid, url, fun, ...args) {
-    return sendinternal(send, tid, url, fun, ...args);
+    return sendinternal(isend, tid, url, fun, ...args);
   }
 
   jml.f.sendjsonp = function(tid, url, fun, ...args) {
-    return sendinternal(sendjsonp, tid, url, fun, ...args);
+    console.log('sendjsonp: 1');
+    let r;
+    try {
+      r = sendinternal(isendjsonp, tid, url, fun, ...args);
+      console.log('sendjsonp: 2');
+    } catch (e) {
+      console.error('sendjsonp: ', ''+e);
+    }
+    return r;
   }
 
   function sendinternal(sender, tid, url, fun, ...args) {
-
+    console.log('sendinternal: 1');
     let ARGS = args.join(' ');
     if (!fun) fun = 'identity';
     console.info(`[send ${tid} ${url} ${fun} ${ARGS}]`);
+    console.log('sendinternal: 2');
     sender(tid, url, '', null,
 	 (txt,res)=>{
+	   console.log('sendinternal: OK');
+	   if (txt === null || txt === undefined)
+	     fun += '-null';
 	   wait_result[tid] = `[${fun} ${ARGS} ${txt}]`;
 	   wakeup(tid);
 	 },
 	 (err,res)=>{
+	   console.log('sendinternal: Fail');
 	   wait_result[tid] = `[${fun}/error ${ARGS} ${err}]`;
 	   wakeup(tid);
 	 }
 	);
+    console.log('sendinternal: 3');
     return `[wait ${tid} 0 ${fun} ${ARGS}]`;
   };
   jml.f.wait = function(tid, count, fun, ...args) {
