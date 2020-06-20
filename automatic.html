@@ -462,6 +462,8 @@ span:nth-child(4n+3) { color: gold; }
     // check replication update authority
     // TODO: where the user got the ID from?
     // guessing?
+
+    // get from old style server
     return `[loadget ${tid} ${hs} ${n}]`;
   }
 
@@ -637,8 +639,9 @@ span:nth-child(4n+3) { color: gold; }
     iput(kn, data);
     // - fast access current value
     iput(kc, v);
-    iput(kt, t);
-    return '[storeput ${tid} ${hs} ${n} ${v}]';
+    iput(kt, tid);
+    // send to old style server
+    return `[storeput ${tid} ${hs} ${n} ${v}]`;
   }
   
   function list(a, b, p) {
@@ -973,12 +976,17 @@ OLD
     // TODO: bad hack, because unprettyfy doe6sn't work! it looses spaces!
     if (!x) x = dom2code('exp');
 
-    let r = jml(x, how);
-    if (r === x) {
-      // finished
-      run('break');
-    } else {
-      update(r);
+    // 
+    try {
+      let r = jml(x, how);
+      if (r === x) {
+	// finished
+	run('break');
+      } else {
+	update(r);
+      }
+    } catch (e) {
+      console.error('run.jml.error: ', e);
     }
     
     if (!run.undo.length

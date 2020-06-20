@@ -101,6 +101,8 @@ function jml(x, opts) {
 	fun = jml.f[ff];
       }
       if (!fun) return '[error ' + inside + ']';
+      if (typeof fun !== 'function')
+	console.error('jml:fun not function:', fun);;
       return '' + fun.apply(undefined, args);
     });
     if (oTrace) console.info(n, '!', x);
@@ -321,7 +323,8 @@ function jml_init() {
       .replace(/"/g, '\\"');
   }
 
-  jml.f['authoritive-source'] = 'http://192.168.44.1:8080';
+  // TODO: make it take a hash
+  jml.f['server']=hSPACE_=>'http://192.168.44.1:8080';
   // [load-get TS N HSPACE]
   //   sends request and register callback
   //   [wait TS 100 3000 get-wait TS N HSPACE]
@@ -336,17 +339,17 @@ function jml_init() {
   //     [FUN/error CODE MSG ID FUN ARGS]
   //   or, which most likely is bad:
   //     [error FUN/error-timeout CODE MSG ID FUN ARGS]
-  jml.f.loadget = (tid, hs, n)=>`[sendjsonp ${tid} hs [authoritive-source]/get?hs=${hs}&id=${n}]`;
+  jml.f.loadget = (tid, hspace, n)=>`[sendjsonp ${tid} [server]/get?hspace=${hspace}&id=${n}]`;
   // TODO: need quote v
-  jml.f.storeput = (tid, hs, n, ...v)=>`[sendjsonp ${tid} hs [authoritive-source]/pu?hs=${hs}&id=${n}&data={v.join('+')}]`;
+  jml.f.storeput = (tid, hspace, n, ...v)=>`[sendjsonp ${tid} [server]/put?hspace=${hspace}&id=${n}&data={v.join('+')}]`;
 
   jml.f.get = get;
   jml.f.put = put;
-  jml.f.list = ()=>`[sendjsonp t0 http://192.168.44.1:8080/list?]`;
+  jml.f.list = (hspace)=>`[sendjson [timestamp] [server]/list?hspace={hspace}]`;
   
-  //jml.f.get = (n)=>`[sendjsonp t0 http://192.168.44.1:8080/get?id=${n}]`;
-  //jml.f.put = (n,...v)=>`[sendjsonp t0 http://192.168.44.1:8080/put?id=${n}&data=${qqq(v.join(' '))}]`;
-  //jml.f.list = ()=>`[sendjsonp t0 http://192.168.44.1:8080/list?]`;
+  //jml.f.get = (n)=>`[isendjsonp t0 http://192.168.44.1:8080/get?id=${n}]`;
+  //jml.f.put = (n,...v)=>`[isendjsonp t0 http://192.168.44.1:8080/put?id=${n}&data=${qqq(v.join(' '))}]`;
+  //jml.f.list = ()=>`[isendjsonp t0 http://192.168.44.1:8080/list?]`;
 
 
   // TODO: same/similar function inside ALd/index.html
