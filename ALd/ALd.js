@@ -30,6 +30,7 @@ function OnStart() {
   ws.AddServlet('/get', onGet);
   ws.AddServlet('/put', onPut);
   ws.AddServlet('/list', onList);
+  ws.AddServlet('/update', onUpdate);
   ws.Start();
 
   app.OpenUrl(url);
@@ -73,6 +74,13 @@ function onList(req,  info) {
   app.ShowPopup(JSON.stringify(db));
   back(req, Object.keys(db).join(' '));
 }
+
+function onUpdate(req,  info) {
+  app.ShowPopup(JSON.stringify(req.data));
+  console.log('DATA=', req.data);
+  back(req, 'whoho!');
+}
+
 
 // on nodejs command line - a simple shim
 if (typeof require !== 'undefined') {
@@ -177,23 +185,28 @@ if (typeof require !== 'undefined') {
 	req.path = u.pathname;
 	
 	// handle it
-	try {
-	  let h = ws[path];
-	  console.log('  ', h);
-	  ws.response = '';
-	  h(req, resp);
-	  console.log('  =>', ws.response);
-	  resp.end(ws.response);
-	} catch (e) {
-	  console.error(e);
+	let h = ws[path];
+	if (h) {
 	  try {
-	    if (path == '/') path = '/index.html';
-	    if (path.match(/(\.\.|\/\/)/)) throw 'Insecure path: ' + path;
-	    resp.end(fs.readFileSync(ws.dir + path));
-	  } catch(e) {
+	    console.log('  ', h);
+	    ws.response = '';
+	    h(req, resp);
+	    console.log('  =>', ws.response);
+	    resp.end(ws.response);
+	    return;
+	  } catch (e) {
 	    console.error(e);
-	    resp.end(`No such path: ${path} !`);
 	  }
+	}
+	try {
+	  if (path == '/') path = '/index.html';
+	  if (path.match(/(\.\.|\/\/)/)) throw 'Insecure path: ' + path;
+	  resp.end(fs.readFileSync(ws.dir + path));
+	  return;
+	} catch(e) {
+	  console.error(e);
+	  resp.end(`No such path: ${path} !`);
+	  return;
 	}
       }).listen(port, e=>e?console.error(e):0),
 

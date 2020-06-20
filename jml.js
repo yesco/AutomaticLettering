@@ -600,7 +600,6 @@ function jml_init() {
   jml.replQ = [];
 
   jml.f.updatefacts = (hspace)=>{
-    console.error('Q=', jml.replQ.length)
     // update locally
     jml.replQ.forEach(e=>{
     });
@@ -615,11 +614,10 @@ function jml_init() {
       data.push(d);
     });
 
-    console.log('data=', JSON.stringify(data));
-    let v = data.join('\n');
-    console.log('v=', v);
-    // send our replQ
-    // wait for reply
+    let json = encodeURI(JSON.stringify(jml.replQ))
+	.replace(/[\(\)]/, c=>`%${c.charCodeAt(0).toString(16)}`);
+
+    return `[sendjsonp ${ts} [server]/update?data=${json} updatefactsrecv ${ts}]`;
     return `[updatefactsrecv <pre>\n${v}</pre>]`;
   };
 
