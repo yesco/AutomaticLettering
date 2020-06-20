@@ -482,7 +482,6 @@ function jml_init() {
     }
   }
 
-  
   function wakeup(tid) {
     // call when id resolved
   }
@@ -553,6 +552,30 @@ function jml_init() {
   jml.f.identity= (...args)=>args.join(' ');
   
   // -- system
+  // tHEX of fixed length
+  function timestamp(optT) {
+    if (optT === undefined) {
+      optT = Date.now();
+      // make sure unique (PER USER),
+      // (then should add machine id...)
+      // if too much data
+      // means timestamp is "fake"
+      // should we mark it, or add extra
+      // digit? considering that most browsers
+      // only give in resolution of 20-100ms
+      // maybe it's ok...
+      if (optT <= timestamp.last)
+	optT = ++timestamp.last;
+    } else {
+      optT = +optT;
+    }
+    return 't' +
+      (
+	'0000000000000000' + optT.toString(16)
+      ).substr(-16);
+  }
+  jml.f.timestamp = optT=>timestamp(optT);
+  
   function error(f, args) {
     let r = '<%%ERROR:' + f + ' ' + args + '%%>';
     console.error('JML:', r);
