@@ -7,6 +7,28 @@
 // - It's live extensible inside itself
 // - Only state is external
 // - Database: keyword put/get usng localStorage
+
+// TODO-----------
+// 1 - facts = store
+// {NAME VALUE} -> {hUSER:NAME VALUE}
+// {SPACE:NAME VALUE} -> {hSPACE:NAME VALUE}
+// {hSPACE:NAME VALUE} -> fact(tid, n, v)
+// {fun ^a^b BODY} -> {fun ^a^b BODY}
+//
+// 2 - immediate = macro pre-processor!
+// (subst #TS# (timestamp) ...) !
+// (timestamp ...#TS#...) = transaction/group
+// (table tbody) (td t) (tr t)
+//
+// 3 - last = future
+// [fact NAME VALUE] -> ... -> fact()
+//
+// - GET?
+// [NAME ...] -> [hUSER:NAME ...]
+// [*NAME ...] -> try path...
+// [SPACE:NAME ...] -> [hSPACE:NAME ...]
+// [hSPACE:NAME ...] -> getfact()
+
 function jml(x, opts) {
   // TODO: if called with a dom element
   //   traverse it and run on whole TextNodes
@@ -39,6 +61,24 @@ function jml(x, opts) {
       let args = inside.split(/\s+/g);
       let f = args.shift();
       let fun = jml.f[f];
+
+      // TODO: make real
+      function hash(s) {
+	// we're good to a few millon values.. lol
+	// at 4 billion => 40% chance of collision
+	// https://www.johndcook.com/blog/2017/01/10/probability-of-secure-hash-collisions/#:~:text=As%20a%20rule%20of%20thumb,or%20about%204%20billion%20items.
+	return 'hSPACESPACESPACEX'
+	return 'hBADSASSSBADSASSS';
+      }
+      // not built-in/cashed
+      if (!fun && f[0]!='h') {
+	let r = all.replace(
+	  /^(.*):/, space=>{
+	    if (space.startsWith('h') && space.length===17) return space;
+	    return `[load-fact ${hash(space)}]`;
+	  });
+	if (r != all) return r; // come back
+      }
       let ff = f;
       // TODO: move out - too long!
       //
@@ -282,6 +322,20 @@ function jml_init() {
   }
 
   jml.f['authoritive-source'] = 'http://192.168.44.1:8080';
+  // [load-get TS N HSPACE]
+  //   sends request and register callback
+  //   [wait TS 100 3000 get-wait TS N HSPACE]
+  // [wait TS MS LEFTMS FUN ARGS]
+  //   checks if UUID available, if not,
+  //   and not other jml evals, wait MS time.
+  //   when data received call:
+  //     [FUN ARGS]
+  //   if error/timeout call:
+  //     [FUN/error-timeout MSG ID FUN ARGS]
+  //   which if not exists will call:
+  //     [FUN/error CODE MSG ID FUN ARGS]
+  //   or, which most likely is bad:
+  //     [error FUN/error-timeout CODE MSG ID FUN ARGS]
   jml.f.loadget = (tid, hs, n)=>`[sendjsonp ${tid} hs [authoritive-source]/get?hs=${hs}&id=${n}]`;
   // TODO: need quote v
   jml.f.storeput = (tid, hs, n, ...v)=>`[sendjsonp ${tid} hs [authoritive-source]/pu?hs=${hs}&id=${n}&data={v.join('+')}]`;
@@ -472,21 +526,26 @@ function jml_init() {
 	 }
 	);
     console.log('sendinternal: 3');
-    return `[wait ${tid} 0 ${fun} ${ARGS}]`;
+    return `[wait ${tid} 0 0 ${fun} ${ARGS}]`;
   };
-  jml.f.wait = function(tid, count, fun, ...args) {
+  jml.f.wait = function(tid, count, ms, fun, ...args) {
     let r = wait_result[tid];
 
     // update
     if (r !== null && r !== undefined) {
       wait_result[tid] == '';
+      // passing around fun/args is redundant
+      // but good for debugging?
       return r;
     }
     
     // wait more again
     let ARGS = args.join(' ');
     count++;
-    return `[wait ${tid} ${count} ${fun} ${ARGS}]`;
+    console.log('TID=', tid);
+    let start = parseInt(tid.substring(1), 16);
+    ms = Date.now() - start;
+    return `[wait ${tid} ${count} ${ms} ${fun} ${ARGS}]`;
   };
   
   // -- library

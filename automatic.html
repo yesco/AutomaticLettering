@@ -343,19 +343,24 @@ span:nth-child(4n+3) { color: gold; }
     keys.sort();
 
     let r = '<pre>';
-    let last, cur;
+    let last='', cur='';
     keys.forEach(key=>{
-      let a = (last || '').split(' ');
-      last = cur;
+      last = last.replace(/ - .*/, '');
+      let a = last.split(/[ :]/);
 
       let data = ls.getItem(key);
-      cur = key + ': ' + data;
+      let s = cur = key + ': ' + data;
+      //r += s + '\n';
 
       last && a && a.forEach((x,i)=>{
-	cur = cur.replace(x, `[${i}]`);
+	if (x && x.length > 8)
+	  s = s.replace(x, `[${i}]`);
       });
 
-      r += cur;
+      s = '<b>' + s.replace(':', ':</b>');
+      r += s + '\n';
+
+      last = cur;
     });
 
     let n = r.length;
@@ -459,23 +464,21 @@ span:nth-child(4n+3) { color: gold; }
     return `[loadget ${tid} ${hs} ${n}]`;
   }
 
-  // [load-get TS N HSPACE]
-  //   sends request and register callback
-  //   [wait TS 100 3000 get-wait TS N HSPACE]
-  // [wait TS MS LEFTMS FUN ARGS]
-  //   checks if UUID available, if not,
-  //   and not other jml evals, wait MS time.
-  //   when data received call:
-  //     [FUN ARGS]
-  //   if error/timeout call:
-  //     [FUN/error-timeout MSG ID FUN ARGS]
-  //   which if not exists will call:
-  //     [FUN/error CODE MSG ID FUN ARGS]
-  //   or, which most likely is bad:
-  //     [error FUN/error-timeout CODE MSG ID FUN ARGS]
-      
+  // REPLICATION - how does replication work?
   var hREPL = 'h0000000000000000'; // broadcast
 
+  // any updates are with same timestamp
+  // timestamp updated every run invocation?
+  // means single step would differ :-(
+  // maybe opt pass in TS?
+  // [fact NAME VALUE] -> 
+  // [fact hSPACE:NAME VALUE]
+  // 1. fact, or {} calls fact(), which logs and push on process queue
+  // 2. at end of copy facts to localStorage
+  // 3. then replicate (send to server)
+  //    this could be put at top->wait! for users to see
+  //    [wait TID 0 stateupdate TID]
+  
   // Sync can use lastStorage.length
   // and compare, but order keeps changing
   // so need to look at keys
