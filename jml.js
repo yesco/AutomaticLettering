@@ -341,10 +341,10 @@ function jml_init() {
   //     [error FUN/error-timeout CODE MSG ID FUN ARGS]
   jml.f.loadget = (tid, hspace, n)=>`[sendjsonp ${tid} [server]/get?hspace=${hspace}&id=${n}]`;
   // TODO: need quote v
-  jml.f.storeput = (tid, hspace, n, ...v)=>`[sendjsonp ${tid} [server]/put?hspace=${hspace}&id=${n}&data={v.join('+')}]`;
+  jml.f.storeput = (tid, hspace, n, ...v)=>`[sendjsonp ${tid} [server]/put?hspace=${hspace}&id=${n}&data=${v.join('+')}]`;
 
   jml.f.get = get;
-  jml.f.put = put;
+  jml.f.put = (k,...v)=>put(k, v.join(' '));
   jml.f.list = (hspace)=>`[sendjson [timestamp] [server]/list?hspace={hspace}]`;
   
   //jml.f.get = (n)=>`[isendjsonp t0 http://192.168.44.1:8080/get?id=${n}]`;
