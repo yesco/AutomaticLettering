@@ -42,6 +42,8 @@ function jml(x, opts) {
     if (oTick) oStep = true;
   }
   let start = Date.now();
+  // timestamp to be used for interactions
+  jml.timestamp = timestamp(start);
 
   if (typeof jml.init === 'undefined')jml_init();
   if (typeof x === undefined) return;
@@ -550,6 +552,87 @@ function jml_init() {
     return `[wait ${tid} ${count} ${ms} ${fun} ${ARGS}]`;
   };
   
+  // -- replacation of facts
+  jml.f.fact = (id, ...data)=>{
+    let hs = id.match(/(.*):/);
+    if (hs) {
+      if (hs[0] !== 'h' || hs.length==17)
+	hs = hash(hs);
+    } else {
+      hs = huser;
+    }
+    let name = id.match(/:(.+)/) || id;
+    name = name.replace(/\^.*/, '');
+    let params = id.match(/\^.*/) || '';
+    if (params) params += ' ';
+
+    data = params + data.join(' ');
+    console.log(`fact: hs>${hs}< id>${name}< data>${data}`);
+    
+    // TODO: this is almost same as in automatic.put (remove that one)
+    let tid = jml.timestamp;
+    let kt = `${hs} ${name} current timestamp`;
+    let ot = iget(kt);
+    if (!ot) {
+      ot = timestamp(0);
+    }
+    // - create value as a ledger
+    // if it's ever extended, add BEFORE ' - '
+    let d = `${ot} ${huser} - ${data}`;
+    //   data: hREST nOLDTIMESTAMP hUSER ... - VALUE
+    let val = `${hash(d, 8)} ${d}`;
+    //    key: hREPL tTIMESTAMP hSPACE NAME
+    let kr = `${hREPL} ${tid} ${hs} ${name}`;
+
+    // TODO: put in replication queue
+    jml.replQ.push({
+      // kv repl store
+      key: kr,
+      value: val,
+      // other
+      timestamp: tid,
+      hspace: hs,
+      name: name,
+    });
+    return `[ignore FACT ${hs}:${name}]`;
+  }      
+
+  jml.replQ = [];
+
+  jml.f.updatefacts = (hspace)=>{
+    console.error('Q=', jml.replQ.length)
+    // update locally
+    jml.replQ.forEach(e=>{
+    });
+
+    // create our update
+    let data = [];
+    let ts;
+    jml.replQ.forEach(e=>{
+      ts = e.timestamp;
+      // TODO: how about quote spaces?
+      let d = e.key + ':::' + e.value;
+      data.push(d);
+    });
+
+    console.log('data=', JSON.stringify(data));
+    let v = data.join('\n');
+    console.log('v=', v);
+    // send our replQ
+    // wait for reply
+    return `[updatefactsrecv <pre>\n${v}</pre>]`;
+  };
+
+  jml.f.updatefactsrecv = (hspace)=>{
+    // get updates
+    
+    // update timestamp as of server
+    
+    // give some user info
+    let names = ['foo', 'bar', 'fie'];
+    return `[ignore UPDATEFACTS ${names.join(' ')}]`;
+  }
+
   // -- library
   jml.f.ignore = _=>'';
   jml.f.identity= (...args)=>args.join(' ');
