@@ -30,6 +30,7 @@
 // [hSPACE:NAME ...] -> getfact()
 
 function jml(x, opts) {
+  if (typeof jml.init === 'undefined')jml_init();
   // TODO: if called with a dom element
   //   traverse it and run on whole TextNodes
   if (opts) {
@@ -42,10 +43,8 @@ function jml(x, opts) {
     if (oTick) oStep = true;
   }
   let start = Date.now();
-  // timestamp to be used for interactions
-  jml.timestamp = timestamp(start);
+  jml.timestamp = jml.f.timestamp(start);
 
-  if (typeof jml.init === 'undefined')jml_init();
   if (typeof x === undefined) return;
   if (typeof x !== 'string') x = '' + x;
     
@@ -64,19 +63,11 @@ function jml(x, opts) {
       let f = args.shift();
       let fun = jml.f[f];
 
-      // TODO: make real
-      function hash(s) {
-	// we're good to a few millon values.. lol
-	// at 4 billion => 40% chance of collision
-	// https://www.johndcook.com/blog/2017/01/10/probability-of-secure-hash-collisions/#:~:text=As%20a%20rule%20of%20thumb,or%20about%204%20billion%20items.
-	return 'hSPACESPACESPACEX'
-	return 'hBADSASSSBADSASSS';
-      }
       // not built-in/cashed
-      if (!fun && f[0]!='h') {
+      if (!fun && !hash.is(f) && f.length!=17) {
 	let r = all.replace(
 	  /^(.*):/, space=>{
-	    if (space.startsWith('h') && space.length===17) return space;
+	    if (hash.is(space) && space.length==17)  return space;
 	    return `[load-fact ${hash(space)}]`;
 	  });
 	if (r != all) return r; // come back
@@ -345,7 +336,7 @@ function jml_init() {
   // TODO: need quote v
   jml.f.storeput = (tid, hspace, n, ...v)=>`[sendjsonp ${tid} [server]/put?hspace=${hspace}&id=${n}&data=${v.join('+')}]`;
 
-  jml.f.get = get;
+  jml.f.get = (k)=>get(k);
   jml.f.put = (k,...v)=>put(k, v.join(' '));
   jml.f.list = (hspace)=>`[sendjson [timestamp] [server]/list?hspace={hspace}]`;
   
@@ -407,24 +398,24 @@ function jml_init() {
     console.log('isendjsonp: 6', u.href);
   }
   
-  window.jmlrecvjsonp = function recvjsonp(tid, data) {
-    let req = isendjsonp[tid];
-    console.info(`recvjsonp: ${tid} ${data}`);
+  if (typeof window != 'undefined')
+    window.jmlrecvjsonp = function recvjsonp(tid, data) {
+      let req = isendjsonp[tid];
+      console.info(`recvjsonp: ${tid} ${data}`);
 
-    let cbOK = req.cbOK;
-    cbOK(data, { status: '200' });
+      let cbOK = req.cbOK;
+      cbOK(data, { status: '200' });
 
-    // TODO: how to detect error?
-    // cbFail(data, { status: '404' });
+      // TODO: how to detect error?
+      // cbFail(data, { status: '404' });
 
-    // cleanup - remove script tag
-    let r = req.scriptdom;
-    r.parentNode.removeChild(r);
-    delete isendjsonp[tid];
+      // cleanup - remove script tag
+      let r = req.scriptdom;
+      r.parentNode.removeChild(r);
+      delete isendjsonp[tid];
 
-    return data;
-  }
-
+      return data;
+    };
 
   function isend(tid, url, what, data, cbOK, cbFail) {
     send[tid] = {
@@ -547,7 +538,7 @@ function jml_init() {
     let ARGS = args.join(' ');
     count++;
     console.log('TID=', tid);
-    let start = parseInt(tid.substring(1), 16);
+    let start = timestamp.decode(tid);
     ms = Date.now() - start;
     return `[wait ${tid} ${count} ${ms} ${fun} ${ARGS}]`;
   };
@@ -556,7 +547,7 @@ function jml_init() {
   jml.f.fact = (id, ...data)=>{
     let hs = id.match(/(.*):/);
     if (hs) {
-      if (hs[0] !== 'h' || hs.length==17)
+      if (hash.is(hs))
 	hs = hash(hs);
     } else {
       hs = huser;
@@ -614,7 +605,7 @@ function jml_init() {
       data.push(d);
     });
 
-    let json = encodeURI(JSON.stringify(jml.replQ))
+    let json = encodeURIComponent(JSON.stringify(jml.replQ))
 	.replace(/[\(\)]/, c=>`%${c.charCodeAt(0).toString(16)}`);
 
     return `[sendjsonp ${ts} [server]/update?data=${json} updatefactsrecv ${ts}]`;
@@ -635,8 +626,137 @@ function jml_init() {
   jml.f.ignore = _=>'';
   jml.f.identity= (...args)=>args.join(' ');
   
+  // https://www.movable-type.co.uk/scripts/tea.html
+  // © 2000-2005 Chris Veness
+  // Extended TEA: this is the 1997 revised version of Needham & Wheeler's algorithm
+  // modified (for readabilty) jsk
+  // 'password': max 16 chars will be used
+  function encrypt(plaintext, password) {
+    var v = new Array(2), k = new Array(4), s = "", i;
+
+    plaintext = escape(plaintext);
+
+    // build key
+    for (var i=0; i<4; i++) k[i] = Str4ToLong(password.slice(i*4,(i+1)*4));
+
+    for (i=0; i<plaintext.length; i+=8) {
+      // encode 64-bits (8 chars)
+      v[0] = Str4ToLong(plaintext.slice(i,i+4));
+      v[1] = Str4ToLong(plaintext.slice(i+4,i+8));
+      code(v, k);
+      s += LongToStr4(v[0]) + LongToStr4(v[1]);
+    }
+
+    return escCtrlCh(s);
+  }
+
+  function decrypt(ciphertext, password) {
+    var v = new Array(2), k = new Array(4), s = "", i;
+
+    for (var i=0; i<4; i++) k[i] = Str4ToLong(password.slice(i*4,(i+1)*4));
+
+    ciphertext = unescCtrlCh(ciphertext);
+    for (i=0; i<ciphertext.length; i+=8) {
+      // decode ciphertext into s in 64-bit (8 char) blocks
+      v[0] = Str4ToLong(ciphertext.slice(i,i+4));
+      v[1] = Str4ToLong(ciphertext.slice(i+4,i+8));
+      decode(v, k);
+      s += LongToStr4(v[0]) + LongToStr4(v[1]);
+    }
+
+    // strip padded 0s
+    s = s.replace(/\0+$/, '');
+
+    return unescape(s);
+  }
+  
+  // v[2] 64-bit value block
+  // k[4] 128-bit key
+  function code(v, k) {
+    var y = v[0], z = v[1];
+    var delta = 0x9E3779B9, limit = delta*32, sum = 0;
+
+    while (sum != limit) {
+      y += (z<<4 ^ z>>>5)+z ^ sum+k[sum & 3];
+      sum += delta;
+      z += (y<<4 ^ y>>>5)+y ^ sum+k[sum>>>11 & 3];
+      // note: unsigned right-shift '>>>' is used in place of original '>>', due to lack
+      // of 'unsigned' type declaration in JavaScript (thanks to Karsten Kraus for this)
+    }
+    v[0] = y; v[1] = z;
+  }
+
+  function decode(v, k) {
+    var y = v[0], z = v[1];
+    var delta = 0x9E3779B9, sum = delta*32;
+
+    while (sum != 0) {
+      z -= (y<<4 ^ y>>>5)+y ^ sum+k[sum>>>11 & 3];
+      sum -= delta;
+      y -= (z<<4 ^ z>>>5)+z ^ sum+k[sum & 3];
+    }
+    v[0] = y; v[1] = z;
+  }
+
+  // TODO: jsk make Str4ToLong take plaintext, and index as parameter!
+  function Str4ToLong(s) {
+    var v = 0;
+    for (var i=0; i<4; i++) v |= s.charCodeAt(i) << i*8;
+    return isNaN(v) ? 0 : v;
+  }
+
+  function LongToStr4(v) {
+    var s = String.fromCharCode(v & 0xFF, v>>8 & 0xFF, v>>16 & 0xFF, v>>24 & 0xFF);
+    return s;
+  }
+
+  function escCtrlCh(str) {
+    return str.replace(/[\0\t\n\v\f\r\xa0'"!]/g, function(c) { return '!' + c.charCodeAt(0) + '!'; });
+  }
+
+  function unescCtrlCh(str) {
+    return str.replace(/!\d\d?\d?!/g, function(c) { return String.fromCharCode(c.slice(1,-1)); });
+  }
+  // END: xtea
+
+  // returns a hash of 16 (or optPrecision) hex chars, prefixed by 'h'
+  function hash(s, optPrecision) {
+    optPrecision = (optPrecision || 16);
+    // we're good to a few millon values.. lol
+    // at 4 billion => 40% chance of collision
+    // https://www.johndcook.com/blog/2017/01/10/probability-of-secure-hash-collisions/#:~:text=As%20a%20rule%20of%20thumb,or%20about%204%20billion%20items.
+    let h = jml.f.encrypt('HASHhash#$@4hsaH', s);
+    console.error('H>'+h+'<');
+    return 'h' + h.substr(-optPrecision).padStart(optPrecision, '0');;
+  }
+  hash.is = h=>{
+    if (h.length<=4 || h[0]!='h') return false;
+    return !!h.match(/^h[0-9A-Za-z]{4,}$/);
+  }
+  jml.f.hash = (...s)=>hash(s.join(' '));
+
+  function text2hex(s) {
+    return s.replace(/./g, c=>{
+      let i = c.charCodeAt(0);
+      if (i < 128) return i.toString(16).padStart(2, '0');
+      return encodeURIComponent(c);
+    }).replace(/%/g, '');
+  }
+  jml.f.text2hex = (...s)=>text2hex(s.join(' '));
+  
+  function hex2text(h) {
+    return decodeURIComponent(h.replace(/../g, '%$&'));
+  }
+  jml.f.hex2text = hex2text;
+  
+  jml.f.encrypt = (pass,...txt)=>text2hex(encrypt(txt.join(' '), pass));
+  jml.f.decrypt = (pass,txt)=>decrypt(hex2text(txt), pass);
+  
+  
   // -- system
-  // tHEX of fixed length
+  // a new unique UTC timestamp at millisecond resolution is returned at eacch call
+  // it's encoded in hex prefixed with a 't'
+  // tHEX of fixed length (1+16 chars)
   function timestamp(optT) {
     if (optT === undefined) {
       optT = Date.now();
@@ -658,7 +778,10 @@ function jml_init() {
 	'0000000000000000' + optT.toString(16)
       ).substr(-16);
   }
-  jml.f.timestamp = optT=>timestamp(optT);
+  timestamp.decode = tid=>parseInt(tid.substring(1), 16);
+  timestamp.is = tid=>tid.length==17 && tid[0]=='t';
+    
+  jml.f.timestamp = timestamp;
   
   function error(f, args) {
     let r = '<%%ERROR:' + f + ' ' + args + '%%>';
@@ -671,3 +794,6 @@ function jml_init() {
 
   jml.f.fun = (n)=>'<pre style="text-align:let;">'+quoteHTML(''+jml.f[n])+'</pre>';
 }
+
+// cold start
+jml();
