@@ -735,6 +735,7 @@ function jml_init() {
   }
   jml.f.hash = (...s)=>hash(s.join(' '));
 
+  // inspiration https://stackoverflow.com/questions/13865302/how-to-convert-a-string-containing-utf8-hex-codes-to-a-javascript-string
   function text2hex(s) {
     return s.replace(/./g, c=>{
       let i = c.charCodeAt(0);
@@ -749,6 +750,13 @@ function jml_init() {
   }
   jml.f.hex2text = hex2text;
   
+  // or symmetric signing with arbitrator
+  // bkk! http://spi.unob.cz/papers/2003/2003-18.pdf
+  //A New Approach of Signing Documents with Symmetric Cryptosystems and an Arbitrator
+  // TODO: public private asymetric encryption
+  // https://developer.mozilla.org/en-US/docs/Web/API/SubtleCrypto
+  // https://cryptojs.gitbook.io/docs/
+  // https://crypto.stackexchange.com/questions/5458/should-we-sign-then-encrypt-or-encrypt-then-sign/5466#5466
   jml.f.encrypt = (pass,...txt)=>text2hex(encrypt(txt.join(' '), pass));
   jml.f.decrypt = (pass,txt)=>decrypt(hex2text(txt), pass);
   

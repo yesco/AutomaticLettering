@@ -169,15 +169,72 @@ aaa += 'e2';
     }
     DBG.toggle(false);
 
+    DBG.inspect = function(x) {
+      if (x === undefined) x = DBG.cmd.value;
+      if (x === '') return;
+
+      let v;
+      try {
+	// TODO: if it's a function call
+	// we'll call it potentially several
+	// times. Possible set variable,
+	// and replace exp by it...
+	// or just cache if same as last?
+	v = eval(x);
+      } catch(e) {
+	return console.error(e);
+      }
+
+      let t = typeof v;
+      if (!t) return;
+
+      // scalar
+      if ('number,string,boolean,bigint,symbol,'.indexOf(t) >= 0)
+	return console.log(pprint(v));
+
+      // objects
+      if (v === null)
+	return console.log('null');
+
+      let h = `<span class='ptype'>${v.constructor.name}</span>: `;
+      if (v.id) h += `<span class='plabel'>id="${v.id}"</span>`;
+      if (Array.isArray(v)) {
+	let nsetvalues = v.map(_=>1).reduce((a,b)=>a+b, 0);
+	let types={};
+	v.forEach(x=>{
+	  let t = typeof(x);
+	  types[t] = (types[t] || 0) + 1;
+	});
+	let ptypes = Object.keys(types).map(t=>`${types[t]} ${t}`).join(', ');
+	h += `ARRAY[${v.length}] with ${nsetvalues} values of ${ptypes}`;
+      }
+
+      if (t === 'function')
+	h += `<span class='pfunc'>${v.name}/${v.length}</span>`;
+      else
+	if (v.name) h += `<span class='plabel'>name="${v.name}"</span>`;
+
+      console.html(h);
+      
+      // fall through, it may have properties
+      console.html(
+	`<span class='plabel'>Keys:</span> ` +
+	  Object.keys(v).map(k=>{
+	    if (v.hasOwnProperty(k))
+	      return `<span class='pkey'>${k}</span>`;
+	  }).join(' ') );
+    }
+
     // set up key stroke activate/hide
     document.addEventListener('keydown', function(e) {
-	let c = e.ctrlKey, a = e.altKey, k = e.key;
-	if (c && k == 'u') DBG.cmd.value = '';
-	if (!c || !a) return;
-	// CTRL-ALT-
-	if (k == 'd') DBG.toggle();
-	if (k == 'l') DBG.clear();
-	if (k == 'h') toggle('DBGhelp');
+      let c = e.ctrlKey, a = e.altKey, k = e.key;
+      if (c && !a && k == 'u') DBG.cmd.value = '';
+      if (c && !a && k == 'i') DBG.inspect();
+      if (!c || !a) return;
+      // CTRL-ALT-
+      if (k == 'd') DBG.toggle();
+      if (k == 'l') DBG.clear();
+      if (k == 'h') toggle('DBGhelp');
     });
     
 aaa += 'e8';
@@ -215,5 +272,39 @@ aaa += 'e8';
 }
 
 DBG();
+
+{
+  let d = document.createElement('style');
+  d.innerText = `
+.ptype, .pkey, .pfunc, .pname, .plabel {
+  all: unset;
+  color: black;
+  font-weight: bold;
+  font-size: 1.0rem;
+  border-radius: 10px;
+  padding: 0.2rem;
+  padding-left: 0.8rem;
+  padding-right: 0.8rem;
+  margin: 0.3rem;
+}
+.ptype {
+  color: white;
+  background-color: black;
+}
+.pkey {
+  background-color: lime;
+}
+.pfunc {
+  background-color: cyan;
+}
+.pname {
+  color: blue;
+  background-color: white;
+}
+.plabel {
+}
+`;
+  document.body.appendChild(d);
+}
 
 aaa += 'c';

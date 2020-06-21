@@ -55,10 +55,12 @@ footer { font-size: 0.5em; text-align: center; position: absolute; bottom:0; z-i
 
 /* pretend were having color language */
 
+/*
 span:nth-child(4n+0) { color: tomato; }
 span:nth-child(4n+1) { color: deepskyblue; }
 span:nth-child(4n+2) { color: lawngreen; }
 span:nth-child(4n+3) { color: gold; }
+*/
 
 /* color of pretty code layout boxes */
 .fun, .args {
@@ -806,6 +808,7 @@ OLD
 </script> 
 
 <script id='prettyprint'>
+  // TODO: need to handle circular refs
   function pprint(o, klass, depth) {
     if (!depth) depth = 0
     // these don't work??? wtf?
@@ -816,7 +819,7 @@ OLD
     case 'number':
     case 'boolean': return '' + o;
     case 'bigint': return '' + o + 'n';
-    case 'string': return '"' + o + '"'; // TODO: quote "
+    case 'string': return JSON.stringify(o);
     case 'symbol': {
       let s = o.toString();
       let f = Symbol.keyFor(o);
