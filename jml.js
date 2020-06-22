@@ -6,7 +6,7 @@
 // - Everything is strings
 // - It's live extensible inside itself
 // - Only state is external
-// - Database: keyword put/get usng localStorage
+// - Database: keyword put/get using localStorage
 
 // TODO-----------
 // 1 - facts = store
@@ -589,6 +589,7 @@ function jml_init() {
   }      
 
   jml.replQ = [];
+  jml.replLastSeen = '';
 
   jml.f.updatefacts = (hspace)=>{
     // update locally
@@ -606,13 +607,12 @@ function jml_init() {
     });
 
     let json = encodeURIComponent(JSON.stringify(jml.replQ))
-	.replace(/[\(\)]/, c=>`%${c.charCodeAt(0).toString(16)}`);
+	.replace(/[\(\)]/, c=>`%${c.charCodeAt(0).toString(16).padStart(2,0)}`);
 
-    return `[sendjsonp ${ts} [server]/update?data=${json} updatefactsrecv ${ts}]`;
-    return `[updatefactsrecv <pre>\n${v}</pre>]`;
+    return `[sendjsonp ${ts} [server]/update?last_seen=${jml.replLastSeen}&&data=${json} updatefactsrecv ${ts}]`;
   };
 
-  jml.f.updatefactsrecv = (hspace)=>{
+  jml.f.updatefactsrecv = (opthSpace)=>{
     // get updates
     
     // update timestamp as of server

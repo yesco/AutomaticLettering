@@ -50,9 +50,30 @@ function back(req, data) {
   }
 }
 
+var MessagesFile = app.GetAppPath() + '/messages.txt';
+
 function onMessage(req, info) {
   app.ShowPopup(JSON.stringify(db));
-  back(req, req.msg);
+
+  let f = app.CreateFile(MessagesFile, 'rwd');
+  f.Seek(req.serverLastPos || 0);
+
+  let lines = [];
+  let line;
+  // this will read utf-8 lines correctly!
+  while (line = f.ReadText('Line')) {
+    lines.push(line);
+  }
+
+  let pos = f.GetPointer();
+  let size = f.GetLength();
+  f.Close();
+
+  // this will append utf8 correctly
+  if (req.msg !== '')
+    app.WriteFile(MessagesFile, req.msg + '\n', 'Append', 'UTF-8');
+  
+  back(req, `STARTPOS: ${req.serverLastPos} ENDPOS: ${pos}, SIZE: ${size}<br/>` + lines.join('<br/>'));
 }
 
 function onGet(req, info) {
@@ -75,10 +96,93 @@ function onList(req,  info) {
   back(req, Object.keys(db).join(' '));
 }
 
+  // TODO: put in library, for now copied from jml.js
+  // a new unique UTC timestamp at millisecond resolution is returned at eacch call
+  // it's encoded in hex prefixed with a 't'
+  // tHEX of fixed length (1+16 chars)
+  function timestamp(optT) {
+    if (optT === undefined) {
+      optT = Date.now();
+      // make sure unique (PER USER),
+      // (then should add machine id...)
+      // if too much data
+      // means timestamp is "fake"
+      // should we mark it, or add extra
+      // digit? considering that most browsers
+      // only give in resolution of 20-100ms
+      // maybe it's ok...
+      if (optT <= timestamp.last)
+	optT = ++timestamp.last;
+    } else {
+      optT = +optT;
+    }
+    return 't' +
+      (
+	'0000000000000000' + optT.toString(16)
+      ).substr(-16);
+  }
+  timestamp.decode = tid=>parseInt(tid.substring(1), 16);
+  timestamp.is = tid=>tid.length==17 && tid[0]=='t';
+
+// on DroidScript need to be full path
+// relative to what?
+let DBLogFileName = './DBLog/facts.log';
+
+  // java: readLine reads only ascii
+
+  // public final String readUTF ()
+  // -> don't use! too special for android
+  // just use plain ascii...
+  // need to quote all unicode...
+  // https://developer.android.com/reference/java/io/DataInput#modified-utf-8
+  // Reads in a string from this file. The string has been encoded using a modified UTF-8 format.
+
+  // The first two bytes are read, starting from the current file pointer, as if by readUnsignedShort. This value gives the number of following bytes that are in the encoded string, not the length of the resulting string. The following bytes are then interpreted as bytes encoding characters in the modified UTF-8 format and are converted into characters.
+
+  // This method blocks until all the bytes are read, the end of the stream is detected, or an exception is thrown.
+
+
 function onUpdate(req,  info) {
   app.ShowPopup(JSON.stringify(req.data));
   console.log('DATA=', req.data);
-  back(req, 'whoho!');
+
+  let tid = timestamp(); // unique
+  let logLines = [];
+  req.data.forEach(e=>{
+    let d = tid + ':::' + e.key + ':::' + e.value;
+    logLines.push(d);
+  });
+  let n = logLines.length;
+  logLines = logLines.join('\n');
+
+  console.log(`FILE: size=${size} date=${date}`);
+
+  // app.FileExists(..)
+  let f = app.CreateFile(DBLogFileName, 'rwd');
+  f.Seek(req.serverLastPos || 0);
+
+  let lines = [];
+  let line;
+  while (line = f.ReadText('Line')) {
+    console.log('LINE: >'+line+'<');
+    lines.push(line);
+  }
+
+  // file.GetLength()
+
+  // write after read...
+  // otherwise will send back what was sent!
+  app.AppendFile(DBLogFileName, logLines, 'Append');
+  let size = app.GetFileSize(DBLogFileName);
+  let date = app.GetFileDate(DBLogFileName);
+
+  back(req, {
+    lines_written: n,
+    server_timestamp: current_server_timestamp,
+    server_pos: size,
+    server_date: date,
+    new_lines: lines.join('\n'),
+  });
 }
 
 

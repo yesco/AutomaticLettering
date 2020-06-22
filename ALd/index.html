@@ -10,9 +10,12 @@
 </style>
 
 <script>
-  function sendMessage(msg, user) {
-    send('message',
-       {msg: msg, user: user});
+  function sendMessage(msg, user, pos) {
+    send('message', {
+      msg: msg,
+      user: user,
+      serverLastPos: pos,
+    });
   }
   function sendGet(id, user) {
     //alert(`get: ${id} ${user}`);
@@ -43,7 +46,7 @@
     }
     bgcol('orange');
     function show(s, col) {
-      txt.innerHTML = s;
+      txt.innerHTML = `<pre>${s}</pre>`;
       bgcol(col);
       // reset button color after awhile
       setTimeout(_=>bgcol(''), 3000);
@@ -78,8 +81,9 @@
   
   User: <input id='userx'/>
   <hr/>
-  Message: <input id='messagex'/>
-  <input id='bmessage' type='button' value='Message' onclick='sendMessage(messagex.value, userx.value)'/>
+  Message: <input id='messagex'/><br/>
+  POS: <input id='serverLastPosx'/>
+  <input id='bmessage' type='button' value='Message' onclick='sendMessage(messagex.value, userx.value, serverLastPosx.value)'/>
   <br/>
 
   ID: <input id='idx'/>
