@@ -55,6 +55,7 @@ var MessagesFile = app.GetAppPath() + '/messages.txt';
 function onMessage(req, info) {
   app.ShowPopup(JSON.stringify(db));
 
+  let msg = `${req.user}: ${req.msg}\n`;
   let f = app.CreateFile(MessagesFile, 'rwd');
   f.Seek(req.serverLastPos || 0);
 
@@ -71,7 +72,7 @@ function onMessage(req, info) {
 
   // this will append utf8 correctly
   if (req.msg !== '')
-    app.WriteFile(MessagesFile, req.msg + '\n', 'Append', 'UTF-8');
+    app.WriteFile(MessagesFile, msg, 'Append', 'UTF-8');
   
   back(req, `STARTPOS: ${req.serverLastPos} ENDPOS: ${pos}, SIZE: ${size}<br/>` + lines.join('<br/>'));
 }

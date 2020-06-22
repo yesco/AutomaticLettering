@@ -46,6 +46,12 @@
     }
     bgcol('orange');
     function show(s, col) {
+      // dirty hack extract response
+      let pos = s.match(/ENDPOS: (\d+)/);
+      pos = pos ? parseInt(pos[1]): 0;
+      if (pos > 0) serverLastPosx.value = pos;
+
+      // ok display
       txt.innerHTML = `<pre>${s}</pre>`;
       bgcol(col);
       // reset button color after awhile
