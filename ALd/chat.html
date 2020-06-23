@@ -1,4 +1,8 @@
 <!doctype html>
+<html>
+  <head>
+  </head>
+  <body style='font-size: 2em;'>
 
 <hr noshade/>
 
@@ -11,7 +15,7 @@ Msg:  <input type="text" name="msg" maxlength="50"/></br>
   <input id='send' type="submit" value="Send"/>
 </form>
 
-<div id="messages"></div>
+<div id="messages" style='font-size: 2rem;'></div>
 
 <script>
 let url = 'ws://localhost:8080/ws';
@@ -58,7 +62,8 @@ socket.onclose = event => showMessage(`Closed ${event.code}`);
 function showMessage(msg) {
   let e = document.createElement('div');
   e.textContent = msg;
-  document.getElementById('messages').prepend(e);
+  //document.getElementById('messages').prepend(e);
+  document.getElementById('messages').appendChild(e);
 }
 
 try {
@@ -72,3 +77,6 @@ try {
 
 } catch (e) {}
 </script>
+
+  </body>
+</html>
