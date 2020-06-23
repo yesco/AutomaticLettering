@@ -125,67 +125,54 @@ function onList(req,  info) {
   timestamp.decode = tid=>parseInt(tid.substring(1), 16);
   timestamp.is = tid=>tid.length==17 && tid[0]=='t';
 
-// on DroidScript need to be full path
-// relative to what?
-let DBLogFileName = './DBLog/facts.log';
-
-  // java: readLine reads only ascii
-
-  // public final String readUTF ()
-  // -> don't use! too special for android
-  // just use plain ascii...
-  // need to quote all unicode...
-  // https://developer.android.com/reference/java/io/DataInput#modified-utf-8
-  // Reads in a string from this file. The string has been encoded using a modified UTF-8 format.
-
-  // The first two bytes are read, starting from the current file pointer, as if by readUnsignedShort. This value gives the number of following bytes that are in the encoded string, not the length of the resulting string. The following bytes are then interpreted as bytes encoding characters in the modified UTF-8 format and are converted into characters.
-
-  // This method blocks until all the bytes are read, the end of the stream is detected, or an exception is thrown.
-
+// TODO: how to handle several?
+// (it's a problem when it's a problem...)
+let ReplicationFileName = app.GetAppPath() + '/replication.log';
 
 function onUpdate(req,  info) {
-  app.ShowPopup(JSON.stringify(req.data));
   console.log('DATA=', req.data);
 
+  // processed received data and timestamp recv time
   let tid = timestamp(); // unique
   let logLines = [];
   req.data.forEach(e=>{
     let d = tid + ':::' + e.key + ':::' + e.value;
     logLines.push(d);
   });
-  let n = logLines.length;
+  let logCount = logLines.length;
   logLines = logLines.join('\n');
 
-  console.log(`FILE: size=${size} date=${date}`);
+  // create or open replication
+  let f = app.CreateFile(ReplicationFileName, 'rwd');
 
-  // app.FileExists(..)
-  let f = app.CreateFile(DBLogFileName, 'rwd');
+  // read from last seen pos according to clien
   f.Seek(req.serverLastPos || 0);
-
   let lines = [];
   let line;
+  let readCount = 0;
   while (line = f.ReadText('Line')) {
     console.log('LINE: >'+line+'<');
     lines.push(line);
+    readCount++;
   }
-
-  // file.GetLength()
 
   // write after read...
   // otherwise will send back what was sent!
   app.AppendFile(DBLogFileName, logLines, 'Append');
+
   let size = app.GetFileSize(DBLogFileName);
   let date = app.GetFileDate(DBLogFileName);
 
+  // TODO: can it be streamed instead of using a large json
   back(req, {
-    lines_written: n,
+    lines_written: logCount,
+    lines_read: readCount,
     server_timestamp: current_server_timestamp,
     server_pos: size,
     server_date: date,
     new_lines: lines.join('\n'),
   });
 }
-
 
 // on nodejs command line - a simple shim
 if (typeof require !== 'undefined') {
@@ -275,6 +262,8 @@ if (typeof require !== 'undefined') {
       display();
     },
     ShowPopup(txt) { console.log('POPUP: ', txt); },
+    // TODO: wait for 'return'
+    Alert(txt) { console.log('ALERT: ', txt); },
     OpenUrl() {},
 
     // meat

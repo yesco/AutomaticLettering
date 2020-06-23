@@ -1,0 +1,74 @@
+<!doctype html>
+
+<hr noshade/>
+
+<form name="publish">
+From:  <input id='username' type="text" name="username" maxlength="32"/><br/>
+To:  <input type="text" name="to" maxlength="32"/><br/>
+Why:  <input type="text" name="why" maxlength="16"/><br/>
+Msg:  <input type="text" name="msg" maxlength="50"/></br>
+  
+  <input id='send' type="submit" value="Send"/>
+</form>
+
+<div id="messages"></div>
+
+<script>
+let url = 'ws://localhost:8080/ws';
+let socket = new WebSocket(url);
+
+function notify(from, to, why, msg) {
+  let txt = `[notify ${from} ${to} ${why} ${msg}]`;
+  try {
+    socket.send(txt);
+  } catch(e) {
+    showMessage('ERROR:' + e);
+  }
+}
+
+// send message from the form
+document.forms.publish.onsubmit = function() {
+  let msg = this.msg.value;
+
+  if (window.username.value != USERNAME) try {
+    let oldname = USERNAME;
+    USERNAME = window.username.value;
+    localStorage.setItem('username', USERNAME);
+    if (oldname)
+      notify(USERNAME, 'all', 'changednamefrom', oldname);
+  } catch (e) { }
+
+  notify(
+    this.username.value || 'anonym',
+    this.to.value || 'all',
+    this.why.value || 'misc',
+    this.msg.value);
+  return false;
+};
+
+// handle incoming messages
+socket.onmessage = function(event) {
+  let msg = event.data;
+  showMessage(msg);
+};
+
+socket.onclose = event => showMessage(`Closed ${event.code}`);
+
+// show message in div#messages
+function showMessage(msg) {
+  let e = document.createElement('div');
+  e.textContent = msg;
+  document.getElementById('messages').prepend(e);
+}
+
+try {
+  USERNAME = localStorage.getItem('username');
+  if (USERNAME) {
+    window.username.value = USERNAME;
+    socket.onopen = function() {
+      notify(USERNAME, 'all', 'entered', 'Hello!');
+    };
+  }
+
+} catch (e) {}
+</script>

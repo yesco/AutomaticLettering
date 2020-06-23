@@ -519,11 +519,46 @@ span:nth-child(4n+3) { color: gold; }
   //   [hjsk:fac ...]
   
   // - Replication/Messaging
-  // R hREPL tTS hSPACE NAME : DATA
-  
+  // to replicate to 'home'
+  // h0000 tTS hSPACE NAME : DATA
+  // 
+  // > cache
+  //          h5 n current   : v
+  //          h5 n timestamp : v
+  //          h5 n tC        : v
+  // > to send
+  //    h0 tC hS n           : hc tP hU ... - v
+  // > received
+  // tL hH tC hS n (tl hp)   : hc tP hU ... - v
+  //
+  // > you can subscribe to several hS
+  //
+  // TODO: how to secure the LOG?
+  //   issues several (unordered entries at tL)
+  //   (tl hp)
+  //   tl previous log entry
+  //   hp hash (current+) previous entry
+  //   
+  // t2 hH t1 hS n (tl hp)   : hc tP hU ... - v
+  //
+  // > expplained
+  //   tL timestamp logged at Home
+  //     Log at Home is ordered
+  //     tL maybe have several instances
+  //   tl timestamp previous
+  //   hH hash of Home (space)
+  //   tC timestamp Creation
+  //   hS hash of Space (user/repo)
+  //   n  name
+  //   hc hash checksum
+  //   hp hash previous
+  //   tP timestamp Previous value of name
+  //   hU hash of user (=space)
+  //   ...potentialy more data
+  //   -  delimeter before value
+  //   v  value can have spaces (encoding?)
 
   // -------- FORMAT:
-
 
   // -----------------EMAIL------------------
   // consider separating mail, msg, chat

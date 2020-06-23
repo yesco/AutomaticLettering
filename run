@@ -18,7 +18,12 @@ echo `cp * WWW &>/dev/null` >/dev/null
 
 ./isodate "[run waiting...]"
 # set up notify: as any  file changes, copy it
+# -- main directory ./
+./isodate "[checking .]"
 (inotifywait -q -m -e CLOSE_WRITE --format "%f" . | xargs -I {} cp -v {} WWW | xargs -I {} ./isodate cp {} | xargs -I {} ./update-lastmodified {}) &
+# -- main directory ./
+./isodate "[checking ALd]"
+(inotifywait -q -m -e CLOSE_WRITE --format "%f" ALd/ | xargs -I {} cp -v ALd/{} ALd/DSALd/ | xargs -I {} ./isodate cp {}) &
 
 # restart itself if edited!
 inotifywait -q -e CLOSE_WRITE ./run

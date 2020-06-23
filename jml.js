@@ -588,6 +588,13 @@ function jml_init() {
     return `[ignore FACT ${hs}:${name}]`;
   }      
 
+  // replication
+  // TODO: we should eventally be uing
+  // websockets, messaging instead
+  // https://www.geeksforgeeks.org/web-socket-in-nodejs/?ref=rp
+
+  // -- we're dealing with 3 different states
+
   jml.replQ = [];
   jml.replLastSeen = '';
 
