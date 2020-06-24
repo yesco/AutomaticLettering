@@ -86,69 +86,10 @@ span:nth-child(4n+3) { color: gold; }
 
 </head>
 
-<script>
-  aaa = '0';
-  function dom(id, optData, opt, optStyle) {
-      let d = (typeof id == 'string') ?
-	  document.getElementById(id) : id;
-      if (!d) alert('dom(): no such dom id='+id);
-      if (optData === undefined) return d;
-      let prefix = '';
-      if (dom.log || opt && opt.indexOf('l') >= 0) {
-	  //prefix += new Date().toISOString();
-	  // TODO: want ms?
-	  prefix += new Date().toTimeString().substring(0, 8);
-      }
-      if (prefix != '') prefix += ': ';
-  
-      let w = d;
-      let append = opt && opt.indexOf('a') >= 0;
-      let prepend = opt && opt.indexOf('p') >= 0;
-      if (append || prepend) {
-	  w = document.createElement('div');
-	  w.style = optStyle;
-      } else if (optStyle) {
-	  w.style = optStyle;
-      }
-
-      // TODO: this needs a pretty printer!
-      if (opt && opt.indexOf('h') >= 0) {
-	  // TODO: smaller font?
-	  if (prefix == '')
-	      d.appendChild(document.createTextNode(prefix));
-	  w.innerHTML = optData;
-      } else {
-	  w.innerText = prefix+optData;
-      }
-
-      if (prepend)
-	  d.insertAdjacentElement('afterbegin', w);
-      if (append)
-	  d.appendChild(w);
-
-      return d;
-  }
-  // TODO: replace by dom
-  function domT(id, ...rest){
-      let d = dom(id);
-      if (rest.length == 0)
-	  d.innerText = '';
-      else if (rest.length == 1)
-	  d.innerText = '' + rest[0];
-      else
-	  d.innerText = rest.join(' ');
-//	  d.innerText = d.innerText + JSON.stringify(rest);
-      // TODO: add better pretty printer
-      // especially for special objects
-      // like: event, error, dom
-  }
+<script src='misc.js'>>
 </script>
 
 <script>
-  function hardspaces(code) {
-      let whitespace = ' \f\n\r\t\v\u00A0\u2028\u2029';
-      return code.replace('['+whitespace+']', '\u00A0');
-  }
   function code2html(code) {
       // https://stackoverflow.com/questions/1496826/check-if-a-single-character-is-a-whitespace
       let whitespace = ' \f\n\r\t\v\u00A0\u2028\u2029',
@@ -324,19 +265,6 @@ span:nth-child(4n+3) { color: gold; }
   // (window.sessionStorage)
   // (could stor inside webpage, load/save)
 
-  // internal functions
-  function iput(n, v) {
-    return localStorage.setItem(n, v);
-  }
-  function iget(n) {
-    return localStorage.getItem(n);
-  }
-  function ilist(a, b, p) {
-  }
-
-  function isearch(a, b) {
-  }
-
   function dump() {
     let ls = localStorage;
     let keys = [];
@@ -369,91 +297,17 @@ span:nth-child(4n+3) { color: gold; }
     console.html(r+`</pre>\n${n} bytes<br/>`);
   }
 
-  function olddump() {
-    let ls = localStorage;
-    let keys = [];
-    for(let i=0; i<ls.length; i++)
-      keys.push(ls.key(i))
-    keys.sort();
-
-    let r = '<pre>';
-    let last;
-    keys.forEach(key=>{
-      let data = ls.getItem(key);
-      let s = key + ' ' + data.replace(/ - (.*)/, (_,x)=>x.replace(/ /g, '+'));;
-      let a = s.split(' ');
-
-      if (last && a.length != last.length)
-	last = undefined;
-
-      if (!last) {
-	r += `<b>${key}</b> ${data}\n`;
-      } else {
-	for(let i=0; i<a.length; i++) {
-	  if (a[i] === last[i])
-	    r += `[${i}] `;
-	  else {
-	    //if (i == 0) r += `\n${i}A:${a[i]}\n${i}B:${last[i]}\n`;
-	    let found = false;
-	    for(let j=0; j<a.length; j++) {
-	      if (a[i] === last[j]) {
-		r += `[${j}] `;
-		found = true;
-		break;
-	      }
-	    }
-	    if (!found) r += a[i] + ' ';
-	  }
-	}
-	r += '\n';
-      }
-      last = a;
-    });
-    
-    let n = r.length;
-    console.html(r+`</pre>\n${n} bytes<br/>`);
-  }
-
   var user = '';
   // 16 char hash prefix with 'h'
   var huser = 'hdeadbeefdeadbeef'; 
 
-  function hash(s, optPrecision) {
-    // TODO: use XTEA
-    //throw "hash: not implemented!"
-    h = 'DEADBEEFDEADBEEF';
-    return 'h' + h.substr(-(optPrecision || 16));
-  }
-  
-  // TODO: remove, it's copied to jml
-  // tHEX of fixed length
-  function timestamp(optT) {
-    if (optT === undefined) {
-      optT = Date.now();
-      // make sure unique (PER USER),
-      // (then should add machine id...)
-      // if too much data
-      // means timestamp is "fake"
-      // should we mark it, or add extra
-      // digit? considering that most browsers
-      // only give in resolution of 20-100ms
-      // maybe it's ok...
-      if (optT <= timestamp.last)
-	optT = ++timestamp.last;
-    }
-    return 't' +
-      (
-	'0000000000000000' + optT.toString(16)
-      ).substr(-16);
-  }
-  
   function get(n, space, tid) {
     tid = tid || timestamp();
     let hs = space ? hash(space) : huser;
     let kc = `${hs} ${n} current value`;
     let kt = `${hs} ${n} current timestamp`;
-    let ot = iget(kt);
-    let o = iget(kc);
+    let ot = lsget(kt);
+    let o = lsget(kc);
 
     // if we have it, assume it's latest
     if (o) {
@@ -642,12 +496,12 @@ span:nth-child(4n+3) { color: gold; }
     let hs = space ? hash(space) : huser;
     let kc = `${hs} ${n} current value`;
     let kt = `${hs} ${n} current timestamp`;
-    let ot = iget(kt);
-    let o = iget(kc);
+    let ot = lsget(kt);
+    let o = lsget(kc);
     // TODO: end "merge" by helper?
 
 
-    // almost same as iget('hs n lex(ot)') after '- '
+    // almost same as lsget('hs n lex(ot)') after '- '
     // if not found, we don't know if it's on server
     // but it's an uninformed put meaning it's based
     // on timestamp 0 information. Works well for
@@ -671,12 +525,12 @@ span:nth-child(4n+3) { color: gold; }
     // update versioned store
     // TODO: make transacational/atomic/recover
     // - replication log
-    iput(kr, data);
+    lsput(kr, data);
     // - local cache
-    iput(kn, data);
+    lsput(kn, data);
     // - fast access current value
-    iput(kc, v);
-    iput(kt, tid);
+    lsput(kc, v);
+    lsput(kt, tid);
     // send to old style server
     return `[storeput ${tid} ${hs} ${n} ${v}]`;
   }
@@ -843,99 +697,6 @@ OLD
   }
 </script> 
 
-<script id='prettyprint'>
-  // TODO: need to handle circular refs
-  function pprint(o, klass, depth) {
-    if (!depth) depth = 0
-    // these don't work??? wtf?
-    switch (typeof(o)) {
-    case undefined:
-    case null:
-    case 'undefined':
-    case 'number':
-    case 'boolean': return '' + o;
-    case 'bigint': return '' + o + 'n';
-    case 'string': return JSON.stringify(o);
-    case 'symbol': {
-      let s = o.toString();
-      let f = Symbol.keyFor(o);
-      return ':' + (f === s ? ':' : '') + s;
-    }
-    case 'function':
-      return 'FUNC:' + o.name + '/';
-      // TODO: if print props of fun then it get's circular!
-      // + o.length + pprintprops(o, klass, depth+1);
-    }
-    // now assumed to be object
-
-    if (o === null) return '' + o;
-
-    if (Array.isArray(o)) {
-      // TODO: make it not print num
-      //      let r = pprintprops(o, klass, depth+1);
-      let r = '';
-      let l = o.length;
-      for(let i=0; i<l; i++) {
-	r += pprint(o[i], klass, depth+1) + ', ';
-      }
-      return r;
-    }
-
-    // TODO: arguments ... args.callee
-    // TODO: date
-    // TODO: regexp
-
-    // object
-    if (typeof o !== 'object') {
-      console.error('ERROR: type of o is ', typeof(o), ' o=' + o);
-      return;
-    }
-    return pprintprops(o, klass, depth+1);
-  }
-
-  function pprintprops(o, klass, depth) {
-    // yeah, it's a friggin object!
-    if (o === null) return 'null';
-
-    // .prototype  .name == objtype?
-    // constructor?
-    // Function.getOwnProperties
-    // .getProperties()
-
-    /*
-     var fooSym = Symbol('foo');
-     var myObj = {};
-     myObj['foo'] = 'bar';
-     myObj[fooSym] = 'baz';
-     Object.keys(myObj); // -> [ 'foo' ]
-     Object.getOwnPropertyNames(myObj); // -> [ 'foo' ]
-     Object.getOwnPropertySymbols(myObj); // -> [ Symbol(foo) ]
-     assert(Object.getOwnPropertySymbols(myObj)[0] === fooSym);
-     getOwnSymbols
-     a  for (let x of o) ???
-    */
-    
-    let op = Object.getOwnPropertyNames(o);
-    let ra = [];
-    for (let n of op) {
-      let ns = n;
-      if (!ns.match(/^\w+$/)) ns = quote(ns);
-      ra.push(ns + ': ' + pprint(o[n], klass, depth+1));
-    }
-    return `{${ra.join(', ')}}`;
-  }
-  
-  if (0) {
-    console.log(pprint(3));
-    console.log(pprint('foo'));
-    console.log(pprint(3n));
-    console.log(pprint(undefined));
-    console.log(pprint(function plus(a,b){ return a+b; }));
-    console.log(pprint({a: 3, b: 4}));
-    console.log(pprint([3, 4]));
-  }
-</script>
-
 <script src='jml.js'>
 </script>
 
@@ -1048,5 +809,8 @@ OLD
 
 <!-- anyway to see status on a script tag?-->
 <!-- todo: provide a loadScript() function...-->
+<script>
+</script>
+
 </body>
 </html>

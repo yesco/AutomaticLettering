@@ -768,34 +768,6 @@ function jml_init() {
   jml.f.decrypt = (pass,txt)=>decrypt(hex2text(txt), pass);
   
   
-  // -- system
-  // a new unique UTC timestamp at millisecond resolution is returned at eacch call
-  // it's encoded in hex prefixed with a 't'
-  // tHEX of fixed length (1+16 chars)
-  function timestamp(optT) {
-    if (optT === undefined) {
-      optT = Date.now();
-      // make sure unique (PER USER),
-      // (then should add machine id...)
-      // if too much data
-      // means timestamp is "fake"
-      // should we mark it, or add extra
-      // digit? considering that most browsers
-      // only give in resolution of 20-100ms
-      // maybe it's ok...
-      if (optT <= timestamp.last)
-	optT = ++timestamp.last;
-    } else {
-      optT = +optT;
-    }
-    return 't' +
-      (
-	'0000000000000000' + optT.toString(16)
-      ).substr(-16);
-  }
-  timestamp.decode = tid=>parseInt(tid.substring(1), 16);
-  timestamp.is = tid=>tid.length==17 && tid[0]=='t';
-    
   jml.f.timestamp = timestamp;
   
   function error(f, args) {
