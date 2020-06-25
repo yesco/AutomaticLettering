@@ -84,9 +84,160 @@ scroll -  by sliding</br>
   DBG.clear = function() {
     return DBGout.innerText = '';
   }
+
+  // adds/creates a (new) dom ELEMENT from ATTRibutes at position HOW relative to AT node
+  //
+  // element, if string creates that element
+  // attr: {id: 'foo', onload...} || id-string
+  // at: id | node -  default: document.body
+  // how: before | first | last | after ==
+  //   | beforeBegin | afterBegin | beforeEnd | afterEnd
+  //   | replace
+  //   default: 'last'
+  //
+  // TODO: domadd('div', {id: 'expr'});
+  // TODO: domadd('div', {id: 'expr'});
+  function domadd(element, attrs={}, how='last', at=document.body) {
+    at = dom(at);
+    let d = typeof(d) == 'object' ?
+	domake(element) :
+	document.createElement(element);
+
+    if (typeof(attrs) === 'string')
+      d.id = attrs;
+    else
+      Object.keys(attrs).forEach(
+	k=>d[k]=attrs[k]);
+
+    switch(how.toLowerCase()) {
+    case 'first': at.appendChild(d); break;
+    case 'last':  at.prepend(d); break;
+    case 'before': at.before(d); break;
+    case 'after': at.after(d); break;
+
+    case 'beforebegin':
+    case 'afterbegin':
+    case 'beforeend':
+    case 'afterend':
+      at.insertAdjacentElement(how, d); break;
+
+    case 'replace': at.parentNode.replaceChild(d, at); break;
+    }
+    return d;
+  }
+
+  // domake('div') => DIV
+  // domake(['div', 'foo']) => DIV .innerText=fo
+  // domake(['div', {id: 'mine'}, 'foo', ...)
+  // domake(['div', {id: 'mine'}, 'foo', ...)
+  // domake(['div', ['span', 'foo'], 'bar', ['pre', 'fie<br>fum']]);
+  // domake(['div', ['span', 'foo'], 'bar', ['pre', HTML('fie<br>fum')]]);
+
+  function setProps(o, attrs) {
+    if (typeof o !== 'object') return o;
+    for(k in attrs) {
+      let v = attrs[k];
+      if (typeof v === 'object')
+	setProps(o[k], v);
+      else
+	o[k] = attrs[k];
+    }
+  }
+  function otype(o) {
+    let t = typeof o;
+    if (!t) return '';
+    if (t !== 'object') return t;
+    if (o === null) return 'null';
+    return o.constructor && o.constructor.name || 'unknownobject';
+  }
+  function HTML(h) { return new String(h); }
+  function domake(...spec) {
+    if (spec.length == 0) return domake('span');
+    if (spec.length == 1) {
+      if (typeof spec[0] === 'string')
+	return document.createElement(spec[0]);
+      else
+	return domake(...spec[0]);
+    }
+    
+    if (!Array.isArray(spec)) return spec;
+
+    let n=domake(spec.shift()), a, last=n;
+    while (a = spec.shift()) {
+      if (a === null || a === undefined) continue;
+      let t = otype(a);
+      if (t === 'Array')
+	last = n.appendChild(domake(a));
+      else if (t === 'String')
+	last = n.appendChild(domake('span'), {innerHTML: ''+a});
+      else if (t === 'Object') {
+	if (otype(last) === 'Text') // upgrade
+	  last = n.appendChild(domake('span', (last.remove(), last)));
+	setProps(last, a);
+      } else if (typeof a == 'object') {
+	last = n.appendChild(a);
+      } else {
+	last = n.appendChild(document.createTextNode(a));
+      }	
+    }
+
+    return n;
+  }
+
+  function loadScript(src, cbLoad, cbErr) {
+    let d = document.createElement('script');
+    d.src = src;
+    d.onload = cbLoad ||
+      (x=>alert(`loadScript.load: ${x} of ${src}`));
+    d.onerror = cbErr ||
+      (x=>alert(`loadScript.error: ${x} of ${src}`));
+    document.body.appendChild(d);
+  }
+  function from(what, ...args) {
+    if (!what) return;
+    let t = typeof what;
+    if (t === 'function') {
+      function call() {
+	return apply(this, what, ...args);
+      }
+
+      return new Promise((resolve, reject)=>{
+	let argsmissing = what.length-args.length
+	switch (argsmissing) {
+	case 0: break;
+	case 1: args.push(
+	  (err, data)=>{
+	    if (err) return reject(err);
+	    return resolve(data);
+	  }); break;
+	case 2: args.push(resolve, reject); break;
+	}
+	return call();
+      });
+    } else if (t === 'object') {
+      // TODO: each iterator?
+    }
+    throw `from: doesn't support type ${t}`;
+  }
+  // when().then()
+  // unless().then()
+  // repeat(10).then()
+  // each(collection/iterator/generator).then()
+  // on(dom, 'click').then()
   DBG.run = function(x){
     if (x === undefined) x = DBG.cmd.value;
-    if (x === 'clear') return DBG.clear();
+
+    // handle commands
+    let params = x.split(/\s+/g);
+    switch (params.shift()) {
+    case '/clear': return DBG.clear();
+    case '/html': return;
+    case '/vars': return;
+    case '/top': return;
+    case '/style': return;
+    case '/load': return loadScript(params[0]);
+    }
+
     lsput('DBG.cmd', x);
     DBG.run.count = (DBG.run.count || 0)+1;
 
