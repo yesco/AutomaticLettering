@@ -184,21 +184,31 @@ LINE: <span id='error'></span>
     return d;
   }
   
+  // this is like equivalent of POKE!
   function screen(row, col, ch) {
     let dc = domc(`cr${row}c${col}`);
-    // read char?
-    if (ch === undefined)
-      return dc.textContent.charCodeAt(0);
+    // read screen?
+    if (ch === undefined) {
+      if (typeof dc.screenchar == 'number')
+	return dc.screenchar;
+      else
+	return dc.screenchar = dc.textContent.charCodeAt(0);
+    }
+    dc.screenchar = ch;
 
     let da = domc(`ar${row}c${col}`);
 
-    let fg, bg, t;
+    let t;
 
+    // interpret char/attribute
     let c = ch & 0x7f;
     if (c >= 32) { // ascii
       t = ch & 0x7f;
     } else if (c < 8) { // ink
-      fg = c & 0x07;
+      let fg = c & 0x07;
+      if (c > 127) fg = inverse(fg);
+      da.style.color=color[fg];
+      t = 32; // blankk it out
     } else if (c < 16) {
       // Character Set modifier
       // 8  Use Standard Charset
@@ -210,28 +220,22 @@ LINE: <span id='error'></span>
       // 14 Use Double Size Blinking Standard Charset
       // 15 Use Double Size Blinking Alternate Char
     } else if (c < 24) { // 16-23 paper
-      bg = c & 0x07;
+      let bg = c & 0x07;
+      if (bg > 127) bg = inverse(bg);
+      da.style.backgroundColor=color[bg];
+      t = 32; // blankk it out
     } else {
       // TODO: mode switching
+      // idea: make screen garbled? lol
       // Video control attributes
       // 24-27 Switch to TEXT mode (60 Hz)
       // 28-31 Switch to HIRES mode (60 Hz)
     }
 
-    if (c > 127) {
-      if (bg) bg = inverse(bg);
-      if (fg) fg = inverse(fg);
-    }
-
-    dom(da).style=
-      (bg ? `background-color:${color[bg]};` : '') +
-      (fg ? `color:${color[fg]};` : '');
-    if (bg || fg) t = 32;
-
-    if (t == 32) 
-      dom(dc, '&nbsp;', 'h');
+    if (t == 32)
+      dc.innerHTML = '&nbsp;';
     else if (t !== undefined)
-      dom(dc, String.fromCharCode(t), 'h');
+      dc.textContent = String.fromCharCode(t);
   }
 
   function INK(color) {
@@ -287,8 +291,10 @@ l0 FOR I=0 TO 7
     // backspace
     if (ch == 8) {
       col--;
-      if (col < 2) { col = 39; row--; }
-      if (row < 1) { col = 2; row = 1; }
+      if (col < 2) col = 2;
+      // TODO: I don't think backspace wraps?
+      //if (col < 2) { col = 39; row--; }
+      //if (row < 1) { col = 2; row = 1; }
       screen(row, col, 32);
     }
 
@@ -689,6 +695,20 @@ HELLO
   function REPEAT() {}
   function UNTIL() {}
   
+  // sounds
+  // https://bulba.untergrund.net/emulator_e.htm
+  // The PLAY command allows you to mix tones and gives access to eight preset envelope shapes.
+  function PLAY() {}
+  // After using MUSIC and SOUND to set channel and select the tones and noise you want, you use PLAY to mix the channels, select an envelope and control the duration of the final sound. In this way, quite complex sounds can be built up even considering the limitations of the single voice and the pre-set envelopes. The three main sound commands can be used in programs written in
+  function MUSIC() {}
+  function SOUND() {}
+
+  function ZAP() {}
+  function PING() {}
+  function SHOOT() {} // "snare-drum"
+  function EXPLODE() {}
+
+
 </script>
 
 <script>
