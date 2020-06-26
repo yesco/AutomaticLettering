@@ -20,12 +20,13 @@ pre, span, div { font-family: 'oric-atmos', monospace; }
 
   span {
       display: inline-block;
-      font-size: 1.4rem;
+      font-size: 1.5rem;
       text-align: left;
+      //color: black;
   }
   
   .char {
-      width: 0.3rem;
+      width: 0.30rem;
       border: 0px;
       padding-left: 0.25rem;
       //width: 50px;
@@ -49,10 +50,21 @@ pre, span, div { font-family: 'oric-atmos', monospace; }
 </br>
 
 <div id='outside' style='width:100%'><center>
-  <div id='screen' style='width:83%; color: black; background-color:white; font-size: 1.05em; text-align: left;
+  <div id='screen' style='width:83%; color: black; font-size: 1.05em; text-align: left;
 '></div>
 </center></div>
 
+
+<br><br>
+<input autofocus style='background:black; color:black; border:none;'>
+<br>
+ROW: <span id='row'></span>
+COL: <span id='col'></span>
+<br>
+LINE: <span id='line'></span>
+<br>
+<br>
+LINE: <span id='error'></span>
 <script>
   loadScript('jsconsole.js');
 </script>
@@ -103,6 +115,7 @@ pre, span, div { font-family: 'oric-atmos', monospace; }
   // 1024 bytes for the secondary ("alternate") character set (from #9C00 to #9FFF)
   // This makes a total of 10210 bytes.
 
+  // http://twilighte.oric.org/twinew/ula.htm
   function HIRES() {
     throw "HIRES: Not implemented!";
   }
@@ -161,9 +174,23 @@ pre, span, div { font-family: 'oric-atmos', monospace; }
     
   let inverse = n=>7-n;
   
+  function domc(id) {
+    domc.cache = domc.cache || {};
+    let d = domc.cache[id];
+    if (!d) {
+      d = dom(id);
+      domc.cache[id];
+    }
+    return d;
+  }
+  
   function screen(row, col, ch) {
-    let da = dom(`ar${row}c${col}`);
-    let dc = dom(`cr${row}c${col}`);
+    let dc = domc(`cr${row}c${col}`);
+    // read char?
+    if (ch === undefined)
+      return dc.textContent.charCodeAt(0);
+
+    let da = domc(`ar${row}c${col}`);
 
     let fg, bg, t;
 
@@ -182,7 +209,7 @@ pre, span, div { font-family: 'oric-atmos', monospace; }
       // 13 Use Blinking Alternate Charset
       // 14 Use Double Size Blinking Standard Charset
       // 15 Use Double Size Blinking Alternate Char
-    } else if (c < 23) { // 16-23 paper
+    } else if (c < 24) { // 16-23 paper
       bg = c & 0x07;
     } else {
       // TODO: mode switching
@@ -256,22 +283,35 @@ l0 FOR I=0 TO 7
     raw = false;
 
     if (ch == 10) { row++; col = 2; }
-    if (ch == 12) CLS(); // CTRL-L
-    if (ch ==  1) copy() // CTRL-A
-    if (ch == 15) toggleClick() // CTRL-F
-    if (ch == 'Q') toggleCursor() // CTRL-Q
-    if (ch == 'X') abortLine(); // CTRL-X
-    if (ch == 'T') toggleCaps(); // CTRL-T
-    if (ch == ']') toggleColumn(); // CTRL-]
 
+    // backspace
+    if (ch == 8) {
+      col--;
+      if (col < 2) { col = 39; row--; }
+      if (row < 1) { col = 2; row = 1; }
+      screen(row, col, 32);
+    }
 
     if (col >= 40) {
       col = 2;
       row++;
     }
+
+    // scroll!
     if (row >= 28) {
-      // TODO: scroll!
-      throw 'princ: scroll not implemented!';
+      let start = Date.now();
+      for(let r=2; r<28; r++) {
+	for(let c=0; c<40; c++) {
+	  screen(r-1, c, screen(r, c));
+	  //screen(r-1, c, 65);
+	}
+      }
+      // TODO: if not hidden column mode?
+      row = 27;
+      for(let c=2; c<40; c++) {
+	screen(row, c, 32);
+      }
+      //alert('scroll time='+(Date.now()-start));
     }
   }
 
@@ -323,11 +363,11 @@ l0 FOR I=0 TO 7
   }
 
   function syntax_error() {
-    PRINT('?SYNTAX ERROR');
+    PRINT('?SYNTAX ERROR\n');
   }
   
   function illegal_quantity_error() {
-    PRINT('?ILLEGAL QUANTITY ERROR');
+    PRINT('?ILLEGAL QUANTITY ERROR\n');
   }
   
   function boot() {
@@ -652,20 +692,114 @@ HELLO
 </script>
 
 <script>
+  window.onerror = function(e) {
+    dom('error', ''+e);
+  };
+  
   function rand(n) {
     return Math.floor(Math.random()*n);
   }
   
   TEXT();
   CLS();
+
   boot();
+
+  let line = '';
+  setInterval(_=>{
+    dom('line', line);
+    dom('row', row);
+    dom('col', col);
+  }, 100);
+
+  function editChar(ch) {
+    line += String.fromCharCode(ch);
+    princ(ch);
+  }    
+
+  function editEnter() {
+    princ(10);
+    run(line);
+    PRINT('READY\n');
+    line = '';
+  }
+
+  function run(line) {
+    if (!line || line === '') return;
+    let a = line.split(/\s+/g);
+    let c = a.shift();
+    a = a.map(x=>(+x==x?+x:x));
+    let f = window[c];
+    if (f) f(...a);
+    else syntax_error();
+  }
+  
+  function editBackspace() {
+    line = line.substring(0, line.length-1);
+    princ(8);
+  }
+  
+  function editCancel() {
+    line = '';
+    princ(10);
+  }
+
+  function editCopy() {
+    let c = screen(row, col);
+    editChar(c);
+    princ(c);
+  }
+
+  function ctrlC() {
+    // TODO: how do we do execution? run()
+    // how to break, put on timerinterrupt!
+    princ(10);
+  }
+  
+  let caps = true, click=true, cursor=true, column=false;
+
+  document.addEventListener('keydown', function(e) {
+    let c = e.ctrlKey, k = e.key; s = e.shiftKey;
+    let ch = e.code;
+
+    if (e.keyCode==13) editEnter();
+    if (e.keyCode==8) editBackspace();
+    if (c && k=='c') ctrlC();
+    if (c && k=='x') editCancel();
+    if (c && k=='l') CLS();
+    if (c && k=='a') editCopy();
+    if (c && k=='f') click = !click;
+    if (c && k=='q') cursor = !cursor;
+    if (c && k=='t') caps = !caps;
+    if (c && k=='j') column = !column;
+    if (c && k=='r') window.location.reload();
+    if (c) e.preventDefault();
+  });
+
+  document.addEventListener('keypress', function(e) {
+    let c = e.ctrlKey, k = e.key; s = e.shiftKey;
+    let legc = e.charCode, legk = e.keyCode;
+    let ch = e.code;
+    //    if (legk > 16) 
+    //    alert(`k=${k} legc=${legc} legk=${legk} ch=${ch}`);
+    // TODO: use e.code - but it's crap
+    // and don't reflect shift
+    if (e.keyCode==13) return;
+    editChar(legc);
+  });
+
+  // TODO: this shouldn't be needed,
+  // but setting background-color changes
+  // layout!
+  PAPER(7);
+  INK(0);
 
   if (0) {
     screen(10, 10, 77);
     screen(12, 12, 3);
     screen(14, 14, 16+5);
-    //  PAPER(1);
-    //  INK(7);
+    PAPER(7);
+    INK(5);
   }
   
   if (0)
@@ -678,4 +812,5 @@ HELLO
 </script>
 
 </body>
+
 </html>
