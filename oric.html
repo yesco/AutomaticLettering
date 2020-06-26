@@ -1,0 +1,681 @@
+<html>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<head>
+
+<style>
+/*default version*/
+@font-face {
+	font-family: 'oric-atmos';
+	src: url('oric-atmos.ttf'); 
+	src: 
+		local('oric-atmos'),
+		local('oric-atmos'),
+		url('oric-atmos.ttf') 
+		format('truetype');
+}
+/*container element*/
+pre, span, div { font-family: 'oric-atmos', monospace; }
+/*span elements inside the container div*/
+
+  span {
+      display: inline-block;
+      font-size: 1.4rem;
+      text-align: left;
+  }
+  
+  .char {
+      width: 0.3rem;
+      border: 0px;
+      padding-left: 0.25rem;
+      //width: 50px;
+      //max-width: 50px;
+      //overflow: hidden;
+  }
+  
+</style>
+  
+<script src='misc.js'>
+</script>
+
+</head>
+
+<body style='background-color: black; color: white;'>
+<div style='width:100%'>
+  <img width='20%' src='oric-logo-black-export.svg'/>
+  <div style='float:right; width:80%; text-align:center; font-decoration:bold; text-justify:inter-word; font-size:3rem;'>W E B - B A S I C</div>
+</div>
+
+</br>
+
+<div id='outside' style='width:100%'><center>
+  <div id='screen' style='width:83%; color: black; background-color:white; font-size: 1.05em; text-align: left;
+'></div>
+</center></div>
+
+<script>
+  loadScript('jsconsole.js');
+</script>
+  
+<script>
+
+  // https://osdk.org/index.php?page=articles&ref=ART9.
+  // From a memory point of view, TEXT mode requires 1120 bytes for display (28 lines of 40 columns)
+  // and 1920 bytes for storing the character set
+  // 1120 bytes for the screen (from #BB80 to #BFDF)
+  // 1024 bytes for the default character set (from #B400 to #B7FF)
+  // 896 bytes for the secondary ("alternate") character set (from #B800 to #BB7F)
+  // This makes a total of 3040 bytes.
+  
+  // So if the first byte of the screen (#BB80), contains the value 65 (ASCII code for the upper case A letter), we know that this block of 6x8 pixels will be filled with graphical information stored at the address #B400+(8*65).
+
+  // TODO: define imgs for each character?
+  // then we can 'poke' to change them?
+
+  function TEXT() {
+    for(let row=0; row<28; row++) {
+      let r = '';
+      for(let col=39; col>=0; col--) {
+	let c = String.fromCharCode('0'.charCodeAt(0)+(row+col)%10);
+	//c = '0';
+	c = String.fromCharCode(32+col+row);
+	c = '&nbsp;';
+	let id = `r${row}c${col}`;
+	r = `<span id='a${id}'><span id='c${id}' class='char'>${c}</span>${r}</span>`;
+      }
+      dom('screen', r+'</br>', 'ah');
+    }
+  }
+  // mode: 0 or 1
+  function LORES(mode) {
+    throw "LORES: Not implemented!";
+  }
+
+  // Structurally it is very similar to the TEXT mode, with 40 bytes per line, with each byte representing 6 pixels for a total of 240 pixels in width.
+  // The main difference is that each line is only one pixel tall instead of 8, so there are 200 of these.
+  // The actual graphical resolution is 240x200, but the screen has an additional area at the bottom containing 3 lines of TEXT mode.
+
+  // From a memory point of view, HIRES mode is much more voracious:
+  // 8000 bytes for the HIRES part of the screen (from #A000 to #BF3F)
+  // 120 bytes for the TEXT part of the screen screen (from #BF68 to #BFDF)
+  // 42 bytes lost between the HIRES and TEXT parts of the screen (from #BF40 to #BF67)
+  // 1024 bytes for the default character set (from #9800 to #9BFF)
+  // 1024 bytes for the secondary ("alternate") character set (from #9C00 to #9FFF)
+  // This makes a total of 10210 bytes.
+
+  function HIRES() {
+    throw "HIRES: Not implemented!";
+  }
+  
+  // VALUE	EFFECT
+
+  // Change Ink (foreground) color
+  // 0	Change INK to BLACK
+  // 1	Change INK to RED
+  // 2	Change INK to GREEN
+  // 3	Change INK to YELLOW
+  // 4	Change INK to BLUE
+  // 5	Change INK to MAGENTA
+  // 6	Change INK to CYAN
+  // 7	Change INK to WHITE
+
+  // Character Set modifier
+  // 8	Use Standard Charset
+  // 9	Use Alternate Charset
+  // 10	Use Double Size Standard Charset
+  // 11	Use Double Size Alternate Charset
+  // 12	Use Blinking Standard Charset
+  // 13	Use Blinking Alternate Charset
+  // 14	Use Double Size Blinking Standard Charset
+  // 15	Use Double Size Blinking Alternate Charset
+
+  // Change Paper (background) color
+  // 16	Change PAPER to BLACK
+  // 17	Change PAPER to RED
+  // 18	Change PAPER to GREEN
+  // 19	Change PAPER to YELLOW
+  // 20	Change PAPER to BLUE
+  // 21	Change PAPER to MAGENTA
+  // 22	Change PAPER to CYAN
+  // 23	Change PAPER to WHITE
+
+  // Video control attributes
+  // 24	Switch to TEXT mode (60 Hz)
+  // 25
+  // 26	Switch to TEXT mode (50 Hz)
+  // 27
+  // 28	Switch to HIRES mode (60 Hz)
+  // 29
+  // 30	Switch to HIRES mode (50 Hz)
+  // 31
+  const color = {
+    black:   '#000000', 0: '#000000',
+    red:     '#FF0000', 1: '#FF0000',
+    green:   '#00FF00', 2: '#00FF00',
+    yellow:  '#FFFF00', 3: '#FFFF00',
+    blue:    '#0000FF', 4: '#0000FF',
+    magnenta:'#FF00FF', 5: '#FF00FF',
+    cyan:    '#00FFFF', 6: '#00FFFF',
+    white:   '#FFFFFF', 7: '#FFFFFF',
+  };
+    
+  let inverse = n=>7-n;
+  
+  function screen(row, col, ch) {
+    let da = dom(`ar${row}c${col}`);
+    let dc = dom(`cr${row}c${col}`);
+
+    let fg, bg, t;
+
+    let c = ch & 0x7f;
+    if (c >= 32) { // ascii
+      t = ch & 0x7f;
+    } else if (c < 8) { // ink
+      fg = c & 0x07;
+    } else if (c < 16) {
+      // Character Set modifier
+      // 8  Use Standard Charset
+      // 9  Use Alternate Charset
+      // 10 Use Double Size Standard Charset
+      // 11 Use Double Size Alternate Charset
+      // 12 Use Blinking Standard Charset
+      // 13 Use Blinking Alternate Charset
+      // 14 Use Double Size Blinking Standard Charset
+      // 15 Use Double Size Blinking Alternate Char
+    } else if (c < 23) { // 16-23 paper
+      bg = c & 0x07;
+    } else {
+      // TODO: mode switching
+      // Video control attributes
+      // 24-27 Switch to TEXT mode (60 Hz)
+      // 28-31 Switch to HIRES mode (60 Hz)
+    }
+
+    if (c > 127) {
+      if (bg) bg = inverse(bg);
+      if (fg) fg = inverse(fg);
+    }
+
+    dom(da).style=
+      (bg ? `background-color:${color[bg]};` : '') +
+      (fg ? `color:${color[fg]};` : '');
+    if (bg || fg) t = 32;
+
+    if (t == 32) 
+      dom(dc, '&nbsp;', 'h');
+    else if (t !== undefined)
+      dom(dc, String.fromCharCode(t), 'h');
+  }
+
+  function INK(color) {
+    for(let row=0; row<28; row++) {
+      screen(row, 1, color);
+    }
+  }
+  function PAPER(color) {
+    for(let row=0; row<28; row++) {
+      screen(row, 0, 16+color);
+    }
+  }
+
+  function exmple_PAPER() {
+    return `
+l0 FOR I=0 TO 7 
+20 INK I 
+30 FOR J=0 TO 7 
+40 PAPER J 
+50 WAIT 50 
+60 NEXT J 
+70 NEXT I 
+80 INK 0 
+`;
+  }
+
+  function example_PRINT_AT() {
+    return `
+10 FOR X=2 TO 30 
+20 PRINT @X,10;·• WHIZZ2" 
+30 NEXT X
+`;
+  }
+
+
+  const ESC = 27;
+  
+  let row = 1, col = 2, raw = false;
+
+  function princ(c) {
+    // TODO: how to handle inverse?
+    let ch = c & 0x7f;
+    if (ch === ESC) return raw = true;
+      
+    if (raw || ch >= 32) {
+      screen(row, col, c);
+      col++;
+    }
+    raw = false;
+
+    if (ch == 10) { row++; col = 2; }
+    if (ch == 12) CLS(); // CTRL-L
+    if (ch ==  1) copy() // CTRL-A
+    if (ch == 15) toggleClick() // CTRL-F
+    if (ch == 'Q') toggleCursor() // CTRL-Q
+    if (ch == 'X') abortLine(); // CTRL-X
+    if (ch == 'T') toggleCaps(); // CTRL-T
+    if (ch == ']') toggleColumn(); // CTRL-]
+
+
+    if (col >= 40) {
+      col = 2;
+      row++;
+    }
+    if (row >= 28) {
+      // TODO: scroll!
+      throw 'princ: scroll not implemented!';
+    }
+  }
+
+  let vars = {};
+  // 20LETSEL=0 => 20 LET SEL = 0
+  // TODO: 63999 max
+  //  
+  // integer -32767 to 32768
+  // A%
+  // A$
+
+  function LET(n, v) {
+    //n = n.substring(0, 2);
+    vars[n] = v;
+  }
+  function val(n) {
+    //n = n.substring(0, 2);
+    return vars[n];
+  }
+  
+  // Also CTRL-L
+  function CLS() {
+    // TODO: does it resent colors?
+    for(let row=0; row<28; row++) {
+      for(let col=2; col<40; col++) {
+	screen(row, col, 32);
+      }
+    }
+    row = 1; col = 2; raw = false;
+  }
+
+  // 20 INPUT"ENTER SALE PRICE";SELL
+  function INPUT(prompt, v) {
+  }
+
+  // #FFFFF 
+  // PRINT "FOO"BAR"
+  // PRINT "4*3="; 4*3
+  // PRINT "FOO";"BAR" => FOOBAR
+  // ?35 == PRINT 35
+  // PRINT 1;2 => <spc>1<spc><spc>2<spc>
+  // 40 PRINT"THE CODE FOR "A$"="ASC(A$)
+  // PRINT "foo",
+  // PRINT "bar"    > fooo       bar 
+  // 20 PRINT @X,10;·• WHIZZ2" 
+  function PRINT(txt) {
+    for(let i=0; i<txt.length; i++)
+      princ(txt.charCodeAt(i));
+  }
+
+  function syntax_error() {
+    PRINT('?SYNTAX ERROR');
+  }
+  
+  function illegal_quantity_error() {
+    PRINT('?ILLEGAL QUANTITY ERROR');
+  }
+  
+  function boot() {
+    let txt = `
+ORIC EXTENDED BASIC Vl.1
+(C) 1983 TANGERINE
+88888 BYTES FREE
+READY
+`;
+    PRINT(txt);
+  }
+
+  // TODO: Basic Lines max 80 chars bell at 79?
+
+  // LIST -100
+  // LIST 100-
+  // LIST 100-200
+  function LIST() {
+  }
+
+  function EDIT(lno) {
+  }
+  
+  function RUN(lno) {
+  }
+
+  function GOTO(lno) {
+  }
+
+  // WAIT 100 = 1s
+  function WAIT(decaseconds) {
+  }
+  
+  function example_VAT() {
+    return `
+10 REM *VAT Calculation* 
+20 INPUT"ENTER SALE PRICE";SELL 
+30 LET UAT=0. 15*SELL 
+40 LET PRICE=SELL+UAT 
+50 PRINT "TOTAL=";PRICE 
+60 'Round agan for next calculatoin
+70 WAIT 500:CLS:GOTO 20
+`;
+  }
+
+  function  example_NAME() {
+    return `
+l 10 A$="0RIC" 
+120 LET Al$="BASI·C" 
+130 LET LAST$="LESSON" 
+140 INPUT"ENTER YOUR NAME,PLEASE";NAME$ 
+150 CLS:PRINT A$;" ";Al$;" ";LAST$ 
+160 PRINT "FOR ";NAME$
+`;
+  }
+
+  function example_KEY() {
+    return `
+10 PRINT"PRESS A KEY" 
+20 GET A$ 
+30 PRINT"YOU PRESSED "A$ 
+40 PRINT"THE CODE FOR "A$"="ASC(A$) 
+50 GOTO 10
+`;
+  }
+
+  function example_DEF() {
+    return`
+5 REM*Define Function M to convert feet 
+to metres 
+10 DEF FNM(FEET)=FEET*0.3048 
+20 INPUT"HOW MANY FEET";X 
+30 M=FNM(X) 
+40 PRINT X;"FEET EQUAL";M;" METRES"
+`;
+}
+
+  function example_FOR() {
+    return `
+10 FOR L=l TO 5:PRINT L*L:NEXT L 
+
+10 FOR L=10 TO 5 STEP-l:PRINT L*L:NEXT 
+
+10 CLS 
+20 FOR LOOP=0 TO 25 
+30 PRINT CHR$(65+LOOP)+CHRS(97+LOOP); 
+40 NEXT LOOP 
+`;
+  }
+
+  function example_READ_DATA() {
+    return `
+10 REM*READ o.nd DATA* 
+20 FOR 0=0 TO 6 
+30 READ D$ 
+40 PR1NT D$ 
+50 NEXT 
+60 REM . . . lots more program 
+70 ' 
+2000 DATA MONDAY,TUESDAY,WEDNESDAY,THUR 
+SDAY 
+2010 REM ... more program in between 
+3000 DATA FRIDAY, SATURDAY,SUNDAY 
+4000 REM .. co.n do it 0.90.in 
+4010 RESTORE 
+4020 FOR K=l TO 7 
+4030 READ DAY$:PRINT DAY$:NEXT
+`;
+  }
+
+  function example_DIM() {
+    return `
+10 INPUT"HOW MANY NAMES" ;N% 
+20 DIM NAME$(N%):DIM AGE(N%)
+30 CLS:SLJM=0 
+40 FOR K=1 TO N..< 
+50 PRINT "ENTER NAME t'-10. "K 
+60 INPUT NAME$CK) 
+70 PRINT NAME$CKJ"'S AGE ?" 
+80 INPUT AGECKJ :SLJM=SLJM+AGECKJ 
+80 CLS 
+100 NEXT K 
+110 FOR K=Nx TO 1 STEP -1 
+120 PRINT :PR1NT NAME$CKJ" JS";
+`;
+  }
+  
+  function example_MULTIDIM() {
+    return `
+10 DIM NXC10,3) 
+20 CLS 
+30 FOR K=l TO 10 
+40 ~OR J=l TO 3 
+50 NxCK,JJ=K"J 
+60 PRINT NxCK,JJ 
+70 NEXT J 
+80 PRINT 
+90 NEXT K
+`;
+  }
+
+  function example_BUBBLESORT() {
+    return `
+5 REM*NUMERIC BUBBLE SORT** 
+10 CLS:LET J=15 'Number of items 
+20 DIM NUMCJJ'ATray foT numbeTs 
+30 'Example numbers generated here" 
+40 FOR K=0 TO J 
+50 LET NUMCKJ=RNDC1J*1000 
+60 PRINT NUMCKJ 
+70 NEXT K 
+99 ' 
+100 REM*SORT*ROUTINE* 
+101 ' 
+110 FOR M=l TO CJ-lJ 
+120 FOR N=M TO J 
+125 REM If correct ordeT 
+already,then skip 
+130 IF NUMCMJ<NUMCNJ THEN 170 
+135 REM Incorrect order,so swap 
+140 TEMP=NUMCMJ 
+150 NUMCMJ=NUMCNJ 
+160 NUMCNJ=TEMP 
+170 NEXT N 
+180 NEXT M 
+189 ' 
+190 REM**ENDSORT** 
+191 ' 
+200 REM *Print sorted list* 
+210 CLS:PRINT ''SORTED LIST:" 
+220 FOR K::::JTO J 
+230 PRINT NUMCKJ 
+240 NEXT K 
+`;
+  }
+
+  // loop is completed, the address is removed, and a subsequent NEXT will 
+  // activate a jump to the address now on the top of the pile. The stack can only 
+  // hold 10 addresses, and more than 10 loops will give an ?OUT OF MEMOR
+  
+  function DIM() {}
+
+  function END() {}
+  
+  function READ() {}
+  function DATA() {}
+  function RESTOR() {}
+  
+  function FOR_TO_STEP() {}
+  function NEXT() {}
+
+  // GET K$
+  function GET() {}
+  function READ() {}
+  function DATA() {}
+
+  function ASC() {}
+
+  function CHR$() {}
+
+  function STR$() {}
+
+  // evaluated first, before any other calculations are worked out. 
+  //The other string function for numeric conversion is HEX$. This returns 
+  // the string form of the hexadecimal number equivalent to the argument. For 
+  // example, HEX$C4I8) returns #IA2. Since hexadecimal numbers can only be 
+  // integers between 0 and 65535, any numbers outside that range will give a 
+  // ?ILLEGAL QUANTITY ERROR, and any non-integer values will be auto-
+  // matically rounded.
+
+  function HEX$() {}
+
+  function LEFT$(s, n) {}
+  function RIGHT$(s, n) {}
+  function MID$(s, a, b) {}
+  
+  function VAL() {}
+  
+  function INT() {}
+  
+  function PING() {}
+  
+
+  // REM comment
+  // ' commment
+  function REM() {}
+
+  // MATH
+  // + - * / ^
+  // Oric BASIC has the following built-in numeric functions: 
+  // Returns absolute magnitude of n
+  function ABS(n) {}
+  // Returns arctangent of n 
+  function ATN(n) {}
+  // Returns cosine of n 
+  function COS(n) {}
+  // Returns e raised to the power of n 
+  function EXP(n) {}
+  // Returns n truncated to integer 
+  function INT(n) {}
+  // Returns natural (base e) logarithm of n 
+  function LN(n) {}
+  // Returns common (base 10) logarithm of n 
+  function LOG(n) {}
+  // Returns value of pi
+  function PI() {}
+  // Returns a random number 
+  function RND(n) {}
+  function RANDOMIZE() {}
+  // Returns 0 if n zero, 
+  // 1 if positive, 
+  // -1 if negative. 
+  function SGN(n) {}
+  // Returns sine of n 
+  function SIN(n) {}
+  // Returns square root of n 
+  function SQR(n) {}
+  // Returns tangent of n
+  function TAN(n) {}
+
+  // tested by means of conditional operators: 
+  // Equal to 
+  // <> Not equal to 
+  // > Greater than 
+  // < Less than 
+  // >= Greater than or equal to 
+  // < = Less than or equal to 
+  // These operate much as you would expect for numeric values. Two things 
+  // need to be remembered, however. The fir
+
+  // 10 DEF FNMCFEETJ=FEET*0.3048 
+  function DEFFN(n, exp) {}
+
+  function AND() {}
+  function OR() {}
+  function NOT() {}
+
+  function example_ON_GOTO() {
+    return `
+10 l NPUT" ENTER 1 .. 2 OR 3_, PLEASE' ' ;N 
+20 ON N GOTO 150,200,300 
+140 RP1 
+159 PRINT "LINE 150 FROM N=J";GClTO 10 
+190 REM 
+200 PRINT "LINE 200 FROM N=2":GOTO 10 
+290 REM 
+300 PRINT "LINE 300 FROM N=3" :GOTO 10
+`;
+  }
+
+  function TAB() {}
+  function PEEK() {}
+  function POKE() {}
+
+  function CSAVE() {}
+
+  function CLOAD() {}
+  function STORE() {}
+  function RECALL() {}
+  
+  function example_TAB() {
+    return `
+10 FOR 1=0 TO 5 
+20 PRINT TABCIJ; "HELLO" 
+30 NEXT I 
+HELLO 
+HELLO 
+ HELLO 
+  HELLO 
+   HELLO 
+    HELLO
+`;
+  }
+  function ON_GOTO() { }
+  function GOSUM() {}
+  function RETURN() {}
+
+  function IF_THEN_ELSE(e, t, e) {}
+  function REPEAT() {}
+  function UNTIL() {}
+  
+</script>
+
+<script>
+  function rand(n) {
+    return Math.floor(Math.random()*n);
+  }
+  
+  TEXT();
+  CLS();
+  boot();
+
+  if (0) {
+    screen(10, 10, 77);
+    screen(12, 12, 3);
+    screen(14, 14, 16+5);
+    //  PAPER(1);
+    //  INK(7);
+  }
+  
+  if (0)
+    setInterval(_=>{
+      for(let i=0; i<100; i++)
+	screen(rand(28), rand(40), rand(256));
+      PAPER(rand(8));
+      INK(rand(8));
+    }, 0);
+</script>
+
+</body>
+</html>

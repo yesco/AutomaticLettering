@@ -547,12 +547,27 @@ function domake(...spec) {
 function loadScript(src, cbLoad, cbErr) {
   let d = document.createElement('script');
   d.src = src;
+  // called even if parse errors, run errors
+  d.windowonerrorsaved = window.onerror;
+  window.onerror = cbErr ||
+    (e=>{
+      console.error(`loadScript.window.error(parse/js script error): ${e} for ${src}`);
+      window.onerror = d.windowonerrorsaved;
+    });
   d.onload = cbLoad ||
-    (x=>alert(`loadScript.load: ${x} of ${src}`));
+    (x=>{
+      console.info(`loadScript.load: ${x} of ${src}`, x);
+      window.onerror = d.windowonerrorsaved;
+    });
+  // file not found
   d.onerror = cbErr ||
-    (x=>alert(`loadScript.error: ${x} of ${src}`));
+    (e=>{
+      console.error(`loadScript.error: ${e} of ${src}`, e);
+      window.onerror = d.windowonerrorsaved;
+    });
   document.body.appendChild(d);
 }
+
 function from(what, ...args) {
   if (!what) return;
   let t = typeof what;

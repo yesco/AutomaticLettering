@@ -809,7 +809,14 @@ OLD
 
 <!-- anyway to see status on a script tag?-->
 <!-- todo: provide a loadScript() function...-->
-<script>
+<script id='fish'>
+  function foo() {
+    try {
+      eval('a=33;\nb=7asd;l asdlkjsadf;c=99;\n');
+    } catch (e) {
+      window.e = e;
+    }
+  }
 </script>
 
 </body>
