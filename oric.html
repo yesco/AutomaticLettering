@@ -49,11 +49,10 @@ pre, span, div { font-family: 'oric-atmos', monospace; }
 
 </br>
 
-<div id='outside' style='width:100%'><center>
+<center>
   <div id='screen' style='width:83%; color: black; font-size: 1.05em; text-align: left;
 '></div>
-</center></div>
-
+</center>
 
 <br><br>
 <input autofocus style='background:black; color:black; border:none;'>
@@ -63,8 +62,10 @@ COL: <span id='col'></span>
 <br>
 LINE: <span id='line'></span>
 <br>
+ERROR: <span id='error'></span>
 <br>
-LINE: <span id='error'></span>
+VARS: <span id='vars'></span>
+
 <script>
   loadScript('jsconsole.js');
 </script>
@@ -88,15 +89,13 @@ LINE: <span id='error'></span>
     for(let row=0; row<28; row++) {
       let r = '';
       for(let col=39; col>=0; col--) {
-	let c = String.fromCharCode('0'.charCodeAt(0)+(row+col)%10);
-	//c = '0';
-	c = String.fromCharCode(32+col+row);
 	c = '&nbsp;';
 	let id = `r${row}c${col}`;
 	r = `<span id='a${id}'><span id='c${id}' class='char'>${c}</span>${r}</span>`;
       }
       dom('screen', r+'</br>', 'ah');
     }
+    cache = {};
   }
   // mode: 0 or 1
   function LORES(mode) {
@@ -275,7 +274,24 @@ l0 FOR I=0 TO 7
   
   let row = 1, col = 2, raw = false;
 
+  function cursorOff() {
+    let d = domc(`cr${row}c${col}`);
+    // TODO: implement real inverse
+    // here we don't know actual color!
+    d.style.backgroundColor = '';
+    d.style.color = '';
+  }
+
+  function cursorOn() {
+    let d = domc(`cr${row}c${col}`);
+    // TODO: implement real inverse
+    // here we don't know actual color!
+    d.style.backgroundColor = 'black';
+    d.style.color = 'white';
+  }
+  
   function princ(c) {
+    cursorOff();
     // TODO: how to handle inverse?
     let ch = c & 0x7f;
     if (ch === ESC) return raw = true;
@@ -309,7 +325,6 @@ l0 FOR I=0 TO 7
       for(let r=2; r<28; r++) {
 	for(let c=0; c<40; c++) {
 	  screen(r-1, c, screen(r, c));
-	  //screen(r-1, c, 65);
 	}
       }
       // TODO: if not hidden column mode?
@@ -319,6 +334,7 @@ l0 FOR I=0 TO 7
       }
       //alert('scroll time='+(Date.now()-start));
     }
+    cursorOn();
   }
 
   let vars = {};
@@ -329,8 +345,13 @@ l0 FOR I=0 TO 7
   // A%
   // A$
 
-  function LET(n, v) {
-    //n = n.substring(0, 2);
+  function LET(n, ...args) {
+    // TODO: not good for strings
+    let v = args.join(' '); 
+    while (v.length && v.match(/^[ =]/)) {
+      print('string: ' + v);
+      v = v.substring(1);
+    }
     vars[n] = v;
   }
   function val(n) {
@@ -340,6 +361,7 @@ l0 FOR I=0 TO 7
   
   // Also CTRL-L
   function CLS() {
+    cursorOff();
     // TODO: does it resent colors?
     for(let row=0; row<28; row++) {
       for(let col=2; col<40; col++) {
@@ -347,6 +369,7 @@ l0 FOR I=0 TO 7
       }
     }
     row = 1; col = 2; raw = false;
+    cursorOn();
   }
 
   // 20 INPUT"ENTER SALE PRICE";SELL
@@ -363,17 +386,32 @@ l0 FOR I=0 TO 7
   // PRINT "foo",
   // PRINT "bar"    > fooo       bar 
   // 20 PRINT @X,10;·• WHIZZ2" 
-  function PRINT(txt) {
+  function print(txt, nonewline) {
+    txt = '' + txt;
     for(let i=0; i<txt.length; i++)
       princ(txt.charCodeAt(i));
+    if (!nonewline) princ(10);
+  }
+
+  function PRINT(txt) {
+    // TODO: parse!
+    //for(let i=0; i<txt.length; i++)
+    //princ(txt.charCodeAt(i));
+    //princ(10);
+    print(txt);
   }
 
   function syntax_error() {
-    PRINT('?SYNTAX ERROR\n');
+    print('?SYNTAX ERROR');
   }
   
+  // TODO: not original?
+  function cont_error() {
+    print('?CAN\'T CONTINUE');
+  }
+
   function illegal_quantity_error() {
-    PRINT('?ILLEGAL QUANTITY ERROR\n');
+    print('?ILLEGAL QUANTITY ERROR');
   }
   
   function boot() {
@@ -381,9 +419,8 @@ l0 FOR I=0 TO 7
 ORIC EXTENDED BASIC Vl.1
 (C) 1983 TANGERINE
 88888 BYTES FREE
-READY
 `;
-    PRINT(txt);
+    print(txt);
   }
 
   // TODO: Basic Lines max 80 chars bell at 79?
@@ -391,18 +428,128 @@ READY
   // LIST -100
   // LIST 100-
   // LIST 100-200
+
+  // TODO: sorted?
+  let lines = {
+    10: 'PRINT "HELLO"',
+    15: 'GOSUB 100',
+    20: 'GOTO 10',
+    100: 'PRINT "GOSUB"',
+    110: 'RETURN',
+  };
+
   function LIST() {
+    stop();
+    line = '';
+    let lastlineno = 0;
+    RUN.interval = setInterval(_=>{
+
+      lineno = lastlineno;
+      nextline();
+      if (!line)
+	stop();
+      else
+	print(lineno + ' ' + line);
+
+      lastlineno = lineno;
+      // better set it to nothing...
+      lineno = 0;
+    });
+
+    // can't be interrupted!
+    //for(let k in lines) { // always ordered!
+    //print(k + ' ' + lines[k]);
+    //}
   }
 
   function EDIT(lno) {
+    LIST(lno);
   }
   
+  let lineno = 0;
   function RUN(lno) {
+    // init
+    lineno = (+lno || 0) - 1;
+    line = '';
+    stack = [];
+    vars = {}
+    
+    stop();
+    cont();
+  }
+  
+  function nextline() {
+    // crazy linear search for next!
+    // you could goto any number
+    // it just find the next numerically
+    line = '';
+    while (!line && lineno < 65536) {
+      lineno++;
+      // TODO: these aren't guaranteed to be in order? only when for-in!!!
+      line = lines[lineno];
+    }
+    if (line === undefined) line = '';
   }
 
+  function cont() {
+    RUN.interval = setInterval(_=>{
+      nextline();
+      if (line && trace) print(lineno + ' ' + line)
+      if (!run(line)) stop();
+    });
+  }
+  
+  function CONT() {
+    if (!CONT.lineno)
+      return cont_error();
+
+    lineno = CONT.lineno;
+    line = CONT.line;
+    delete CONT.lineno;
+    delete CONT.line;
+
+    cont();
+  }
+  function CONTINUE() { CONT(); }
+  
+  function ON_GOTO() { }
+
+  let stack = []; // [ [lno, restline] ...]
+  function GOSUB(lno) {
+    stack.push([lineno, line]);
+    lineno = lno-1;
+    print('[gosub ' + (+lno) + ']');
+    line = '';
+  }
+  function RETURN() {
+    [lineno, line] = stack.pop();
+  }    
+
+  function stop() {
+    let wasrunning = RUN.interval;
+    if (col > 2) princ(10);
+    if (wasrunning) {
+      clearInterval(RUN.interval);
+      delete RUN.interval;
+    }
+    line = '';
+    return wasrunning;
+  }
+  
   function GOTO(lno) {
+    lineno = lno;
   }
 
+  function ctrlC() {
+    let lno = lineno;
+    let l = line;
+    if (stop()) {
+      print('INTERUPTED AT LINE ' + lineno)
+      CONT.lineno = lno;
+      CONT.line = l;
+    }
+  }
+  
   // WAIT 100 = 1s
   function WAIT(decaseconds) {
   }
@@ -687,10 +834,6 @@ HELLO
     HELLO
 `;
   }
-  function ON_GOTO() { }
-  function GOSUM() {}
-  function RETURN() {}
-
   function IF_THEN_ELSE(e, t, e) {}
   function REPEAT() {}
   function UNTIL() {}
@@ -724,34 +867,68 @@ HELLO
   CLS();
 
   boot();
+  run();
 
   let line = '';
   setInterval(_=>{
     dom('line', line);
     dom('row', row);
     dom('col', col);
+    dom('vars', JSON.stringify(vars));
   }, 100);
-
+  // clear initial error
+  dom('error', '');
+  
   function editChar(ch) {
-    line += String.fromCharCode(ch);
-    princ(ch);
+    let c = String.fromCharCode(ch);
+    // ignore keyboard setting
+    if (caps)
+      c = c.toUpperCase();
+    else
+      c = c.toLowerCase();
+    line += c;
+    princ(c.charCodeAt(0)); // lol
   }    
 
   function editEnter() {
     princ(10);
-    run(line);
-    PRINT('READY\n');
+    if (run(line)) print('READY');
     line = '';
   }
 
+  // interprets and runs one line
+  // returns true if ok
+  // END return false
   function run(line) {
-    if (!line || line === '') return;
-    let a = line.split(/\s+/g);
-    let c = a.shift();
+    if (!line || line === '') return true;
+    line = line.trim();
+
+    let many = line.split(':');
+    // TODO: incorrect, and can't CTRL-C!
+    if (many != line)
+      return many.some(x=>!run(x));
+
+    // quote strings
+    line = line.replace(
+      /\".?\"/g,
+      s=>s.replace(/!/g, '!!')
+	.replace(/ /g, '!s!'));
+    let a = line.split(/[\s;=\(\),]+\s*/g);
+    // unquote strings
+    a = a.map(
+      s=>s.replace(/!s!/g, ' ')
+	.replace(/!!/g, '!'));
+    // make numbers out of numbers
     a = a.map(x=>(+x==x?+x:x));
+    print('------' + a.join(' | '));
+
+    let c = a.shift();
     let f = window[c];
-    if (f) f(...a);
+    if (f) f.apply(line, a);
     else syntax_error();
+
+    if (c === 'END') return false;
+    return true;
   }
   
   function editBackspace() {
@@ -767,23 +944,33 @@ HELLO
   function editCopy() {
     let c = screen(row, col);
     editChar(c);
-    princ(c);
   }
 
-  function ctrlC() {
-    // TODO: how do we do execution? run()
-    // how to break, put on timerinterrupt!
-    princ(10);
+  function editArrow(ch) {
+    cursorOff();
+    switch(ch) {
+    case 37: col--; break; // left
+    case 38: row--; break; // up
+    case 39: col++; break; // right
+    case 40: row++; break; // down
+    }
+    // move cursor, wrap around (?)
+    // TODO: columns mode?
+    if (col < 2) col = 39;
+    if (col > 39) col = 2;
+    if (row < 0) row = 27;
+    if (row > 27) row = 0;
+    cursorOn();
   }
-  
-  let caps = true, click=true, cursor=true, column=false;
+
+  let caps=true, click=true, cursor=true, column=false, trace=false;
 
   document.addEventListener('keydown', function(e) {
-    let c = e.ctrlKey, k = e.key; s = e.shiftKey;
-    let ch = e.code;
-
-    if (e.keyCode==13) editEnter();
-    if (e.keyCode==8) editBackspace();
+    let c = e.ctrlKey, k = e.key.toLowerCase();
+    let s = e.shiftKey, ch = e.code;
+    let kc = e.keyCode;
+    if (kc==13) editEnter();
+    if (kc==8) editBackspace();
     if (c && k=='c') ctrlC();
     if (c && k=='x') editCancel();
     if (c && k=='l') CLS();
@@ -792,7 +979,12 @@ HELLO
     if (c && k=='q') cursor = !cursor;
     if (c && k=='t') caps = !caps;
     if (c && k=='j') column = !column;
+    if (37 <= kc && kc <= 40) editArrow(kc);
+
+    // my extensions
     if (c && k=='r') window.location.reload();
+    if (c && k=='p') trace = !trace;
+
     if (c) e.preventDefault();
   });
 
@@ -805,7 +997,7 @@ HELLO
     // TODO: use e.code - but it's crap
     // and don't reflect shift
     if (e.keyCode==13) return;
-    editChar(legc);
+    editChar(legc) // , e.getModifierState("CapsLock"));
   });
 
   // TODO: this shouldn't be needed,

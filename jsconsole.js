@@ -1,4 +1,5 @@
 // poor mans mobile browser console
+if (typeof aaa === 'undefined') aaa = '';
 aaa += 'C';
 
 // TODO: consider adding configurations
@@ -172,7 +173,9 @@ scroll -  by sliding</br>
       //	    dom('DBGcmd').focus();
     } else {
       // TODO: restore cursor
-      dom('exp').focus();
+      // TODO: move out of there, this is automatic specific!
+      let d = document.getElementById('exp');
+      if (d) d.focus();
     }
     return;
   }
