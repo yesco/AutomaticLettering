@@ -22,18 +22,43 @@ pre, span, div { font-family: 'oric-atmos', monospace; }
       display: inline-block;
       font-size: 1.5rem;
       text-align: left;
-      //color: black;
   }
   
   .char {
       width: 0.30rem;
       border: 0px;
       padding-left: 0.25rem;
-      //width: 50px;
-      //max-width: 50px;
-      //overflow: hidden;
   }
-  
+
+  /* TODO: investigate!
+  {
+       font-size: 12px;
+       letter-spacing: 0.015em;
+       word-spacing: 0.001em;
+  }
+ */
+  /* https://developer.mozilla.org/en-US/docs/Web/CSS/transform */
+  /* we can get double height! but only
+     on each char; the problem is the nested
+     elements - do it twice and it'll double
+     again!
+
+     TODO: I couldn't find a way to translate
+     the it and 'clip-y' seems 'overflow-y: hidden isn't working...
+ */
+  .double {
+      width: 0.30rem;
+      border: 0px;
+      padding-left: 0.25rem;
+
+      //max-height: 45px;
+      transform:
+	  scale(1, 2)
+	       /* translateY(15px); */
+      ;
+      overflow-x: visible;
+      /* overflow-y: hidden; /* doesn't work */
+  }
 </style>
   
 <script src='misc.js'>
@@ -44,7 +69,7 @@ pre, span, div { font-family: 'oric-atmos', monospace; }
 <body style='background-color: black; color: white;'>
 <div style='width:100%'>
   <img width='20%' src='oric-logo-black-export.svg'/>
-  <div style='float:right; width:80%; text-align:center; font-decoration:bold; text-justify:inter-word; font-size:3rem;'>W E B - B A S I C</div>
+  <div style='float:right; top:0; width:80%; text-align:center; font-decoration:bold; text-justify:inter-word; font-size:3rem;'>W E B - B A S I C</div>
 </div>
 
 </br>
@@ -63,15 +88,55 @@ COL: <span id='col'></span>
 <br>
 LINE: <span id='line'></span>
 <br>
-ERROR: <span id='error'></span>
+ERROR: <span id='stats'></span>
+<br>
+ERROR: <span id='error' style='color:red;'></span>
 <br>
 VARS: <span id='vars'></span>
-
-<script>
-  loadScript('jsconsole.js');
+<br>
+INFO:<br><span id='info'></span>
+<br>
+<br>
+<script src='jsconsole.js'>
+  //loadScript('jsconsole.js');
 </script>
   
 <script>
+  let vars = {},
+      stack = [], // [ [lno, restline] ...]
+      line = '',
+      caps = true,
+      click = true,
+      column = false,
+      trace = false,
+      row = 1,
+      col = 2;
+
+  const ESC = 27;
+
+  function boot() {
+    stop();
+    
+    // init
+    vars = {};
+    stack = [];
+    line = '';
+    caps = true
+    click = true
+    column = false
+    trace = false;
+    row = 1;
+    col = 0;
+    
+    showStatus();
+
+    print(`
+ORIC EXTENDED BASIC Vl.1
+(C) 1983 TANGERINE
+
+373188 BYTES FREE
+`);
+  }
 
   // https://osdk.org/index.php?page=articles&ref=ART9.
   // From a memory point of view, TEXT mode requires 1120 bytes for display (28 lines of 40 columns)
@@ -86,6 +151,7 @@ VARS: <span id='vars'></span>
   // TODO: define imgs for each character?
   // then we can 'poke' to change them?
 
+  // TODO: calling twice messes something up
   function TEXT() {
     for(let row=0; row<28; row++) {
       let r = '';
@@ -117,50 +183,10 @@ VARS: <span id='vars'></span>
 
   // http://twilighte.oric.org/twinew/ula.htm
   function HIRES() {
+    implemented_error('HIRES');
     throw "HIRES: Not implemented!";
   }
   
-  // VALUE	EFFECT
-
-  // Change Ink (foreground) color
-  // 0	Change INK to BLACK
-  // 1	Change INK to RED
-  // 2	Change INK to GREEN
-  // 3	Change INK to YELLOW
-  // 4	Change INK to BLUE
-  // 5	Change INK to MAGENTA
-  // 6	Change INK to CYAN
-  // 7	Change INK to WHITE
-
-  // Character Set modifier
-  // 8	Use Standard Charset
-  // 9	Use Alternate Charset
-  // 10	Use Double Size Standard Charset
-  // 11	Use Double Size Alternate Charset
-  // 12	Use Blinking Standard Charset
-  // 13	Use Blinking Alternate Charset
-  // 14	Use Double Size Blinking Standard Charset
-  // 15	Use Double Size Blinking Alternate Charset
-
-  // Change Paper (background) color
-  // 16	Change PAPER to BLACK
-  // 17	Change PAPER to RED
-  // 18	Change PAPER to GREEN
-  // 19	Change PAPER to YELLOW
-  // 20	Change PAPER to BLUE
-  // 21	Change PAPER to MAGENTA
-  // 22	Change PAPER to CYAN
-  // 23	Change PAPER to WHITE
-
-  // Video control attributes
-  // 24	Switch to TEXT mode (60 Hz)
-  // 25
-  // 26	Switch to TEXT mode (50 Hz)
-  // 27
-  // 28	Switch to HIRES mode (60 Hz)
-  // 29
-  // 30	Switch to HIRES mode (50 Hz)
-  // 31
   const color = {
     black:   '#000000', 0: '#000000',
     red:     '#FF0000', 1: '#FF0000',
@@ -219,6 +245,14 @@ VARS: <span id='vars'></span>
       // 13 Use Blinking Alternate Charset
       // 14 Use Double Size Blinking Standard Charset
       // 15 Use Double Size Blinking Alternate Char
+      let alt = c & 1;
+      let double = c & 2;
+      let blink = c & 4;
+      // TODO: alt - complicated (edit font?)
+      // https://en.fontke.com/font/10042736/
+      // https://github.com/Zigazou/miedit
+      // https://github.com/Zigazou/miedit/tree/master/font
+      
     } else if (c < 24) { // 16-23 paper
       let bg = c & 0x07;
       if (bg > 127) bg = inverse(bg);
@@ -239,12 +273,14 @@ VARS: <span id='vars'></span>
   }
 
   function INK(color) {
-    for(let row=0; row<28; row++) {
+    // skip status line
+    for(let row=1; row<28; row++) {
       screen(row, 1, color);
     }
   }
   function PAPER(color) {
-    for(let row=0; row<28; row++) {
+    // skip status line
+    for(let row=1; row<28; row++) {
       screen(row, 0, 16+color);
     }
   }
@@ -270,14 +306,10 @@ l0 FOR I=0 TO 7
 `;
   }
 
-
-  const ESC = 27;
-  
-  let row = 1, col = 2, raw = false;
-
   // TODO: ORIC used to have blinking cursor
   // also has 'cursor' varaible controlled by
   let cursor = true;
+  let raw = false;
   function cursorToggle(wantOn) {
     if (wantOn === undefined) {
       cursor = !cursor;
@@ -317,6 +349,7 @@ l0 FOR I=0 TO 7
     if (typeof(c) !== 'number')
       alert('princ: only take nubmers: ' +  c);
     dirty++;
+
     // TODO: how to handle inverse?
     let ch = c & 0x7f;
     if (ch === ESC) return raw = true;
@@ -349,7 +382,10 @@ l0 FOR I=0 TO 7
       let start = Date.now();
       for(let r=2; r<28; r++) {
 	for(let c=0; c<40; c++) {
-	  screen(r-1, c, screen(r, c));
+	  let old = screen(r-1, c);
+	  let nw = screen(r,c);
+	  if (nw != old)
+	    screen(r-1, c, nw);
 	}
       }
       // TODO: if not hidden column mode?
@@ -357,11 +393,10 @@ l0 FOR I=0 TO 7
       for(let c=2; c<40; c++) {
 	screen(row, c, 32);
       }
-      //dom('error', 'scroll time='+(Date.now()-start));
+      dom('info', 'scroll time='+(Date.now()-start), 'lp');
     }
   }
 
-  let vars = {};
   // 20LETSEL=0 => 20 LET SEL = 0
   // TODO: 63999 max
   //  
@@ -426,7 +461,12 @@ l0 FOR I=0 TO 7
       // pow!
       x = x.replace(/\^/g, '**');
       if (trace) print('EXP: ' + x);
+      // TOOD: not correct comparisons
+      // as ORIC returns 0/-1 for false/true
+      if (x.match(/(<|=|>)/))
+	return implemented_error('comparisons');
       let r = (function(ATMOSexp){
+	// fast cheat!
 	with (vars) {
 	  return eval(ATMOSexp);
 	}
@@ -434,9 +474,10 @@ l0 FOR I=0 TO 7
       if (trace) print('-->: ' + r);
       return r;
     } catch(e) {
-      if (!trace) print('EVAL: ' + v);
+      if (!trace) print('EVAL: ' + x);
       eval_error('' + e);
       //stop();
+      throw e;
     }
   }
   
@@ -448,14 +489,15 @@ l0 FOR I=0 TO 7
   // Also CTRL-L
   function CLS() {
     let start = Date.now();
-    // TODO: does it resent colors?
-    for(let row=0; row<28; row++) {
+    // TODO: does it scroll colors?
+    // don't touch mode-line
+    for(let row=1; row<28; row++) {
       for(let col=2; col<40; col++) {
 	screen(row, col, 32);
       }
     }
     row = 1; col = 2; raw = false;
-    dom('error', 'CLS time ' + (Date.now()-start));
+    //dom('error', 'CLS time ' + (Date.now()-start));
   }
 
   // 20 INPUT"ENTER SALE PRICE";SELL
@@ -579,10 +621,15 @@ l0 FOR I=0 TO 7
       princ(10);
   }
 
-  function syntax_error() {
-    print('?SYNTAX ERROR');
+  function syntax_error(cmd) {
+    print('?SYNTAX ERROR: ' + cmd);
   }
 
+  function implemented_error(s) {
+    print('?NOT IMPLEMENTED ERROR: ' + s);
+    throw 'Not implemented';
+  }
+  
   function unexpected_error(s) {
     print('?UNEXPECTED ERROR: ' + s);
   }
@@ -604,15 +651,6 @@ l0 FOR I=0 TO 7
     print('?ILLEGAL QUANTITY ERROR');
   }
   
-  function boot() {
-    let txt = `
-ORIC EXTENDED BASIC Vl.1
-(C) 1983 TANGERINE
-373188 BYTES FREE
-`;
-    print(txt);
-  }
-
   // TODO: Basic Lines max 80 chars bell at 79?
 
   // LIST -100
@@ -621,7 +659,11 @@ ORIC EXTENDED BASIC Vl.1
 
   // TODO: sorted?
   let lines = {
-    2: 'LET A=0',
+
+    1: 'PRINT "HELLO!"',
+    2: 'END',
+    
+    7: 'LET A=0',
 //    10: 'PRINT "HELLO"',
     //10: 'PRINT ".";',
     12: 'LET A=A+1',
@@ -644,7 +686,7 @@ ORIC EXTENDED BASIC Vl.1
 
 //      lineno = lastlineno;
 
-      for(let i=3; i>=0; i--) {
+      for(let i=0; i>=0; i--) {
       nextline();
       if (!line)
 	stop();
@@ -717,8 +759,6 @@ ORIC EXTENDED BASIC Vl.1
   
   function ON_GOTO() { }
 
-  // TODO: currently no limit...
-  let stack = []; // [ [lno, restline] ...]
   function GOSUB(lno) {
     stack.push([lineno, line]);
     lineno = lno-1;
@@ -742,10 +782,7 @@ ORIC EXTENDED BASIC Vl.1
     if (wasrunning) {
       clearInterval(RUN.interval);
       delete RUN.interval;
-      if (!noprompt) {
-	print('READY');
-	cursorShow();
-      }
+      if (!noprompt) prompt();
     }
     line = '';
     return wasrunning;
@@ -1065,11 +1102,7 @@ HELLO
   TEXT();
   CLS();
 
-  boot();
-  cursorShow();
-  run();
-
-  let line = '';
+  run('boot');
 
   let lastnow = Date.now();
   let lastrun = 0;
@@ -1080,7 +1113,7 @@ HELLO
     dom('vars', JSON.stringify(vars));
     
     let now = Date.now();
-    dom('error', 'Statements: '+run.count+
+    dom('stats', 'Statements: '+run.count+
 	' sps= ' + Math.floor(1000*(run.count-lastrun)/(now-lastnow)));
     
     lastnow = now;
@@ -1132,12 +1165,17 @@ HELLO
 	.replace(/!!/g, '!'));
   }
 
+  function prompt() {
+    print('Ready');
+    cursorShow();
+  }
   // interprets and runs one line
   // returns true if ok
   // END return false
   function run(line) {
-    run.count++
-    if (!line || line === '') return true;
+    if (!line || line === '')
+      return cursorShow();
+
     line = line.trim();
     line = quoteStrings(line);
 
@@ -1147,9 +1185,18 @@ HELLO
     // TODO: incorrect, and can't CTRL-C!
     if (many.length > 1) {
       let r= many.map(unquoteStrings)
-	  .some(x=>!run(x));
+	  .some(x=>!run_h(x));
       return r;
     }
+
+    let cmd = run_h(line);
+    
+    // if it's not running in background
+    if (!running()) prompt();
+  }
+  // internal: takes quotedStrings param
+  function run_h(line) {
+    run.count++
 
     // rough parameter extraction
     let a = line.split(/[\s;=\(\),]+\s*/g);
@@ -1160,20 +1207,20 @@ HELLO
     a = a.map(x=>(+x==x?+x:x));
     if (trace) print('------' + a.join(' | '));
 
-    let c = a.shift();
-    let f = window[c];
+    let cmd = a.shift();
+    let f = window[cmd];
     if (trace) print('LINE: ' + line);
     if (f)
-      f.apply(line, a);
+      try {
+	f.apply(line, a);
+      } catch(e) {
+	// TOOD: make into error?
+	// simplify error handl: just throw strings!
+      }
     else
-      syntax_error();
+      syntax_error(cmd);
 
-    if (!running()) {
-      print('READY');
-      cursorShow();
-    }
-    if (c === 'END') return false;
-    return true;
+    return  cmd;
   }
   run.count = 0;
   
@@ -1196,6 +1243,13 @@ HELLO
     editChar(c);
   }
 
+  let arrows = {l:37, u:38, r:39, d:40};
+  function cursorMove(direction, steps=1) {
+    direction = direction.toLowerCase();
+    let c = arrows[direction[0]];
+    while(steps--)
+      editArrow(c);
+  }
   function editArrow(ch) {
     cursorHide();
     switch(ch) {
@@ -1213,8 +1267,29 @@ HELLO
     cursorShow();
   }
 
-  let caps=true, click=true, column=false, trace=false;
+  function showStatus() {
+    // save ---
+    let r = row, c = col;
+    row = 0;
+    col = 36;
 
+    // make modeline black w white text
+    screen(0, 0, 0);
+    screen(0, 1, 7);
+    
+    // CTRL-Q: toggle cursor
+    print(caps?'CAPS':'    ', true);
+
+    // TODO: column enable disable CTRL-J
+    if (column) {
+    } else {
+    }
+
+    // --- and restore
+    row = r;
+    col = c;
+  }
+  
   dom('exp').addEventListener('keydown', function(e) {
     let c = e.ctrlKey, k = e.key.toLowerCase();
     let s = e.shiftKey, ch = e.code;
@@ -1227,8 +1302,8 @@ HELLO
     if (c && k=='a') editCopy();
     if (c && k=='f') click = !click;
     if (c && k=='q') cursorToggle();
-    if (c && k=='t') caps = !caps;
-    if (c && k=='j') column = !column;
+    if (c && k=='t') showStatus(caps = !caps);
+    if (c && k=='j') showStatus(column = !column);
     if (37 <= kc && kc <= 40) editArrow(kc);
 
     // my extensions
@@ -1236,9 +1311,9 @@ HELLO
     if (c && k=='p') trace = !trace;
 
     if (c) e.preventDefault();
-  });
+  })
 
-  document.addEventListener('keypress', function(e) {
+  dom('exp').addEventListener('keypress', function(e) {
     let c = e.ctrlKey, k = e.key; s = e.shiftKey;
     let legc = e.charCode, legk = e.keyCode;
     let ch = e.code;
@@ -1275,6 +1350,239 @@ HELLO
       PAPER(rand(8));
       INK(rand(8));
     }, 0);
+
+
+  // ORIC BASIC KEYWORDS
+  // https://www.defence-force.org/computing/oric/coding/annexe_1/index.htm
+
+  // Note: STR$ indicates a value of 334 for the token. It seems to be
+  // hard to put in a byte !
+  // NAME	CODE	TYPE
+  (function(){
+    `
+ABS	216	
+function
+AND	209	
+operator
+ASC	236	
+function
+ATN	229	
+function
+AUTO	199	
+parameter
+CALL	191	
+instruction
+CHR$	237	
+function
+CIRCLE	173	
+instruction
+CLEAR	189	
+instruction
+CLOAD	182	
+instruction
+CLS	148	
+instruction
+CONT	187	
+instruction
+COS	226	
+function
+CSAVE	183	
+instruction
+CURMOV	171	
+instruction
+CURSET	170	
+instruction
+DATA	145	
+instruction
+DEEK	231	
+function
+DEF	184	
+instruction
+DIM	147	
+instruction
+DOKE	138	
+instruction
+DRAW	172	
+instruction
+EDIT	129	
+instruction
+ELSE	200	
+instruction
+END	128	
+instruction
+EXP	225	
+function
+EXPLODE	164	
+instruction
+FALSE	240	
+constant
+FILL	175	
+instruction
+FN	196	
+function
+FOR	141	
+instruction
+FRE	218	
+function
+GET	190	
+function
+GO	247
+instruction
+GOSUB	155	
+instruction
+GOTO	151	
+instruction
+GRAB	159	
+instruction
+HEX$	220	
+function
+HIMEM	158	
+instruction
+HIRES	162	
+instruction
+IF	153	
+instruction
+INK	178	
+instruction
+INPUT	146	
+instruction
+INT	215	
+function
+KEY$	241	
+function
+LEFT$	244	
+function
+LEN	233	
+function
+LET	150	
+instruction
+LIST	188	
+instruction
+LLIST	142	
+instruction
+LN	224	
+function
+LOG	232	
+function
+LORES	137	
+instruction
+LPRINT	143	
+instruction
+MID$	146	
+function
+MUSIC	168	
+instruction
+NEW	193	
+instruction
+NEXT	144	
+instruction
+NOT	202	
+operator
+ON	180	
+instruction
+OR	210	
+operator
+PAPER	177	
+instruction
+PATTERN	174	
+instruction
+PEEK	230	
+function
+PI	238	
+constant
+PING	166	
+instruction
+PLAY	169	
+instruction
+PLOT	135	
+instruction
+POINT	243	
+function
+POKE	185	
+instruction
+POP	134	
+instruction
+POS	219	
+function
+PRINT	186	
+instruction
+PULL	136	
+instruction
+READ	149	
+instruction
+RECALL	131	
+instruction
+RELEASE	160	
+instruction
+REM	157	
+instruction
+REPEAT	139	
+instruction
+RESTORE	154	
+instruction
+RETURN	156	
+instruction
+RIGHT$	245	
+function
+RND	223	
+function
+RUN	152	
+instruction
+SCRN	242	
+function
+SGN	214	
+function
+SHOOT	163	
+instruction
+SIN	227	
+function
+SOUND	167	
+instruction
+SPC	197	
+function
+SQR	222	
+function
+STEP	203	
+instruction
+STOP	179	
+instruction
+STORE	130	
+instruction
+STR$	334	
+function
+TAB	194	
+function
+TAN	228	
+function
+TEXT	161	
+instruction
+THEN	201	
+instruction
+TO	195	
+instruction
+TROFF	133	
+instruction
+TRON	132	
+instruction
+TRUE	239	
+constant
+UNTIL	140	
+instruction
+USR	217	
+function
+VAL	235	
+function
+WAIT	181	
+instruction
+ZAP	165	
+instruction
+`.replace(/(\S+)\t(\d+)\t\n(\S+)/g,
+	  (_, word, code, what)=>{
+	    document.write(`<tt>${word}=${code} is ${what}</tt></br>`);
+	  });
+  })();
+
+
 </script>
 
 </body>

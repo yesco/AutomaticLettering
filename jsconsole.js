@@ -37,14 +37,14 @@ function DBG() {
   x.style.left = '0';
   x.accesskey = 'd'; // not working?
   x.innerHTML = `
-<div id=DBG style="max-width:100%; text-size:0.8em;">
+<div id=DBG style="max-width:100%; text-size:0.8rem; font-family:Lucida Console;">
   <div style="display:flex; align-items:stretch; max-width:100%;">
     <span id=DBGhelpbutton style="border:0.2em black solid; color:white; background-color:#595959"><b>DBG</b>&gt;</span>
     &nbsp;
     <input id=DBGcmd style="background-color:black; color: white; font-size:1em;"/>
   </div>
   <div id=DBGhelp hidden=true></div>
-  <div id=DBGout style='font-size:0.8em'></div>
+  <div id=DBGout style='font-size:18px; font-family:Ariel;'></div>
 </div>
 `;
   document.body.appendChild(x);
@@ -85,6 +85,17 @@ scroll -  by sliding</br>
   DBG.clear = function() {
     return DBGout.innerText = '';
   }
+
+  DBG.zoom = function(k) {
+    if (!k) k = lsget('DBG.zoom');
+    let z = dom('DBG').style.zoom;
+    z = +z;
+    if (!z) z = 1;
+    z *= k;
+    dom('DBG').style.zoom = z;
+    lsput('DBG.zoom', z);
+  };
+  DBG.zoom();
 
   DBG.run = function(x){
     if (x === undefined) x = DBG.cmd.value;
@@ -216,6 +227,9 @@ scroll -  by sliding</br>
     if (c && !a && k == 'u') DBG.cmd.value = '';
     if (c && !a && k == 'i') DBG.inspect();
     if (c && !a && k == 'j') DBG.inspect(undefined, 'j');
+    if (c && a && k == '=') DBG.zoom(1.2);
+    if (c && a && k == '-') DBG.zoom(1/1.2);
+
     if (!c || !a) return;
     // CTRL-ALT-
     if (k == 'd') DBG.toggle();
@@ -224,7 +238,8 @@ scroll -  by sliding</br>
   });
   
   aaa += 'e8';
-  window.addEventListener('error', function(e) {
+  // https://developer.mozilla.org/en-US/docs/Web/API/GlobalEventHandlers/onerror
+  if (1) window.addEventListener('error', function(e) {
     let base = window.location.href.replace(/\/[^\/]*$/, '/');
 
     let fn = e.filename.replace(base, '').
@@ -232,7 +247,7 @@ scroll -  by sliding</br>
 	  return "<b>" + x + "</b>";
 	});
     try {
-      dom('DBGout', [e.target, e.currentTarget, e.deepPath, fn + '<b>:' + e.lineno + '</b>:' + e.colno + ': ' + e.message, '' + e.error],
+      dom('DBGout', [e.target, e.source, e.currentTarget, e.deepPath, fn + '<b>:' + e.lineno + '</b>:' + e.colno + ': ' + e.message, '' + e.error],
 	  'hal', 'color: red;');
       // TODO: make this default during load
       // and then, later, each time minimized reset counter to 0
@@ -241,6 +256,7 @@ scroll -  by sliding</br>
     } catch(ee) {
       dom('DBGout', ['dom function error', ''+ee], 't');
     }
+    return false;
   });
   
   if (0 || DBG.debug) {
