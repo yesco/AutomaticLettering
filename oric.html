@@ -290,8 +290,11 @@ l0 FOR I=0 TO 7
     d.style.color = 'white';
   }
   
+  let dirty = 0;
   function princ(c) {
-    cursorOff();
+    if (typeof(c) !== 'number')
+      alert('princ: only take nubmers: ' +  c);
+    dirty++;
     // TODO: how to handle inverse?
     let ch = c & 0x7f;
     if (ch === ESC) return raw = true;
@@ -332,9 +335,8 @@ l0 FOR I=0 TO 7
       for(let c=2; c<40; c++) {
 	screen(row, c, 32);
       }
-      //alert('scroll time='+(Date.now()-start));
+      dom('error', 'scroll time='+(Date.now()-start));
     }
-    cursorOn();
   }
 
   let vars = {};
@@ -345,15 +347,77 @@ l0 FOR I=0 TO 7
   // A%
   // A$
 
-  function LET(n, ...args) {
-    // TODO: not good for strings
-    let v = args.join(' '); 
-    while (v.length && v.match(/^[ =]/)) {
-      print('string: ' + v);
-      v = v.substring(1);
+  // DIM varname(exp, ...)
+  function DIM(n, ...dims) {
+    let v = 0.0;
+    if (n.match(/^\w+\%/)) v = 0;
+    if (n.match(/^\w+\$/)) v = '';
+    
+    function gen(dim, ...dims) {
+      if (!dim) return v;
+      return [...Array(dim)]
+	.map(_=>gen(...dims));
     }
-    vars[n] = v;
+    
+    vars[n] = gen(...dims);
   }
+
+  function LET(n) {
+    let v = this;
+    v = v.replace(/^\s*LET\s*\S+\s*=\s*/, '');
+    if (trace) print('LET: ' + v);
+    let r = EVAL(v);
+    if (r === undefined) return;
+
+    if (n.endsWith('%')) r = Math.floor(r);
+    if (n.endsWith('$')) r = ''+r;
+
+    // indexing (interpolate using fixpoint!)
+    let lastn = n;
+    while (lastn != (n = n.replace(
+      /\[([^\[\]]*)\]/g, (_,i)=>'['+EVAL(i)+']'))) {
+      if (trace) print('IX: ' + n);
+      lastn = n;
+    }
+
+    // set
+    if (trace) print('SET: ' + n);
+    let path = n.replace(/[\[\]]/g, ' ').trim()
+	.split(/\s+/g);
+    if (trace) print('PATH: ' + JSON.stringify(path));
+    let nv = vars;
+    let x;
+    let lastx = path.shift();
+    while ((x = path.shift()) !== undefined) {
+      if (trace) print('LOOP lastx: ' + lastx);
+      if (trace) print('LOOP x: ' + x);
+      nv = nv[lastx];
+      lastx = x;
+    }
+    if (trace) print('SET: ' + (nv == vars) + ' ' + lastx);
+    nv[lastx] = r;
+  }
+
+  function EVAL(x) {
+    try {
+      if (trace) print('VARS: ' + JSON.stringify(vars));
+      // pow!
+      x = x.replace(/\^/g, '**');
+      if (trace) print('EXP: ' + x);
+      let r = (function(ATMOSexp){
+	with (vars) {
+	  return eval(ATMOSexp);
+	}
+      })(x);
+      if (trace) print('-->: ' + r);
+      return r;
+    } catch(e) {
+      if (!trace) print('EVAL: ' + v);
+      eval_error('' + e);
+      //stop();
+    }
+  }
+  
   function val(n) {
     //n = n.substring(0, 2);
     return vars[n];
@@ -361,7 +425,7 @@ l0 FOR I=0 TO 7
   
   // Also CTRL-L
   function CLS() {
-    cursorOff();
+    let start = Date.now();
     // TODO: does it resent colors?
     for(let row=0; row<28; row++) {
       for(let col=2; col<40; col++) {
@@ -369,7 +433,7 @@ l0 FOR I=0 TO 7
       }
     }
     row = 1; col = 2; raw = false;
-    cursorOn();
+    dom('error', 'CLS time ' + (Date.now()-start));
   }
 
   // 20 INPUT"ENTER SALE PRICE";SELL
@@ -387,22 +451,126 @@ l0 FOR I=0 TO 7
   // PRINT "bar"    > fooo       bar 
   // 20 PRINT @X,10;·• WHIZZ2" 
   function print(txt, nonewline) {
+    if (typeof txt == 'number')
+      txt = ' ' + txt + ' ';
     txt = '' + txt;
     for(let i=0; i<txt.length; i++)
       princ(txt.charCodeAt(i));
     if (!nonewline) princ(10);
   }
 
-  function PRINT(txt) {
-    // TODO: parse!
-    //for(let i=0; i<txt.length; i++)
-    //princ(txt.charCodeAt(i));
-    //princ(10);
-    print(txt);
+  function tab(n) {
+    while ((col-2) % 8 !== 0)
+      princ(32);
+  }
+  
+  function PRINT() {
+    let line = this;
+    line = line.replace(/^PRINT\s*/, '');
+    line = line.trim();
+
+    let exp = '', mode = 'normal', par = '';
+    let nonewline = false;
+    for(let i=0; i<line.length; i++) {
+      let c = line[i];
+      if (trace) print('PRINT.c: ' + c);
+
+      function finish(ev) {
+	if (exp.length)
+	  print(ev?EVAL(exp):exp, true)
+	exp = '';
+	if (c === ',') tab();
+      }
+      
+      switch(mode) {
+      case 'normal': {
+	switch(c) {
+	case ',':
+	case ';': 
+	case ' ': finish(true); break;
+	case '\\': return unexpected_error('\\');
+	case '"': finish(true); mode = 'string'; par += '"'; break;
+	case '(': mode = 'expr'; par += ')'; break;
+	case '[': mode = 'expr'; par += ']'; break;
+	default: exp += c;
+	}
+	break;
+      }
+      case 'string': {
+	if (c=='"') {
+	  if (exp.length)
+	    print(exp, true);
+	  exp = '';
+	  mode = 'normal';
+	} else {
+	  exp += c;
+	}
+	break;
+      }
+	// TOOD: too simple
+      case 'expr': {
+	if (par)
+	  if (')]"'.indexOf(c) >= 0) {
+	    let e = par[par.length-1];
+	    if (e !== c)
+	      return unmatched_paren_error(e, c);
+	    else
+	      par = par.substring(0, par.length-1);
+	  }
+	
+	switch(c) {
+	case '\\': return unexpected_error('\\');
+	case ';': if (par) return unexpected_error(';');
+	  
+	case '(': par += ')'; break;
+	case '[': par += ']'; break;
+	case '"': par += '"'; break;
+	  
+	case ',':
+	case ' ': {
+	  if (exp.length && !par.length) {
+	    print(EVAL(exp), true);
+	    exp = ''
+	    mode = 'normal';
+	  }
+	  if (c === ',') tab();
+	  break;
+	}
+	default: exp += c;
+	}
+	break;
+      }
+      }
+      if (c !== ' ') nonewline = false;
+      if (c === ';') nonewline = true;
+    }
+
+    // cleanup
+    if (exp.length) {
+      // TODO: missing " ?
+      if (mode === 'string')
+	print(exp, true);
+      else
+	print(EVAL(exp), true)
+    }
+    if (!nonewline)
+      princ(10);
   }
 
   function syntax_error() {
     print('?SYNTAX ERROR');
+  }
+
+  function unexpected_error(s) {
+    print('?UNEXPECTED ERROR: ' + s);
+  }
+
+  function unmatched_error(e, g) {
+    print('?MATCHING ERROR, expected: ' + e + ' got: ' +g);
+  }
+
+  function eval_error(e) {
+    print('?EVAL ERROR (' + e +')');
   }
   
   // TODO: not original?
@@ -431,30 +599,41 @@ ORIC EXTENDED BASIC Vl.1
 
   // TODO: sorted?
   let lines = {
-    10: 'PRINT "HELLO"',
+    2: 'LET A=0',
+//    10: 'PRINT "HELLO"',
+    10: 'PRINT ".";',
+    12: 'LET A=A+1',
     15: 'GOSUB 100',
-    20: 'GOTO 10',
-    100: 'PRINT "GOSUB"',
+    20: 'GOTO 9',
+    100: 'PRINT A;',
     110: 'RETURN',
   };
 
+  function running() {
+    return !!RUN.interval;
+  }
+  
   function LIST() {
-    stop();
+    //stop();
     line = '';
-    let lastlineno = 0;
+//    let lastlineno = 0;
+    lineno = 0;
     RUN.interval = setInterval(_=>{
 
-      lineno = lastlineno;
+//      lineno = lastlineno;
+
+      for(let i=3; i>=0; i--) {
       nextline();
       if (!line)
 	stop();
       else
 	print(lineno + ' ' + line);
-
-      lastlineno = lineno;
+      }
+      
+//      lastlineno = lineno;
       // better set it to nothing...
-      lineno = 0;
-    });
+//      lineno = 0;
+    }, 1);
 
     // can't be interrupted!
     //for(let k in lines) { // always ordered!
@@ -474,7 +653,6 @@ ORIC EXTENDED BASIC Vl.1
     stack = [];
     vars = {}
     
-    stop();
     cont();
   }
   
@@ -493,10 +671,13 @@ ORIC EXTENDED BASIC Vl.1
 
   function cont() {
     RUN.interval = setInterval(_=>{
-      nextline();
-      if (line && trace) print(lineno + ' ' + line)
-      if (!run(line)) stop();
-    });
+      let start = Date.now();
+      do {
+	nextline();
+	if (line && trace) print(lineno + ' ' + line)
+	if (!run(line)) stop();
+      } while (Date.now() - start < 200);
+    }, 1);
   }
   
   function CONT() {
@@ -514,40 +695,46 @@ ORIC EXTENDED BASIC Vl.1
   
   function ON_GOTO() { }
 
+  // TODO: currently no limit...
   let stack = []; // [ [lno, restline] ...]
   function GOSUB(lno) {
     stack.push([lineno, line]);
     lineno = lno-1;
-    print('[gosub ' + (+lno) + ']');
     line = '';
   }
   function RETURN() {
     [lineno, line] = stack.pop();
   }    
 
-  function stop() {
-    let wasrunning = RUN.interval;
+  function stop(noprompt) {
+    let wasrunning = running();
     if (col > 2) princ(10);
     if (wasrunning) {
       clearInterval(RUN.interval);
       delete RUN.interval;
+      if (!noprompt) {
+	print('READY');
+	cursorOn();
+      }
     }
     line = '';
     return wasrunning;
   }
   
   function GOTO(lno) {
-    lineno = lno;
+    lineno = lno-1;
   }
 
   function ctrlC() {
+    cursorOff();
     let lno = lineno;
     let l = line;
-    if (stop()) {
-      print('INTERUPTED AT LINE ' + lineno)
+    if (stop('noprompt')) {
+      print('?INTERUPTED AT LINE ' + lineno)
       CONT.lineno = lno;
       CONT.line = l;
     }
+    cursorOn();
   }
   
   // WAIT 100 = 1s
@@ -558,17 +745,17 @@ ORIC EXTENDED BASIC Vl.1
     return `
 10 REM *VAT Calculation* 
 20 INPUT"ENTER SALE PRICE";SELL 
-30 LET UAT=0. 15*SELL 
-40 LET PRICE=SELL+UAT 
+30 LET VAT=0. 15*SELL 
+40 LET PRICE=SELL+VAT
 50 PRINT "TOTAL=";PRICE 
-60 'Round agan for next calculatoin
+60 'Round agan for next calculation
 70 WAIT 500:CLS:GOTO 20
 `;
   }
 
   function  example_NAME() {
     return `
-l 10 A$="0RIC" 
+10 A$="0RIC" 
 120 LET Al$="BASI·C" 
 130 LET LAST$="LESSON" 
 140 INPUT"ENTER YOUR NAME,PLEASE";NAME$ 
@@ -636,15 +823,16 @@ SDAY
 10 INPUT"HOW MANY NAMES" ;N% 
 20 DIM NAME$(N%):DIM AGE(N%)
 30 CLS:SLJM=0 
-40 FOR K=1 TO N..< 
+40 FOR K=1 TO N%
 50 PRINT "ENTER NAME t'-10. "K 
-60 INPUT NAME$CK) 
-70 PRINT NAME$CKJ"'S AGE ?" 
-80 INPUT AGECKJ :SLJM=SLJM+AGECKJ 
+60 INPUT NAME$[K]
+70 PRINT NAME$[K]"'S AGE ?" 
+80 INPUT AGE[K] :SLJM=SLJM+AGE[K]
 80 CLS 
 100 NEXT K 
-110 FOR K=Nx TO 1 STEP -1 
-120 PRINT :PR1NT NAME$CKJ" JS";
+110 FOR K=N% TO 1 STEP -1 
+120 PRINT :PR1NT NAME$[K]" JS";
+130 NEXT K
 `;
   }
   
@@ -701,8 +889,6 @@ already,then skip
   // activate a jump to the address now on the top of the pile. The stack can only 
   // hold 10 addresses, and more than 10 loops will give an ?OUT OF MEMOR
   
-  function DIM() {}
-
   function END() {}
   
   function READ() {}
@@ -733,6 +919,7 @@ already,then skip
 
   function HEX$() {}
 
+  function LENGTH(s) { return s.length; }
   function LEFT$(s, n) {}
   function RIGHT$(s, n) {}
   function MID$(s, a, b) {}
@@ -750,36 +937,25 @@ already,then skip
 
   // MATH
   // + - * / ^
+  
   // Oric BASIC has the following built-in numeric functions: 
-  // Returns absolute magnitude of n
-  function ABS(n) {}
-  // Returns arctangent of n 
-  function ATN(n) {}
-  // Returns cosine of n 
-  function COS(n) {}
-  // Returns e raised to the power of n 
-  function EXP(n) {}
-  // Returns n truncated to integer 
-  function INT(n) {}
-  // Returns natural (base e) logarithm of n 
-  function LN(n) {}
-  // Returns common (base 10) logarithm of n 
-  function LOG(n) {}
-  // Returns value of pi
-  function PI() {}
-  // Returns a random number 
-  function RND(n) {}
+  ABS = Math.abs;
+  ATN = Math.atan;
+  COS = Math.cos;
+  EXP = Math.exp;
+  INT = Math.floor;
+  LN = Math.ln;
+  LOG = Math.ln10;
+  const PI = Math.PI;
+  SGN = n=>(n>0)?+1:(n<0)?-1:0;
+  SIN = Math.sin;
+  SQR = Math.sqrt;
+  TAN = Math.tan;
+  function RND(n) {
+    if (!n) return Math.random();
+    return Math.floor(n * Math.random());
+  }
   function RANDOMIZE() {}
-  // Returns 0 if n zero, 
-  // 1 if positive, 
-  // -1 if negative. 
-  function SGN(n) {}
-  // Returns sine of n 
-  function SIN(n) {}
-  // Returns square root of n 
-  function SQR(n) {}
-  // Returns tangent of n
-  function TAN(n) {}
 
   // tested by means of conditional operators: 
   // Equal to 
@@ -855,10 +1031,6 @@ HELLO
 </script>
 
 <script>
-  window.onerror = function(e) {
-    dom('error', ''+e);
-  };
-  
   function rand(n) {
     return Math.floor(Math.random()*n);
   }
@@ -867,6 +1039,7 @@ HELLO
   CLS();
 
   boot();
+  cursorOn();
   run();
 
   let line = '';
@@ -880,6 +1053,7 @@ HELLO
   dom('error', '');
   
   function editChar(ch) {
+    cursorOff();
     let c = String.fromCharCode(ch);
     // ignore keyboard setting
     if (caps)
@@ -888,12 +1062,37 @@ HELLO
       c = c.toLowerCase();
     line += c;
     princ(c.charCodeAt(0)); // lol
+    cursorOn();
   }    
 
   function editEnter() {
+    cursorOff();
     princ(10);
-    if (run(line)) print('READY');
+    run(line);
     line = '';
+  }
+
+  // basically make other arguments splittable
+  function quoteStrings(line) {
+    return line.replace(
+      /\".?\"/g,
+      s=>s.replace(/!/g, '!!')
+	.replace(/ /g, '!s!')
+	.replace(/:/g, '!c!')
+      	.replace(/\(/g, '!po!')
+        .replace(/=/g, '!e!')
+        .replace(/,/g, '!com!')
+    );
+  }
+  function unquoteStrings(line) {
+    return line.replace(
+      s=>s.replace(/!c!/g, ':')
+	.replace(/!s!/g, ' ')
+      	.replace(/!po!/g, '(')
+        .replace(/!pc!/g, ')')
+        .replace(/!e!/g, '=')
+        .replace(/!com!)/g, ',')
+	.replace(/!!/g, '!'));
   }
 
   // interprets and runs one line
@@ -902,43 +1101,55 @@ HELLO
   function run(line) {
     if (!line || line === '') return true;
     line = line.trim();
+    line = quoteStrings(line);
 
+    if (trace) print('LINE: ' + line);
     let many = line.split(':');
+    if (trace) print('MANY: ' + many.length);
     // TODO: incorrect, and can't CTRL-C!
-    if (many != line)
-      return many.some(x=>!run(x));
+    if (many.length > 1) {
+      let r= many.map(unquoteStrings)
+	  .some(x=>!run(x));
+      return r;
+    }
 
-    // quote strings
-    line = line.replace(
-      /\".?\"/g,
-      s=>s.replace(/!/g, '!!')
-	.replace(/ /g, '!s!'));
+    // rough parameter extraction
     let a = line.split(/[\s;=\(\),]+\s*/g);
-    // unquote strings
-    a = a.map(
-      s=>s.replace(/!s!/g, ' ')
-	.replace(/!!/g, '!'));
-    // make numbers out of numbers
+    if (trace) print('------' + a.join(' | '));
+    a = a.map(unquoteStrings);
+    if (trace) print('------' + a.join(' | '));
+    // make numbers great again
     a = a.map(x=>(+x==x?+x:x));
-    print('------' + a.join(' | '));
+    if (trace) print('------' + a.join(' | '));
 
     let c = a.shift();
     let f = window[c];
-    if (f) f.apply(line, a);
-    else syntax_error();
+    if (trace) print('LINE: ' + line);
+    if (f)
+      f.apply(line, a);
+    else
+      syntax_error();
 
+    if (!running()) {
+      print('READY');
+      cursorOn();
+    }
     if (c === 'END') return false;
     return true;
   }
   
   function editBackspace() {
+    cursorOff();
     line = line.substring(0, line.length-1);
     princ(8);
+    cursorOn();
   }
   
   function editCancel() {
+    cursorOff();
     line = '';
     princ(10);
+    cursorOn();
   }
 
   function editCopy() {
@@ -1006,6 +1217,10 @@ HELLO
   PAPER(7);
   INK(0);
 
+  window.onerror = function(e) {
+    dom('error', ''+e);
+  };
+  
   if (0) {
     screen(10, 10, 77);
     screen(12, 12, 3);
