@@ -82,6 +82,31 @@ pre, span, div { font-family: 'oric-atmos', monospace; }
 <br><br>
 <!-- id=exp is magical for jsconsole - it returns focus there -->
 <input id='exp' autofocus style='background:black; color:black; border:none;'>
+<input id="file" type="file"/>
+<script>
+  // inspired by https://stackoverflow.com/questions/16495125/parsing-binary-files-in-client-side-js
+  // REFERENCE:
+  //  https://developer.mozilla.org/en-US/docs/Web/API/FileReader
+  // readAsBinaryString
+  function readFile() {
+    let fileInput = dom('file');
+    let fReader = new FileReader();
+
+    fReader.onload = function(e) {
+      /// <-- this contains an ArrayBuffer
+      console.log(e.target.result);
+    }
+
+    // onloadend
+    // https://developer.mozilla.org/en-US/docs/Web/API/FileReader/readAsBinaryString
+    // https://developer.mozilla.org/en-US/docs/Web/API/FileReader/readAsArrayBuffer
+    fileInput.onchange = function(e) {
+      let file = this.files[0];
+      fReader.readAsArrayBuffer(file);
+    }
+  }
+</script>
+
 <br>
 ROW: <span id='row'></span>
 COL: <span id='col'></span>
@@ -105,6 +130,7 @@ INFO:<br><span id='info'></span>
   let vars = {},
       stack = [], // [ [lno, restline] ...]
       line = '',
+      lineno = 0,
       caps = true,
       click = true,
       column = false,
@@ -115,12 +141,13 @@ INFO:<br><span id='info'></span>
   const ESC = 27;
 
   function boot() {
-    stop();
+    stop('noprompt');
     
     // init
     vars = {};
     stack = [];
     line = '';
+    lineno = 0;
     caps = true
     click = true
     column = false
@@ -664,12 +691,12 @@ l0 FOR I=0 TO 7
     2: 'END',
     
     7: 'LET A=0',
-//    10: 'PRINT "HELLO"',
-    //10: 'PRINT ".";',
+    10: 'PRINT "HELLO"',
+    10: 'PRINT ".";',
     12: 'LET A=A+1',
     15: 'GOSUB 100',
     20: 'GOTO 9',
-    //100: 'PRINT A;',
+    100: 'PRINT A;',
     110: 'RETURN',
   };
 
@@ -677,14 +704,10 @@ l0 FOR I=0 TO 7
     return !!RUN.interval;
   }
   
-  function LIST() {
-    //stop();
+  function LIST(n) {
     line = '';
-//    let lastlineno = 0;
     lineno = 0;
     RUN.interval = setInterval(_=>{
-
-//      lineno = lastlineno;
 
       for(let i=0; i>=0; i--) {
       nextline();
@@ -694,22 +717,31 @@ l0 FOR I=0 TO 7
 	print(lineno + ' ' + line);
       }
       
-//      lastlineno = lineno;
-      // better set it to nothing...
-//      lineno = 0;
     }, 1);
-
-    // can't be interrupted!
-    //for(let k in lines) { // always ordered!
-    //print(k + ' ' + lines[k]);
-    //}
   }
 
-  function EDIT(lno) {
-    LIST(lno);
+  function saveline(lno, line) {
+    if (!lno) return;
+    if (trace) print('saveline.lno: ' + lno);
+    if (trace) print('saveline.line: ' + line);
+
+    let l = line.replace(/^\d+\s*/, '');
+    if (trace) print('saveline.l: ' + l);
+
+    // store instruction
+    lines[lno] = l;
   }
   
-  let lineno = 0;
+  function EDIT(lno) {
+    lno = lno || lineno;
+    let line = lines[lno]
+    // TODO: error?
+    if (!line) return;
+
+    print(lno + ' ' + line);
+    cursorMove('u');
+  }
+  
   function RUN(lno) {
     // init
     lineno = (+lno || 0) - 1;
@@ -718,6 +750,10 @@ l0 FOR I=0 TO 7
     vars = {}
     
     cont();
+  }
+  
+  function END() {
+    stop('noprompt');
   }
   
   function nextline() {
@@ -777,6 +813,7 @@ l0 FOR I=0 TO 7
   function UNTIL() {}
 
   function stop(noprompt) {
+    print('STOPPED!');
     let wasrunning = running();
     if (col > 2) princ(10);
     if (wasrunning) {
@@ -955,8 +992,6 @@ already,then skip
   // loop is completed, the address is removed, and a subsequent NEXT will 
   // activate a jump to the address now on the top of the pile. The stack can only 
   // hold 10 addresses, and more than 10 loops will give an ?OUT OF MEMOR
-  
-  function END() {}
   
   function READ() {}
   function DATA() {}
@@ -1165,16 +1200,24 @@ HELLO
 	.replace(/!!/g, '!'));
   }
 
-  function prompt() {
-    print('Ready');
+  function prompt(noprompt) {
+    if (!noprompt) print('Ready');
     cursorShow();
   }
   // interprets and runs one line
   // returns true if ok
   // END return false
   function run(line) {
+    let orig = line;
     if (!line || line === '')
       return cursorShow();
+
+    // NN PRINT ... new line?
+    let linedef = line.match(/^(\d+)\s(.*)$/);
+    if (linedef) {
+      saveline(+linedef[1], linedef[2]);
+      return prompt();
+    }
 
     line = line.trim();
     line = quoteStrings(line);
@@ -1189,13 +1232,14 @@ HELLO
       return r;
     }
 
-    let cmd = run_h(line);
+    let cmd = run_h(line, orig);
     
     // if it's not running in background
-    if (!running()) prompt();
+    if (!running()) prompt(cmd === 'EDIT');
+    return true;
   }
   // internal: takes quotedStrings param
-  function run_h(line) {
+  function run_h(line, orig) {
     run.count++
 
     // rough parameter extraction
@@ -1208,17 +1252,20 @@ HELLO
     if (trace) print('------' + a.join(' | '));
 
     let cmd = a.shift();
+
+    // call function
     let f = window[cmd];
     if (trace) print('LINE: ' + line);
-    if (f)
+    if (f) {
       try {
-	f.apply(line, a);
+	f.apply(orig, a);
       } catch(e) {
 	// TOOD: make into error?
 	// simplify error handl: just throw strings!
       }
-    else
+    } else {
       syntax_error(cmd);
+    }
 
     return  cmd;
   }
@@ -1298,7 +1345,11 @@ HELLO
     if (kc==8) editBackspace();
     if (c && k=='c') ctrlC();
     if (c && k=='x') editCancel();
-    if (c && k=='l') CLS();
+    if (c && k=='l') {
+      cursorHide();
+      CLS();
+      cursorShow();
+    }
     if (c && k=='a') editCopy();
     if (c && k=='f') click = !click;
     if (c && k=='q') cursorToggle();
