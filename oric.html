@@ -55,7 +55,8 @@ pre, span, div { font-family: 'oric-atmos', monospace; }
 </center>
 
 <br><br>
-<input autofocus style='background:black; color:black; border:none;'>
+<!-- id=exp is magical for jsconsole - it returns focus there -->
+<input id='exp' autofocus style='background:black; color:black; border:none;'>
 <br>
 ROW: <span id='row'></span>
 COL: <span id='col'></span>
@@ -274,15 +275,36 @@ l0 FOR I=0 TO 7
   
   let row = 1, col = 2, raw = false;
 
-  function cursorOff() {
+  // TODO: ORIC used to have blinking cursor
+  // also has 'cursor' varaible controlled by
+  let cursor = true;
+  function cursorToggle(wantOn) {
+    if (wantOn === undefined) {
+      cursor = !cursor;
+    } else if (typeof wantOn === 'string') {
+      cursor = (wantOn.toLowerCase() === 'on');
+    } else {
+      cursor = !!wantOn;
+    }
+
+    if (!cursor) cursorHide();
+    // don't show cursor here as this run as soon as key presseed leaving traces
+  }
+
+  // cursorHide(),cursorShow() - don't call as it's managed by the system functions call cursorToggle() for your intent
+  let cursorVisible = false;
+  function cursorHide() {
+    if (!cursorVisible) return;
+    cursorVisible = false;
     let d = domc(`cr${row}c${col}`);
     // TODO: implement real inverse
     // here we don't know actual color!
     d.style.backgroundColor = '';
     d.style.color = '';
   }
-
-  function cursorOn() {
+  function cursorShow() {
+    if (!cursor || cursorVisible) return;
+    cursorVisible = true;
     let d = domc(`cr${row}c${col}`);
     // TODO: implement real inverse
     // here we don't know actual color!
@@ -586,7 +608,7 @@ l0 FOR I=0 TO 7
     let txt = `
 ORIC EXTENDED BASIC Vl.1
 (C) 1983 TANGERINE
-88888 BYTES FREE
+373188 BYTES FREE
 `;
     print(txt);
   }
@@ -706,6 +728,14 @@ ORIC EXTENDED BASIC Vl.1
     [lineno, line] = stack.pop();
   }    
 
+  function IF_THEN_ELSE(e, t, e) {
+    let line = this;
+    
+  }
+  
+  function REPEAT() {}
+  function UNTIL() {}
+
   function stop(noprompt) {
     let wasrunning = running();
     if (col > 2) princ(10);
@@ -714,7 +744,7 @@ ORIC EXTENDED BASIC Vl.1
       delete RUN.interval;
       if (!noprompt) {
 	print('READY');
-	cursorOn();
+	cursorShow();
       }
     }
     line = '';
@@ -726,7 +756,7 @@ ORIC EXTENDED BASIC Vl.1
   }
 
   function ctrlC() {
-    cursorOff();
+    cursorHide();
     let lno = lineno;
     let l = line;
     if (stop('noprompt')) {
@@ -734,7 +764,7 @@ ORIC EXTENDED BASIC Vl.1
       CONT.lineno = lno;
       CONT.line = l;
     }
-    cursorOn();
+    cursorShow();
   }
   
   // WAIT 100 = 1s
@@ -1010,9 +1040,6 @@ HELLO
     HELLO
 `;
   }
-  function IF_THEN_ELSE(e, t, e) {}
-  function REPEAT() {}
-  function UNTIL() {}
   
   // sounds
   // https://bulba.untergrund.net/emulator_e.htm
@@ -1039,7 +1066,7 @@ HELLO
   CLS();
 
   boot();
-  cursorOn();
+  cursorShow();
   run();
 
   let line = '';
@@ -1063,7 +1090,7 @@ HELLO
   dom('error', '');
   
   function editChar(ch) {
-    cursorOff();
+    cursorHide();
     let c = String.fromCharCode(ch);
     // ignore keyboard setting
     if (caps)
@@ -1072,11 +1099,11 @@ HELLO
       c = c.toLowerCase();
     line += c;
     princ(c.charCodeAt(0)); // lol
-    cursorOn();
+    cursorShow();
   }    
 
   function editEnter() {
-    cursorOff();
+    cursorHide();
     princ(10);
     run(line);
     line = '';
@@ -1143,7 +1170,7 @@ HELLO
 
     if (!running()) {
       print('READY');
-      cursorOn();
+      cursorShow();
     }
     if (c === 'END') return false;
     return true;
@@ -1151,17 +1178,17 @@ HELLO
   run.count = 0;
   
   function editBackspace() {
-    cursorOff();
+    cursorHide();
     line = line.substring(0, line.length-1);
     princ(8);
-    cursorOn();
+    cursorShow();
   }
   
   function editCancel() {
-    cursorOff();
+    cursorHide();
     line = '';
     princ(10);
-    cursorOn();
+    cursorShow();
   }
 
   function editCopy() {
@@ -1170,7 +1197,7 @@ HELLO
   }
 
   function editArrow(ch) {
-    cursorOff();
+    cursorHide();
     switch(ch) {
     case 37: col--; break; // left
     case 38: row--; break; // up
@@ -1183,12 +1210,12 @@ HELLO
     if (col > 39) col = 2;
     if (row < 0) row = 27;
     if (row > 27) row = 0;
-    cursorOn();
+    cursorShow();
   }
 
-  let caps=true, click=true, cursor=true, column=false, trace=false;
+  let caps=true, click=true, column=false, trace=false;
 
-  document.addEventListener('keydown', function(e) {
+  dom('exp').addEventListener('keydown', function(e) {
     let c = e.ctrlKey, k = e.key.toLowerCase();
     let s = e.shiftKey, ch = e.code;
     let kc = e.keyCode;
@@ -1199,7 +1226,7 @@ HELLO
     if (c && k=='l') CLS();
     if (c && k=='a') editCopy();
     if (c && k=='f') click = !click;
-    if (c && k=='q') cursor = !cursor;
+    if (c && k=='q') cursorToggle();
     if (c && k=='t') caps = !caps;
     if (c && k=='j') column = !column;
     if (37 <= kc && kc <= 40) editArrow(kc);
