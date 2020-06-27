@@ -335,7 +335,7 @@ l0 FOR I=0 TO 7
       for(let c=2; c<40; c++) {
 	screen(row, c, 32);
       }
-      dom('error', 'scroll time='+(Date.now()-start));
+      //dom('error', 'scroll time='+(Date.now()-start));
     }
   }
 
@@ -601,11 +601,11 @@ ORIC EXTENDED BASIC Vl.1
   let lines = {
     2: 'LET A=0',
 //    10: 'PRINT "HELLO"',
-    10: 'PRINT ".";',
+    //10: 'PRINT ".";',
     12: 'LET A=A+1',
     15: 'GOSUB 100',
     20: 'GOTO 9',
-    100: 'PRINT A;',
+    //100: 'PRINT A;',
     110: 'RETURN',
   };
 
@@ -676,7 +676,7 @@ ORIC EXTENDED BASIC Vl.1
 	nextline();
 	if (line && trace) print(lineno + ' ' + line)
 	if (!run(line)) stop();
-      } while (Date.now() - start < 200);
+      } while (Date.now() - start < 20);
     }, 1);
   }
   
@@ -1043,11 +1043,21 @@ HELLO
   run();
 
   let line = '';
+
+  let lastnow = Date.now();
+  let lastrun = 0;
   setInterval(_=>{
     dom('line', line);
     dom('row', row);
     dom('col', col);
     dom('vars', JSON.stringify(vars));
+    
+    let now = Date.now();
+    dom('error', 'Statements: '+run.count+
+	' sps= ' + Math.floor(1000*(run.count-lastrun)/(now-lastnow)));
+    
+    lastnow = now;
+    lastrun = run.count;
   }, 100);
   // clear initial error
   dom('error', '');
@@ -1099,6 +1109,7 @@ HELLO
   // returns true if ok
   // END return false
   function run(line) {
+    run.count++
     if (!line || line === '') return true;
     line = line.trim();
     line = quoteStrings(line);
@@ -1137,6 +1148,7 @@ HELLO
     if (c === 'END') return false;
     return true;
   }
+  run.count = 0;
   
   function editBackspace() {
     cursorOff();
