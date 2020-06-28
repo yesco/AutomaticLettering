@@ -3,6 +3,52 @@
 
 <head>
 
+<script>
+  function error(msg) {
+    princ(msg);
+    if (lineno) print(' IN LINE ' + lineno);
+    print('');
+
+    line = '';
+    lineno = 0;
+
+    throw msg;
+  }
+  
+  function syntax_error(cmd) {
+    error('?SYNTAX ERROR: ' + cmd);
+  }
+
+  function implemented_error(s) {
+    error('?NOT IMPLEMENTED ERROR: ' + s);
+  }
+  
+  function unexpected_error(s) {
+    error('?UNEXPECTED ERROR: ' + s);
+  }
+
+  function unmatched_error(e, g) {
+    error('?MATCHING ERROR, expected: ' + e + ' got: ' +g);
+  }
+
+  function eval_error(e) {
+    error('?EVAL ERROR (' + e +')');
+  }
+  
+  function return_error() {
+    error('?RETURN WITHOUT GOSUB ERROR');
+  }
+  
+  function cont_error() {
+    error('?CAN\'T CONTINUE ERROR');
+  }
+
+  function illegal_quantity_error() {
+    error('?ILLEGAL QUANTITY ERROR');
+  }
+  
+</script>
+  
 <style>
 /*default version*/
 @font-face {
@@ -161,8 +207,7 @@ INFO:<br><span id='info'></span>
 ORIC EXTENDED BASIC Vl.1
 (C) 1983 TANGERINE
 
-373188 BYTES FREE
-`);
+373188 BYTES FREE`);
   }
 
   // https://osdk.org/index.php?page=articles&ref=ART9.
@@ -372,9 +417,9 @@ l0 FOR I=0 TO 7
   }
   
   let dirty = 0;
-  function princ(c) {
+  function putc(c) {
     if (typeof(c) !== 'number')
-      alert('princ: only take nubmers: ' +  c);
+      alert('putc: only take nubmers: ' +  c);
     dirty++;
 
     // TODO: how to handle inverse?
@@ -399,10 +444,8 @@ l0 FOR I=0 TO 7
       screen(row, col, 32);
     }
 
-    if (col >= 40) {
-      col = 2;
-      row++;
-    }
+    // TODO: should be 40????
+    if (col >= 40) { row++; col = 2; }
 
     // scroll!
     if (row >= 28) {
@@ -432,7 +475,25 @@ l0 FOR I=0 TO 7
   // A$
 
   // DIM varname(exp, ...)
+  // TEST:
+  //  Q(9)=3
+  //  Q(10)=4
+  //  Q(11)=5 => ?BAD SUBSCRIPT ERROR
+  //  Q(0)=77
+  //  Q(-1)=44 => ?ILLEGAL QUANTITY ERROR
+  
+  // TODO: fix
+  // TODO: maybe let an array be a function! __Arr(3,4) evaluate to the value, or if LET an LVALUE
+  // TODO: how to see in an exppression it's
+  // an variable and not function call?
   function DIM(n, ...dims) {
+    // DOC: Dimension an multidimensional array DIM A$(1:st dim, 2:nd dim, ...)
+    // All elements set to detault value.
+    // ORIC: Any array index 0..10 is 'predefined'
+    // New: Any index can be set once dimensioned, it's automatically extended (with nulls!)
+    // Bug: Not capture index out of bounds
+    // Bug: There is no diff between array varaibles and others with same name...
+    // ...and so PRINT will happily print the array
     let v = 0.0;
     if (n.match(/^\w+\%/)) v = 0;
     if (n.match(/^\w+\$/)) v = '';
@@ -531,6 +592,92 @@ l0 FOR I=0 TO 7
   function INPUT(prompt, v) {
   }
 
+  function princ(txt) {
+    return print(txt, 'nonewline');
+  }
+  function print(txt, nonewline) {
+    if (!txt) return putc(10);
+    if (typeof txt == 'number')
+      txt = ' ' + txt + ' ';
+    txt = '' + txt;
+    for(let i=0; i<txt.length; i++)
+      putc(txt.charCodeAt(i));
+    if (!nonewline) putc(10);
+  }
+
+  function TAB(pos) {
+    // DOC: Move cursor to POS
+    // New: If no arg move to next column
+    while ((col-2) % 8 !== 0)
+      putc(32);
+    
+    // return '' as I think it's used in PRINT
+    return '';
+  }
+  
+  function HELP(cmd) {
+    if (cmd) {
+      let f = window[cmd];
+      if (f) {
+	let s = f.toString();
+	if (trace) print('FUN=' + f.toString());
+	s = s.match(/\/\/\s*DOC\s*:?\s*([\s\S]+)/i);
+	let doc;
+	if (!s) {
+	  doc = '- NO DOCS';
+	} else {
+	  s = s.join('').replace(/\n\s*[^\s\/][\s\S]*$/, '');
+	  s = s.replace(/\n\s*\n[\s\S]*/, '');
+	  s = ('\n'+s).replace(/\n\s*\/\/\s*/g, '\n');
+	  s = s.replace(/^[\n]DOC[\s:]*/, '');
+	  doc = s;
+	}
+
+	princ(cmd); TAB();
+	// indent paragraph!
+	let mincol = col;
+	for(let i=0; i<doc.length; i++) {
+	  let ch = doc.charCodeAt(i)
+	  let c = col;
+	  if (col < mincol) TAB();
+	  putc(ch);
+	  if (ch === 10 || col > 38) {
+	    //alert('NEWLINE: col='+col+' row='+row);
+	    //princ('[' + c + ']');
+	    TAB(); col++;
+	  }
+	}
+	print();
+	return;
+      } else {
+	print('?NO SUCH NAME');
+      }
+    }
+
+    function printkeys(msg, k) {
+      let num = 0;
+      k.forEach(n=>{
+	if (cmd && !n.match(cmd)) return;
+	princ(n);TAB();
+	num++;
+      });
+      if (num) {
+	print(); princ(num);
+	print('WORDS ' + msg);
+      }
+    }
+
+    printkeys(
+      'MISSING', OKK(/(missing|impl|UNKN)/i));
+    print();
+    printkeys(
+      'DEFINED', OKK(/(defined|native|innov)/i));
+
+    print('Usage: HELP [cmd]');
+
+  }
+
+  
   // #FFFFF 
   // PRINT "FOO"BAR"
   // PRINT "4*3="; 4*3
@@ -541,20 +688,28 @@ l0 FOR I=0 TO 7
   // PRINT "foo",
   // PRINT "bar"    > fooo       bar 
   // 20 PRINT @X,10;·• WHIZZ2" 
-  function print(txt, nonewline) {
-    if (typeof txt == 'number')
-      txt = ' ' + txt + ' ';
-    txt = '' + txt;
-    for(let i=0; i<txt.length; i++)
-      princ(txt.charCodeAt(i));
-    if (!nonewline) princ(10);
-  }
-
-  function tab(n) {
-    while ((col-2) % 8 !== 0)
-      princ(32);
-  }
-  
+  // TEST: PRINT 1 2 3+6 =>  123  6
+  // TEST: PRINT 1 2 3, 4 5, FOO, FOO& =>
+  //   123     45   3
+  //   ?SYNTAX ERROR
+  // TEST: LET A=1 2 3 : PRINT A => 123
+  // TEST: A=77 : AA=6 : A$="FOO"
+  //   TEST: PRINT A A => 6
+  //   TEST: PRINT 7A => 7  77
+  //   TEST: PRINT 9AA4 5, 99 => 9  6   99
+  //   TEST: PRINT 3A$6 =>  3 FOO 6
+  //   PRINT 3A$77AA(3)5A$A =>
+  //     3 FOO 77 0 5 FOO 77
+  //   ?A$7A$AA => FOO 7 FOO 6
+  //   ?A$3+4*10^2A => FOO 403  77
+  //   PRINT A A => 6
+  //   PRINT AA => 6
+  //   PRINT A => 77
+  //   ? A A+7 => 13
+  // TEST: LET A B = 7 5
+  //   PRINT AB =>  75
+  //   PRINT AB 5 =>  75
+  //   PRINT AB C => 75
   function PRINT() {
     let line = this;
     line = line.replace(/^PRINT\s*/, '');
@@ -568,9 +723,9 @@ l0 FOR I=0 TO 7
 
       function finish(ev) {
 	if (exp.length)
-	  print(ev?EVAL(exp):exp, true)
+	  princ(ev?EVAL(exp):exp);
 	exp = '';
-	if (c === ',') tab();
+	if (c === ',') TAB();
       }
       
       switch(mode) {
@@ -590,7 +745,7 @@ l0 FOR I=0 TO 7
       case 'string': {
 	if (c=='"') {
 	  if (exp.length)
-	    print(exp, true);
+	    princ(exp)
 	  exp = '';
 	  mode = 'normal';
 	} else {
@@ -620,11 +775,11 @@ l0 FOR I=0 TO 7
 	case ',':
 	case ' ': {
 	  if (exp.length && !par.length) {
-	    print(EVAL(exp), true);
+	    princ(EVAL(exp))
 	    exp = ''
 	    mode = 'normal';
 	  }
-	  if (c === ',') tab();
+	  if (c === ',') TAB();
 	  break;
 	}
 	default: exp += c;
@@ -640,50 +795,14 @@ l0 FOR I=0 TO 7
     if (exp.length) {
       // TODO: missing " ?
       if (mode === 'string')
-	print(exp, true);
+	princ(exp);
       else
-	print(EVAL(exp), true)
+	princ(EVAL(exp));
     }
     if (!nonewline)
-      princ(10);
+      putc(10);
   }
 
-  function error(msg) {
-    print(msg, true);
-    if (lineno) print(' IN LINE ' + lineno);
-    print('');
-    throw msg;
-  }
-  
-  function syntax_error(cmd) {
-    error('?SYNTAX ERROR: ' + cmd);
-  }
-
-  function implemented_error(s) {
-    error('?NOT IMPLEMENTED ERROR: ' + s);
-  }
-  
-  function unexpected_error(s) {
-    error('?UNEXPECTED ERROR: ' + s);
-  }
-
-  function unmatched_error(e, g) {
-    error('?MATCHING ERROR, expected: ' + e + ' got: ' +g);
-  }
-
-  function eval_error(e) {
-    error('?EVAL ERROR (' + e +')');
-  }
-  
-  // TODO: not original?
-  function cont_error() {
-    error('?CAN\'T CONTINUE ERROR');
-  }
-
-  function illegal_quantity_error() {
-    error('?ILLEGAL QUANTITY ERROR');
-  }
-  
   // TODO: Basic Lines max 80 chars bell at 79?
 
   // LIST -100
@@ -692,20 +811,16 @@ l0 FOR I=0 TO 7
 
   // TODO: sorted?
   let lines = {
-    1: 'PRINT "HELLO!"',
-    2: 'END',
+    //1: 'PRINT "HELLO!"',
+    //2: 'END',
     
-    7: 'LET A=0',
-    10: 'PRINT "HELLO"',
-    10: 'PRINT ".";',
-    12: 'LET A=A+1',
-    15: 'GOSUB 100',
-    20: 'GOTO 9',
-    100: 'PRINT A;',
-    110: 'RETURN',
+    10: 'LET A=0',
+    20: 'PRINT A;',
+    30: 'LET A=A+1',
+    40: 'GOTO 20',
   };
 
-  lines = {
+  ylines = {
     5: 'LET E=1000',
     10: 'FOR I=0 TO E',
     15: 'PRINT I',
@@ -764,6 +879,10 @@ l0 FOR I=0 TO 7
   }
   
   function RUN(lno) {
+    // DOC: Runs program (from LINE)
+    // END, STOP, or CTRL-C interrupts
+    // Continue with CONT or GOTO num
+    
     // init
     lineno = (+lno || 0) - 1;
     line = '';
@@ -773,6 +892,7 @@ l0 FOR I=0 TO 7
     cont();
   }
   
+  // TODO: On ORIC you can CONT after END!
   function END() {
     stop('noprompt');
   }
@@ -816,18 +936,21 @@ l0 FOR I=0 TO 7
   function ON_GOTO() { }
 
   function GOSUB(lno) {
-    stack.push([lineno, line]);
+    stack.push(['RETURN', lineno, line]);
     lineno = lno-1;
     line = '';
   }
   function RETURN() {
-    [lineno, line] = stack.pop();
+    let ret = stack.pop();
+    if (!ret) return_error();
+    if (ret[0] !== 'RETURN')
+      return return_error();
+    [ret, lineno, line] = ret;
   }    
 
   // use same stack as GOSUB as they need to be matched! (you can't GOSUB and there NEXT)
   function FOR() {
     let line = this;
-    //let [_, init, to, step] =
     let [_, init, to, __, step] =
 	line.match(/^FOR\s*(.*?)\s*TO\s*(.*?)\s*(STEP\s*(.*)|)\s*$/);
     print('FOR.init: ' + init);
@@ -846,15 +969,38 @@ l0 FOR I=0 TO 7
     // and something about
     // FIE : FOR : BAR
     // FUM : NEXT : FOO
-
+    //
+    // FIE : STOP : BAR
+    //
+    // PRINT 11 : STOP : PRINT 22 : END
+    // CONT -> 22
+    // CONT ater END ok! haha
+    //
     // notice: the loop is run at least once!
     //   and it'll do one step...
+    // ?NEXT WITHOUT FOR ERROR IN LINE...
+  }
+
+  function TO() {
+    let line = this;
+    let [_, init, to, __, step] =
+	line.match(/^FOR\s*(.*?)\s*TO\s*(.*?)\s*(STEP\s*(.*)|)\s*$/);
+    print('TO.to: ' + to);
+    print('TO.step: ' + step);
+
+    to = EVAL(to); // once or every time?
+    step = EVAL(step); // once or every time?
+    if (variable <= to)
+      stack.push([lineno, `TO ${to} STEP ${step}`]);
   }
 
   function NEXT() {
+    // TODO: ...
+    // cheat for now
+    return RETURN(); 
   }
 
-  function IF_THEN_ELSE(e, t, e) {
+  function IF(e, t, e) {
     let line = this;
     
   }
@@ -863,14 +1009,22 @@ l0 FOR I=0 TO 7
   function UNTIL() {}
 
   function STOP() {
-    print(' BREAK IN   '+lineno);
-    stop();
+    print('\n BREAK IN   '+lineno);
+    let lno = lineno;
+    let l = line;
+
+    stop('noprompt');
+
+    CONT.lineno = lno;
+    CONT.line = l;
+    lineno = 0;
+    line = '';
   }
   
   function stop(noprompt) {
     //print('STOPPED!');
     let wasrunning = running();
-    if (col > 2) princ(10);
+    if (col > 2) print();
     if (wasrunning) {
       clearInterval(RUN.interval);
       delete RUN.interval;
@@ -889,7 +1043,7 @@ l0 FOR I=0 TO 7
     let lno = lineno;
     let l = line;
     if (stop('noprompt')) {
-      print('?INTERUPTED AT LINE ' + lineno)
+      print('?INTERUPTED AT LINE ' + lno);
       CONT.lineno = lno;
       CONT.line = l;
     }
@@ -1141,7 +1295,6 @@ already,then skip
 `;
   }
 
-  function TAB() {}
   function PEEK() {}
   function POKE() {}
 
@@ -1154,7 +1307,7 @@ already,then skip
   function example_TAB() {
     return `
 10 FOR 1=0 TO 5 
-20 PRINT TABCIJ; "HELLO" 
+20 PRINT TAB(I); "HELLO" 
 30 NEXT I 
 HELLO 
 HELLO 
@@ -1218,13 +1371,13 @@ HELLO
     else
       c = c.toLowerCase();
     line += c;
-    princ(c.charCodeAt(0)); // lol
+    putc(c.charCodeAt(0)); // lol
     cursorShow();
   }    
 
   function editEnter() {
     cursorHide();
-    princ(10);
+    print();
     run(line);
     line = '';
   }
@@ -1253,7 +1406,7 @@ HELLO
   }
 
   function prompt(noprompt) {
-    if (!noprompt) print('Ready');
+    if (!noprompt) print('\nReady');
     cursorShow();
   }
   // interprets and runs one line
@@ -1301,7 +1454,7 @@ HELLO
     if (trace) print('------' + a.join(' | '));
 
     // hehe - crap!
-    if (!orig.match(/^(LET|INPUT|FOR)/)) {
+    if (!orig.match(/^(LET|INPUT|FOR|HELP|DIM)/)) {
       if (trace) print('---EVAL---' + a.join(' | '));
       a = a.map((x,i)=>!i?x:EVAL(x));
     }
@@ -1333,14 +1486,14 @@ HELLO
   function editBackspace() {
     cursorHide();
     line = line.substring(0, line.length-1);
-    princ(8);
+    putc(8);
     cursorShow();
   }
   
   function editCancel() {
     cursorHide();
     line = '';
-    princ(10);
+    print();
     cursorShow();
   }
 
@@ -1384,7 +1537,7 @@ HELLO
     screen(0, 1, 7);
     
     // CTRL-Q: toggle cursor
-    print(caps?'CAPS':'    ', true);
+    princ(caps?'CAPS':'    ');
 
     // TODO: column enable disable CTRL-J
     if (column) {
@@ -1725,7 +1878,7 @@ instruction
       f = f.replace(/^function \w+/);
       if (f.length < 20) s += ',named';
       if (f.match(/implemented/)) s += ',not implemented';
-      if (f.match(/(if|while|return|for)/)) s += ',DEFINED';
+      if (f.match(/(if|while|return|for|=)/)) s += ',DEFINED';
       if (f.match(/native code/)) s += ',native';
       // NEW?
       if (OricKeywords.name2code[k])
@@ -1757,11 +1910,13 @@ instruction
 	k=>`TATUS - +${k} - - ${OricKeywords.status[k]}\n`).join(''),
       'a');
 
-  function OKC(s) {
+  function OKK(s) {
     return Object.keys(OricKeywords.status)
       .filter(
-	k=>OricKeywords.status[k].match(s))
-      .length;
+	k=>!!OricKeywords.status[k].match(s));
+  }
+  function OKC(s) {
+    return OKK(s).length;
   }
   dom('info',
       '\nORIC ATMOS BASIC SIMULATOR STATUS'+
