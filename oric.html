@@ -159,7 +159,7 @@ COL: <span id='col'></span>
 <br>
 LINE: <span id='line'></span>
 <br>
-ERROR: <span id='stats'></span>
+STATS: <span id='stats'></span>
 <br>
 ERROR: <span id='error' style='color:red;'></span>
 <br>
@@ -237,9 +237,9 @@ ORIC EXTENDED BASIC Vl.1
     cache = {};
   }
   // mode: 0 or 1
-  function LORES(mode) {
-    throw "LORES: Not implemented!";
-  }
+  //function LORES(mode) {
+  //throw "LORES: Not implemented!";
+  //}
 
   // Structurally it is very similar to the TEXT mode, with 40 bytes per line, with each byte representing 6 pixels for a total of 240 pixels in width.
   // The main difference is that each line is only one pixel tall instead of 8, so there are 200 of these.
@@ -254,10 +254,10 @@ ORIC EXTENDED BASIC Vl.1
   // This makes a total of 10210 bytes.
 
   // http://twilighte.oric.org/twinew/ula.htm
-  function HIRES() {
-    implemented_error('HIRES');
-    throw "HIRES: Not implemented!";
-  }
+  //function HIRES() {
+  //implemented_error('HIRES');
+  //throw "HIRES: Not implemented!";
+  //}
   
   const color = {
     black:   '#000000', 0: '#000000',
@@ -463,7 +463,7 @@ l0 FOR I=0 TO 7
       for(let c=2; c<40; c++) {
 	screen(row, c, 32);
       }
-      dom('info', 'scroll time='+(Date.now()-start), 'lp');
+      //dom('info', 'scroll time='+(Date.now()-start), 'lp');
     }
   }
 
@@ -1935,6 +1935,11 @@ instruction
       '\nInnovated: '+OricKeywords.innovated.length+
       '\n----------------',
       'p');
+
+  // create the missing funcs to throw error
+  OricKeywords.missing.forEach(
+    n=>window[n]=()=>implemented_error(n));
+
 </script>
 
 </body>
