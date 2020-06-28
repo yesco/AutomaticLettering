@@ -1491,8 +1491,9 @@ HELLO
   }
   
   function editCancel() {
+    line = ''; 
     cursorHide();
-    line = '';
+    princ('\\');
     print();
     cursorShow();
   }
@@ -1566,6 +1567,11 @@ HELLO
     if (c && k=='f') click = !click;
     if (c && k=='q') cursorToggle();
     if (c && k=='t') showStatus(caps = !caps);
+    if (c && k=='s') screenTogge();
+    if (c && k=='f') clickToggle();
+    if (c && k=='d') doubleToggle();
+    if (c && k=='g') bell();
+
     if (c && k=='j') showStatus(column = !column);
     if (37 <= kc && kc <= 40) editArrow(kc);
 
