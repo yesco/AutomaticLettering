@@ -622,9 +622,18 @@ l0 FOR I=0 TO 7
   }
   function print(txt, nonewline) {
     if (txt === undefined) return putc(10);
-    if (typeof txt == 'number')
+
+    // for numbers ORIC makes SURE it fits
+    // without line breaks!
+    if (typeof txt == 'number') {
       txt = ' ' + txt + ' ';
-    txt = '' + txt;
+      if (col + txt.length > 40) // ?
+	putc(10);
+    } else {
+      txt = '' + txt;
+    }
+    
+    // make sure we have text
     for(let i=0; i<txt.length; i++)
       putc(txt.charCodeAt(i));
     if (!nonewline) putc(10);
@@ -1073,10 +1082,12 @@ l0 FOR I=0 TO 7
     let lno = lineno;
     let l = line;
     if (stop('noprompt')) {
-      print('\n BREAK IN   '+lineno);
+      if (col>2) print();
+      print(' BREAK IN   '+lineno);
       CONT.lineno = lno;
       CONT.line = l;
     }
+    prompt();
     cursorShow();
   }
   
@@ -1537,7 +1548,10 @@ errorObj : ${errorObj}
   }
 
   function prompt(noprompt) {
-    if (!noprompt) print('\nReady');
+    if (!noprompt) {
+      if (col > 2) print();
+      print('Ready');
+    }
     cursorShow();
   }
   // interprets and runs one line
