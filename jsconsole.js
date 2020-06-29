@@ -227,8 +227,8 @@ scroll -  by sliding</br>
     if (c && !a && k == 'u') DBG.cmd.value = '';
     if (c && !a && k == 'i') DBG.inspect();
     if (c && !a && k == 'j') DBG.inspect(undefined, 'j');
-    if (c && a && k == '=') DBG.zoom(1.2);
-    if (c && a && k == '-') DBG.zoom(1/1.2);
+    if (c && a && k == '=') DBG.zoom(1.1);
+    if (c && a && k == '-') DBG.zoom(1/1.1);
 
     if (!c || !a) return;
     // CTRL-ALT-

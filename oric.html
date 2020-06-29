@@ -4,27 +4,27 @@
 <head>
 
 <script>
-  function error(msg) {
+  function error(msg, data) {
     princ(msg);
-    if (lineno) print(' IN LINE ' + lineno);
-    print('');
+    if (data) { putc(32); princ(data); }
+    if (lineno) { princ(' IN LINE'); print(lineno); }
 
-    line = '';
-    lineno = 0;
+    print();
 
+    stop(true);
     throw msg;
   }
   
   function syntax_error(cmd) {
-    error('?SYNTAX ERROR: ' + cmd);
+    error('?SYNTAX ERROR: ', cmd);
   }
 
   function implemented_error(s) {
-    error('?NOT IMPLEMENTED ERROR: ' + s);
+    error('?NOT IMPLEMENTED ERROR:, s);
   }
   
   function unexpected_error(s) {
-    error('?UNEXPECTED ERROR: ' + s);
+    error('?UNEXPECTED ERROR: ', s);
   }
 
   function unmatched_error(e, g) {
@@ -66,14 +66,12 @@ pre, span, div { font-family: 'oric-atmos', monospace; }
 
   span {
       display: inline-block;
-      font-size: 1.5rem;
-      text-align: left;
   }
   
   .char {
       width: 0.30rem;
       border: 0px;
-      padding-left: 0.25rem;
+      padding-right: 0.25rem;
   }
 
   /* TODO: investigate!
@@ -120,10 +118,27 @@ pre, span, div { font-family: 'oric-atmos', monospace; }
 
 </br>
 
-<center>
-  <div id='screen' style='width:83%; color: black; font-size: 1.05em; text-align: left;
-'></div>
-</center>
+<!-- seemingly useless span, but need for getting correct width of 'screen'-->
+<span id='foo'>
+<div id='screen' style='color:black; font-size: 1.5rem; overflow:hidden; xtext-align: left; white-space:nowrap;'>
+</div>
+</span>
+
+<script>
+  window.onresize = function(){
+    let s = dom('screen');
+    
+    let w = s.offsetWidth;
+    let h = s.offsetHeight;
+
+    let ww = window.outerWidth;
+    let wh = window.innerHeight;
+
+    s.style.zoom = Math.min(ww/w, wh/h);
+  };
+  // call an initial time after first render
+  setTimeout(x=>window.onresize(), 1000);
+</script>
 
 <br><br>
 <!-- id=exp is magical for jsconsole - it returns focus there -->
@@ -173,6 +188,10 @@ INFO:<br><span id='info'></span>
 </script>
   
 <script>
+  // Configuration
+  let TIMESLICE = 20; // run about X ms
+
+  // Global ORIC ATMOS state
   let vars = {},
       stack = [], // [ [lno, restline] ...]
       line = '',
@@ -181,6 +200,7 @@ INFO:<br><span id='info'></span>
       click = true,
       column = false,
       trace = false,
+      tron = false,
       row = 1,
       col = 2;
 
@@ -198,6 +218,7 @@ INFO:<br><span id='info'></span>
     click = true
     column = false
     trace = false;
+    tron = false;
     row = 1;
     col = 0;
     
@@ -227,7 +248,8 @@ ORIC EXTENDED BASIC Vl.1
   function TEXT() {
     for(let row=0; row<28; row++) {
       let r = '';
-      for(let col=39; col>=0; col--) {
+      // lol, let's create one extra as the last character is kind of hidden...
+      for(let col=40; col>=0; col--) {
 	c = '&nbsp;';
 	let id = `r${row}c${col}`;
 	r = `<span id='a${id}'><span id='c${id}' class='char'>${c}</span>${r}</span>`;
@@ -370,7 +392,7 @@ l0 FOR I=0 TO 7
 `;
   }
 
-  function example_PRINT_AT() {
+  function example_PRINTAT() {
     return `
 10 FOR X=2 TO 30 
 20 PRINT @X,10;·• WHIZZ2" 
@@ -608,7 +630,11 @@ l0 FOR I=0 TO 7
   function TAB(pos) {
     // DOC: Move cursor to POS
     // New: If no arg move to next column
-    while ((col-2) % 8 !== 0)
+    // New: -POS is using custom tabwidth POS
+    // New: "3" means use 3 cols (=INT(-40/3))
+    if (typeof pos === 'string') pos = -INT(40/3);
+    let width = (pos < 0) ? -pos : 8;
+    while ((col-2) % width !== 0)
       putc(32);
     
     // return '' as I think it's used in PRINT
@@ -844,16 +870,16 @@ l0 FOR I=0 TO 7
     line = '';
     lineno = 0;
     RUN.interval = setInterval(_=>{
-
       for(let i=0; i>=0; i--) {
-      nextline();
-      if (!line)
-	stop();
-      else
-	print(lineno + ' ' + line);
+	nextline();
+	if (!line) {
+	  stop();
+	} else {
+	  princ(lineno);
+	  print(line);
+	}
       }
-      
-    }, 1);
+    }, 0);
   }
 
   function saveline(lno, line) {
@@ -878,6 +904,15 @@ l0 FOR I=0 TO 7
     cursorMove('u');
   }
   
+  function TRON() {
+    tron = true;
+    print('Trace in on');
+  }
+  function TROFF() {
+    tron = false;
+    print('Trace in off');
+  }
+
   function RUN(lno) {
     // DOC: Runs program (from LINE)
     // END, STOP, or CTRL-C interrupts
@@ -916,8 +951,9 @@ l0 FOR I=0 TO 7
       do {
 	nextline();
 	if (line && trace) print(lineno + ' ' + line)
+	if (tron) princ('('+lineno+')');
 	if (!run(line)) stop();
-      } while (Date.now() - start < 20);
+      } while (Date.now() - start < TIMESLICE);
     }, 1);
   }
   
@@ -1111,7 +1147,7 @@ to metres
 `;
   }
 
-  function example_READ_DATA() {
+  function example_READDATA() {
     return `
 10 REM*READ o.nd DATA* 
 20 FOR 0=0 TO 6 
@@ -1149,7 +1185,7 @@ SDAY
 `;
   }
   
-  function example_MULTIDIM() {
+  function example_2DIM() {
     return `
 10 DIM NXC10,3) 
 20 CLS 
@@ -1282,7 +1318,7 @@ already,then skip
   function OR() {}
   function NOT() {}
 
-  function example_ON_GOTO() {
+  function example_ONGOTO() {
     return `
 10 l NPUT" ENTER 1 .. 2 OR 3_, PLEASE' ' ;N 
 20 ON N GOTO 150,200,300 
@@ -1298,9 +1334,52 @@ already,then skip
   function PEEK() {}
   function POKE() {}
 
-  function CSAVE() {}
+  function NEW() {
+    stop(true);
+    lines = {};
+  }
+  
+  // TODO: load basic from any URL!
+  function CLOAD(name, info) {
+    // DOC: Loads a file "NAME"
+    // New: Without arguments lists examples
+    // New: With 'CLOAD D' shows names with 'D'
+    let names = Object.keys(window)
+	.filter(n=>n.startsWith('example'));
+    if (name) {
+      names = names.filter(n=>n.match(name));
+      if (names.length === 1) {
+	name = names[0];
+	print('Loading ' + name);
+	let src = window[name];
+	if (typeof src === 'function')
+	  src = src();
+	NEW();
+	let n = 0;
+	try{
+	src.replace(
+	  /\n\s*(\d+)\s*(.*)/g,
+	  (_, lno, l)=>{
+	    saveline(+lno, l);
+	    n++;
+	  });
+	}catch(e){alert(e);}
+	princ(n); print('lines loaded');
+	return;
+      } else {
+	print('?CLOAD AMBIGOUS NAME ERRROR');
+      }
+    }
+    // list'em
+    names
+      .map(n=>n.replace(/^example_+/, ''))
+      .forEach(n=>(princ(n), TAB("3")));
+  }
+  
+  function CSAVE() {
+    
+  }
 
-  function CLOAD() {}
   function STORE() {}
   function RECALL() {}
   
@@ -1454,7 +1533,7 @@ HELLO
     if (trace) print('------' + a.join(' | '));
 
     // hehe - crap!
-    if (!orig.match(/^(LET|INPUT|FOR|HELP|DIM)/)) {
+    if (!orig.match(/^(LET|INPUT|FOR|HELP|DIM|CLOAD)/)) {
       if (trace) print('---EVAL---' + a.join(' | '));
       a = a.map((x,i)=>!i?x:EVAL(x));
     }
@@ -1474,6 +1553,8 @@ HELLO
       } catch(e) {
 	// TOOD: make into error?
 	// simplify error handl: just throw strings!
+	stop();
+	throw e;
       }
     } else {
       syntax_error(cmd);
@@ -1551,11 +1632,17 @@ HELLO
   }
   
   dom('exp').addEventListener('keydown', function(e) {
-    let c = e.ctrlKey, k = e.key.toLowerCase();
+    let c = e.ctrlKey, a = e.altKey;
+    let k = e.key.toLowerCase();
     let s = e.shiftKey, ch = e.code;
     let kc = e.keyCode;
+
     if (kc==13) editEnter();
     if (kc==8) editBackspace();
+
+    // WARNING: NO ALT (below here)
+    if (a) return;
+    
     if (c && k=='c') ctrlC();
     if (c && k=='x') editCancel();
     if (c && k=='l') {
