@@ -7,7 +7,12 @@ aaa += 'C';
 // - restore: callback when minimizing
 // - key: 'ca-d' or list for help/clear/
 
-function DBG() {
+function DBG(i, v) {
+  // nasty way to set 'any' property
+  //   noerr  - ignores errors
+  //   logerr - don't toggle DBG on at error
+  if (i) return DBG[i]=v;
+    
   let x = document.createElement('div');
   x.id = 'DBG';
   x.style.backgroundColor = 'white';
@@ -239,7 +244,10 @@ scroll -  by sliding</br>
   
   aaa += 'e8';
   // https://developer.mozilla.org/en-US/docs/Web/API/GlobalEventHandlers/onerror
-  if (1) window.addEventListener('error', function(e) {
+  window.addEventListener('error', onerror);
+  
+  function onerror(e) {
+    if (DBG.noerr) return;
     let base = window.location.href.replace(/\/[^\/]*$/, '/');
 
     let fn = e.filename.replace(base, '').
@@ -252,12 +260,13 @@ scroll -  by sliding</br>
       // TODO: make this default during load
       // and then, later, each time minimized reset counter to 0
       // if minimized, show red counter, don't auto-show
+      if (DBG.logerr) return false;
       DBG.toggle(true);
     } catch(ee) {
       dom('DBGout', ['dom function error', ''+ee], 't');
     }
     return false;
-  });
+  }
   
   if (0 || DBG.debug) {
     aaa += 'e3';
@@ -273,6 +282,7 @@ scroll -  by sliding</br>
   aaa += 'e9';
 }
 
+// init
 DBG();
 
 {
