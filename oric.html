@@ -4,6 +4,23 @@
 <head>
 
 <script>
+  // -- Simplified testing of types and values
+  function tType(t, x, err) {
+    if (x === undefined) syntax_error();
+    if (typeof x !== t) type_error();
+    if (err) quantity_error();
+    // okay
+  }
+  function tStr(s, err) {
+    tType('string', s, err);
+  }
+  function tNum(n, err) {
+    tType('number', n, err);
+  }
+  function tPos(n, err) {
+    tNum(n, err || n < 0);
+  }
+
   function error(msg, data) {
     print();
     princ(msg);
@@ -13,7 +30,8 @@
     stop(true);
     throw msg;
   }
-  
+
+  // NEW?
   function save_error(info) {
     error("?CAN'T SAVE", info);
   }
@@ -22,18 +40,22 @@
     error('?SYNTAX ERROR: ', cmd);
   }
 
+  // NEW
   function implemented_error(s) {
     error('?NOT IMPLEMENTED ERROR:', s);
   }
   
+  // NEW?
   function unexpected_error(s) {
     error('?UNEXPECTED ERROR:', s);
   }
 
+  // NEW?
   function unmatched_error(e, g) {
     error('?MATCHING ERROR, expected:' + e + ' got: ' +g);
   }
 
+  // NEW?
   function eval_error(e) {
     error('?EVAL ERROR:', e);
   }
@@ -46,10 +68,18 @@
     error('?CAN\'T CONTINUE ERROR');
   }
 
-  function illegal_quantity_error() {
+  function quantity_error() {
     error('?ILLEGAL QUANTITY ERROR');
   }
+
+  function type_error() {
+    error('?TYPE MISMATCH ERROR');
+  }
   
+  function div_error() {
+    error('?DIVISION BY ZERO ERROR');
+  }
+g  
 </script>
   
 <style>
@@ -63,8 +93,17 @@
 		url('oric-atmos.ttf') 
 		format('truetype');
 }
+@font-face {
+	font-family: 'neoletters';
+	src: url('neoletters.ttf'); 
+	src: 
+		local('neoletters'),
+		local('neoletters'),
+		url('neoletters.ttf') 
+		format('truetype');
+}
 /*container element*/
-pre, span, div { font-family: 'oric-atmos', monospace; }
+span, div { font-family: 'oric-atmos', monospace; }
 /*span elements inside the container div*/
 
   span {
@@ -117,16 +156,17 @@ pre, span, div { font-family: 'oric-atmos', monospace; }
 <body style='background-color: black; color: white;'>
 <div style='width:100%'>
   <img width='20%' src='oric-logo-black-export.svg'/>
-  <div style='float:right; top:0; width:80%; text-align:center; font-decoration:bold; text-justify:inter-word; font-size:3rem;'>W E B - B A S I C</div>
+  <div style='float:right; top:0; width:80%; text-align:center; font-decoration:bold; text-justify:inter-word; font-size:3rem;'>W E B - B A S I C
+<div style='font-size:1rem;'>jsk@yesco.org</div>
+  </div>
+<span style='transform-origin:left; transform:scale(1.8, 1);'><b>&nbsp;&nbsp;B A S I C</b></span>
 </div>
-
-</br>
 
 <!-- seemingly useless span, but need for getting correct width of 'screen'-->
-<span id='foo'>
+<center><span id='foo'>
 <div id='screen' style='color:black; font-size: 1.5rem; overflow:hidden; xtext-align: left; white-space:nowrap;'>
 </div>
-</span>
+</span></center>
 
 <script>
   window.onresize = function(){
@@ -359,7 +399,21 @@ ORIC EXTENDED BASIC Vl.1
     return col;
   }
   
-  // this is like equivalent of POKE!
+  // BRAILLE
+  // https://en.m.wikipedia.org/wiki/Braille_Patterns
+  // bit-value:
+  //  1   8
+  //  2  10
+  //  4  20
+  // 40  80
+  let BRAILLE = 2800; // REALLY!?
+
+  // nodejs can't handle it?
+  // let braille =⠀"⠁⠂⠃⠄⠅⠆⠇⠈⠉⠊⠋⠌⠍⠎⠏⠐⠑⠒⠓⠔⠕⠖⠗⠘⠙⠚⠛⠜⠝⠞⠟";
+	 
+	 
+   // this is like equivalent of POKE!
+  
   function screen(row, col, ch) {
     let dc = domc(`cr${row}c${col}`);
     // read screen?
@@ -379,8 +433,16 @@ ORIC EXTENDED BASIC Vl.1
 
     // interpret char/attribute
     let c = ch & 0x7f;
-    if (c >= 32) { // ascii
-      t = ch & 0x7f;
+
+    if (ch > 255) { // unicode! lol
+      // pass through, we don't c(h)ar(e)
+      t = ch;
+    } else if (c >= 32) { // ascii
+      // TODO: implement inverse!
+      // remove high-bit as it means inverse
+      t = ch & 0x7f; 
+    } else if (ch < 0) { // bits...
+      t =  BRAILLE - ch; // so it get's "added"
     } else if (c < 8) { // ink
       let fg = c & 0x07;
       if (c > 127) fg = inverse(fg);
@@ -652,8 +714,8 @@ l0 FOR I=0 TO 7
       if (trace) print('-->: ' + r);
       return r;
     } catch(e) {
-      if (!trace) print('?EVAL: ' + x);
-      eval_error('' + e);
+      console.log('?EVAL: ' + x);
+      //eval_error('' + e);
       //stop();
       throw e;
     }
@@ -769,14 +831,14 @@ l0 FOR I=0 TO 7
 	num++;
       });
       if (num) {
-	print(); princ(num);
+	if (col > 2) print();
+	princ(num);
 	print('WORDS ' + msg);
       }
     }
 
     printkeys(
       'MISSING', OKK(/(dummy|missing|impl|UNKN)/i));
-    print();
     printkeys(
       'DEFINED', OKK(/(const|defined|native|innov)/i));
 
@@ -959,6 +1021,7 @@ l0 FOR I=0 TO 7
     line = '';
     lineno = -1;
     print();
+    
     RUN.interval = setInterval(_=>{
       for(let i=0; i>=0; i--) {
 	nextline();
@@ -1292,9 +1355,14 @@ l0 FOR I=0 TO 7
     cont();
   }
 
-  // dummies
-  function REM() {}
-  function AUTO() {} // haha thought it was autonum?
+  // -- dummies
+  function REM() {
+    // DOC: REMMARK nice days, isn't?
+  }
+  // haha thought it was autonum?
+  function AUTO() {
+    // DOC: CSAVE "fnme", AUTO autoruns!
+  }
   function CALL() {
     error("?WHO'RE YOU GONNA CALL? STEVE?");
   }
@@ -1477,60 +1545,84 @@ already,then skip
   
   function READ() {}
   function DATA() {}
-  function RESTOR() {}
+  function RESTORE() {}
   
   // GET K$
   function GET() {}
   function READ() {}
   function DATA() {}
 
-  function ASC() {}
+  function ASC(s) {
+    // DOC: get ascii number from string
+    tString(s, s === '');
+    return s.charCodeAt(0);
+  }
 
-  function CHR$() {}
+  function CHR$(n) {
+    // DOC: get char from ascii number
+    tNum(n, n < 0 || n > 255);
+    // TODO: cheat with allo unicode?
+    return String.fromCharCode(n);
+  }
 
-  function STR$() {}
+  function STR$(n) {
+    // DOC: make a string from a number
+    tNum(n);
+    return (n < 0 ? '' : ' ') + n.toString();
+  }
 
-  // evaluated first, before any other calculations are worked out. 
-  //The other string function for numeric conversion is HEX$. This returns 
-  // the string form of the hexadecimal number equivalent to the argument. For 
-  // example, HEX$C4I8) returns #IA2. Since hexadecimal numbers can only be 
-  // integers between 0 and 65535, any numbers outside that range will give a 
-  // ?ILLEGAL QUANTITY ERROR, and any non-integer values will be auto-
-  // matically rounded.
+  function HEX$(n) {
+    // DOC: return #HEX for number
+    // Curiosity: return #0 for string
+    if (typeof n !== 'number') return '#0';
+    tNum(n, n < 0 || n > 65535);
+    return '#' + INT(n).toString(16).toUpperCase();
+  }  
 
-  function HEX$() {}
-
-  function LEN(s) { return s.length; }
+  function LEN(s) {
+    tStr(s);
+    return s.length; }
 
   function LEFT$(s, len) {
     // DOC: From S return LEN first chars.
+    tStr(s); tPos(len);
     return  s.substring(0, len);
   }    
   function RIGHT$(s, len) {
     // DOC: From S return LEN last chars.
+    tStr(s); tPos(len);
     return  s.substr(-len);
   }
 
   function MID$(s, pos, len) {
     // DOC: From S from POS get LEN chars
+    tStr(s); tPos(pos); tPos(len);
     return s.substr(s, from, len);
   }
 
-  function SPC(n) { return ' '.repeat(n); }
+  function SPC(n) {
+    tPos(n);
+    return ' '.repeat(n);
+  }
   
-  function VAL() {}
+    
+  function VAL(s) {
+    // Oric: doesn't even need to terminate "string in PRINT, but in VAL("FOO   have to...
+    
+  }    
   
-  function INT() {}
+  function INT(n) {
+    tNum(n);
+    return Math.floor(n);
+  }
   
-  function PING() {}
-  
-
   // REM comment
   // ' commment
   function REM() {}
 
   // MATH
   // + - * / ^
+  //   / == div_error()... check...
   
   // Oric BASIC has the following built-in numeric functions: 
   ABS = Math.abs;
@@ -1552,6 +1644,19 @@ already,then skip
     return Math.floor(n * Math.random());
   }
 
+  function AND(a, b) {
+    // DOC: bitwise and 2 values
+    return a & b;
+  }
+  function OR(a, b) {
+    // DOC: bitwise or 2 values
+    return a | b;
+  }
+  function NOT() {
+    // DOC: negate all bits (0 <=> -1)
+    return ~a;
+  }
+
   // tested by means of conditional operators: 
   // Equal to 
   // <> Not equal to 
@@ -1564,10 +1669,6 @@ already,then skip
 
   // 10 DEF FNMCFEETJ=FEET*0.3048 
   function DEFFN(n, exp) {}
-
-  function AND() {}
-  function OR() {}
-  function NOT() {}
 
   function example_ONGOTO() {
     return `
@@ -1896,6 +1997,8 @@ errorObj : ${errorObj}
     if (trace) print('LINE: ' + line);
     if (f) {
       try {
+	// TODO if f.len !+ a.length => ?SYN
+	// problem is with ...args count=0
 	f.apply(orig, a);
       } catch(e) {
 	// TOOD: make into error?
@@ -2388,6 +2491,13 @@ instruction
   // create the missing funcs to throw error
   OricKeywords.missing.forEach(
     n=>window[n]=()=>implemented_error(n));
+
+  // remove non-basic names... not extensions
+  'DBG,OKK,OKC,TEMPORARY,PERSISTENT,EVAL,HTML,STORE'.split(',').map(
+    n=>{
+      delete OricKeywords.status[n];
+    });
+
 
 </script>
 

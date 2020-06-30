@@ -47,6 +47,7 @@ function DBG(i, v) {
     <span id=DBGhelpbutton style="border:0.2em black solid; color:white; background-color:#595959"><b>DBG</b>&gt;</span>
     &nbsp;
     <input id=DBGcmd style="background-color:black; color: white; font-size:1em;"/>
+    <a target='new' href='https://codepen.io/pen/'>CodePen</a>
   </div>
   <div id=DBGhelp hidden=true></div>
   <div id=DBGout style='font-size:18px; font-family:Ariel;'></div>
