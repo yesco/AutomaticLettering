@@ -115,6 +115,7 @@ function parseExp(line) {
     line.substring(0, i),
     line.substring(i),
     i,
+    r,
   ];
 }
 
@@ -122,13 +123,24 @@ function parseExp(line) {
 if (typeof required !== undefined) {
   function test(line, xpt) {
     console.log('\n==== ' + line);
-    let r = parseExp(line);
-    console.log('GOT:', r[0]);
-    if (r[0] === xpt) {
+    let ra = [];
+    let rr = [];
+    let r;
+    let s = line;
+    while (s) {
+      r = parseExp(s);
+      ra.push(r);
+      //console.log('-----', r);
+      rr.push(r[0]);
+      s = r[1]
+    }
+    console.log(':', rr);
+    //console.log('GOT:', rr[0]);
+    if (rr[0] === xpt) {
       //console.log('OK!');
     } else {
       console.log('EXP:', xpt);
-      console.log('RES:', r);
+      console.log('RES:', ra[0]);
       console.error('?-------------------------WRONG!');
     }
   }
@@ -155,4 +167,6 @@ if (typeof required !== undefined) {
   test('("FOO', '("FOO'); // it's not saying it correct...
   test('(FOO', '(FOO'); // it's not saying it correct...
 
+  test('35,FOO', '35'); // it's not saying it correct...
+  test(',FOO', ','); // it's not saying it correct...
 }

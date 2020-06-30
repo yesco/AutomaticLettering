@@ -412,8 +412,16 @@ ORIC EXTENDED BASIC Vl.1
   // let braille =⠀"⠁⠂⠃⠄⠅⠆⠇⠈⠉⠊⠋⠌⠍⠎⠏⠐⠑⠒⠓⠔⠕⠖⠗⠘⠙⠚⠛⠜⠝⠞⠟";
 	 
 	 
-   // this is like equivalent of POKE!
-  
+  // this is like equivalent of POKE!
+  // READ   screen(row, col) => ch
+  // WRITE  screen(row, col, ch)
+  //   ch <  0   magical pixels
+  //   ch <  8   INK
+  //   ch < 16   ... blink, ALT, double
+  //   ch < 24   PAPER
+  //   ch > 31   ASCII
+  //   ch >127   ASCII inverted!
+  //   ch > 255  Unicode ...
   function screen(row, col, ch) {
     let dc = domc(`cr${row}c${col}`);
     // read screen?
