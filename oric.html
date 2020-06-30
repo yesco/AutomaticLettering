@@ -337,6 +337,28 @@ ORIC EXTENDED BASIC Vl.1
     return d;
   }
   
+  function PLOT(x, y, sORn) {
+    // DOC: X,Y puts a string or raw attribute
+    if (typeof sORn === 'string') {
+      let r = row, c = col;
+      row = y; col = x;
+      prin(sORn);
+      row = r; col = c;
+    } else {
+      screen(y, x, sORn);
+    }
+  }
+      
+  function SCRN(x, y) {
+    // DOC: Return char/attr at X, Y
+    return screen(y, x);
+  }
+  
+  function POS() {
+    // DOC: Column position
+    return col;
+  }
+  
   // this is like equivalent of POKE!
   function screen(row, col, ch) {
     let dc = domc(`cr${row}c${col}`);
@@ -698,6 +720,7 @@ l0 FOR I=0 TO 7
   
   function HELP(cmd) {
     if (cmd) {
+      // extract DOC string from function!
       let f = window[cmd];
       if (f) {
 	let s = f.toString();
@@ -715,6 +738,7 @@ l0 FOR I=0 TO 7
 	}
 
 	princ(cmd); TAB();
+
 	// indent paragraph!
 	let mincol = col;
 	for(let i=0; i<doc.length; i++) {
@@ -735,6 +759,8 @@ l0 FOR I=0 TO 7
       }
     }
 
+    // list names!
+    
     function printkeys(msg, k) {
       let num = 0;
       k.forEach(n=>{
@@ -749,10 +775,10 @@ l0 FOR I=0 TO 7
     }
 
     printkeys(
-      'MISSING', OKK(/(missing|impl|UNKN)/i));
+      'MISSING', OKK(/(dummy|missing|impl|UNKN)/i));
     print();
     printkeys(
-      'DEFINED', OKK(/(defined|native|innov)/i));
+      'DEFINED', OKK(/(const|defined|native|innov)/i));
 
     print('Usage: HELP [cmd]');
 
@@ -1266,8 +1292,22 @@ l0 FOR I=0 TO 7
     cont();
   }
 
-  function REM() {
+  // dummies
+  function REM() {}
+  function AUTO() {} // haha thought it was autonum?
+  function CALL() {
+    error("?WHO'RE YOU GONNA CALL? STEVE?");
   }
+  function USR() {
+    error('USSR NOT ANSWERING. TRY LATER!');
+  }
+  
+  function FRE() { return FRE.size; }
+  FRE.size = 393737; // Atmos 38737;
+  // LOL
+  function GRAB() { FRE.size *= 2; }
+  function HIMEM() { FRE.size *= 2; }
+  function RELEASE() { FRE.size *= 2; }
   
   function STOP() {
     cursorHide();
@@ -1461,9 +1501,22 @@ already,then skip
   function HEX$() {}
 
   function LEN(s) { return s.length; }
-  function LEFT$(s, n) {}
-  function RIGHT$(s, n) {}
-  function MID$(s, a, b) {}
+
+  function LEFT$(s, len) {
+    // DOC: From S return LEN first chars.
+    return  s.substring(0, len);
+  }    
+  function RIGHT$(s, len) {
+    // DOC: From S return LEN last chars.
+    return  s.substr(-len);
+  }
+
+  function MID$(s, pos, len) {
+    // DOC: From S from POS get LEN chars
+    return s.substr(s, from, len);
+  }
+
+  function SPC(n) { return ' '.repeat(n); }
   
   function VAL() {}
   
@@ -1487,7 +1540,9 @@ already,then skip
   INT = Math.floor;
   LN = Math.ln;
   LOG = Math.ln10;
-  const PI = Math.PI;
+  PI = Math.PI;
+  TRUE = -1;
+  FALSE = 0;
   SGN = n=>(n>0)?+1:(n<0)?-1:0;
   SIN = Math.sin;
   SQR = Math.sqrt;
@@ -1496,7 +1551,6 @@ already,then skip
     if (!n) return Math.random();
     return Math.floor(n * Math.random());
   }
-  function RANDOMIZE() {}
 
   // tested by means of conditional operators: 
   // Equal to 
@@ -1543,6 +1597,7 @@ already,then skip
     // New: With 'CLOAD D' shows names with 'D'
     if (!name) name = '';
     
+    let origline = this;
     function load(src) {
       if (!src) return;
       NEW();
@@ -1557,6 +1612,7 @@ already,then skip
 	  n++;
 	});
       princ(n); print('lines loaded');
+      if (origline.match(/,\s*AUTO/)) RUN();
       return true;
     }
     
@@ -1695,7 +1751,6 @@ errorObj : ${errorObj}
 `);
   }
 
-  let lastnow = Date.now();
   let lastrun = 0;
   setInterval(_=>{
     dom('line', line);
@@ -1705,9 +1760,8 @@ errorObj : ${errorObj}
     
     dom('stats', 'Statements: '+run.count+
 	' sps= ' + Math.floor(1000*(run.count-lastrun)/(cont.millis)));
-    
-    lastnow = now;
     lastrun = run.count;
+    
   }, 100);
   // clear initial error
   dom('error', '');
@@ -1773,6 +1827,8 @@ errorObj : ${errorObj}
     // remove leading ':' (used for indent!)
     line = line.replace(/^[\s:]*/, '');
 
+    // TODO: remove ll cursorShow from here...
+    
     // fast comments
     if (line.match(/^(REM|')/))
       return (cursorShow(), 'REM');
@@ -2251,22 +2307,34 @@ instruction
   OricKeywords.missing = new Set();
   for(let k in OricKeywords.name2code) {
     OricKeywords.missing.add(k);
+    // assume mssing till removed
     OricKeywords.status[k] = 'missing';
   }
   for(let k in window) {
     // Oric functions are all uppercase!
+    
     if (k.toUpperCase() == k) {
+      OricKeywords.missing.delete(k);
+      OricKeywords.status[k] = 'window';
+      
       OricKeywords.defined.push(k);
+
       let s = '';
       let f = window[k];
-      if (!f || !f.toString) continue;
-      //if (typeof f !== 'function') continue;
-      f = f.toString();
-      f = f.replace(/^function \w+/);
-      if (f.length < 20) s += ',named';
-      if (f.match(/implemented/)) s += ',not implemented';
-      if (f.match(/(if|while|return|for|=)/)) s += ',DEFINED';
-      if (f.match(/native code/)) s += ',native';
+      if (typeof f === 'function')
+	s += 'function';
+      else
+	s += 'const?';
+      //if !f) continue; // || !f.toString) continue;
+      if (typeof f == 'function') {
+	f = f.toString();
+	f = f.replace(/^function \w+/);
+	if (f.length < 20) s += ',named,dummy';
+	if (f.match(/implemented/)) s += ',not implemented';
+	if (f.match(/(if|while|return|for|=)/)) s += ',DEFINED';
+	if (f.match(/native code/)) s += ',native';
+      }
+
       // NEW?
       if (OricKeywords.name2code[k])
 	OricKeywords.missing.delete(k);
@@ -2277,7 +2345,7 @@ instruction
 
       if (s == '') s = 'UNKNOWN';
       
-      //dom('info', `== ${k} - - ${s}`, 'a');
+      dom('info', `== ${k} - - ${s}`, 'a');
       OricKeywords.status[k] = s;
     } else{
       //dom('info', `!! ${k}`, 'a');
@@ -2294,7 +2362,7 @@ instruction
       'a');
   dom('info',
       Object.keys(OricKeywords.status).map(
-	k=>`TATUS - +${k} - - ${OricKeywords.status[k]}\n`).join(''),
+	k=>`STATUS - - ${k} - - ${OricKeywords.status[k]}\n`).join(''),
       'a');
 
   function OKK(s) {
