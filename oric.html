@@ -69,6 +69,7 @@ pre, span, div { font-family: 'oric-atmos', monospace; }
 
   span {
       display: inline-block;
+      /*height: 1px; /* haha you can try! */
   }
   
   .char {
@@ -145,8 +146,10 @@ pre, span, div { font-family: 'oric-atmos', monospace; }
 
 <br><br>
 <!-- id=exp is magical for jsconsole - it returns focus there -->
-<input id='exp' autofocus style='background:black; color:black; border:none;'>
-<input id="file" type="file"/>
+<div style='display:flex; width:100%;'>
+  <input id='exp' autofocus style='flex:1; xbackground:black; color:black; border:none; width:100; float:right;'>
+</div>
+<!---input id="file" type="file"/-->
 <script>
   // inspired by https://stackoverflow.com/questions/16495125/parsing-binary-files-in-client-side-js
   // REFERENCE:
@@ -194,16 +197,26 @@ INFO:<br><span id='info'></span>
   // Configuration
   let TIMESLICE = 20; // run about X ms
 
+  const COLWIDTH = 40, // ORIC: 40
+	ROWHEIGHT = 28, // ORIC: 28
+	
+	LastOne = 'foo';
+  
+  
+
   // Global ORIC ATMOS state
   let vars = {},
       stack = [], // [ [lno, restline] ...]
       line = '',
+      lineToDo = [], // queue
       lineno = 0,
       caps = true,
       click = true,
       column = false,
-      trace = false,
-      tron = false,
+      scrn = true,
+      trace = false, // debug tracing CTRL-P
+      tron = false, // TRON/TROFF
+      forceUpdate = false,
       row = 1,
       col = 2;
 
@@ -211,20 +224,37 @@ INFO:<br><span id='info'></span>
 
   function boot() {
     stop('noprompt');
+    CLS();
     
     // init
     vars = {};
     stack = [];
     line = '';
     lineno = 0;
+    lineToDo = [];
     caps = true
     click = true
     column = false
     trace = false;
     tron = false;
-    row = 1;
-    col = 0;
+    forceUpdate = false,
     
+    row = 1;
+    col = 2;
+    
+    // stats
+    putc.count = 0;
+    putc.scrollcount = 0;
+
+    screen.readcount = 0;
+    screen.writecount = 0;
+
+    run.count = 0;
+    
+    cont.intervalcount = 0;
+    cont.millis = 0;
+
+    // action
     showStatus();
 
     print(`
@@ -235,7 +265,7 @@ ORIC EXTENDED BASIC Vl.1
   }
 
   // https://osdk.org/index.php?page=articles&ref=ART9.
-  // From a memory point of view, TEXT mode requires 1120 bytes for display (28 lines of 40 columns)
+  // From a memory point of view, TEXT mode requires 1120 bytes for display (ROWHEIGHT lines of 40 columns)
   // and 1920 bytes for storing the character set
   // 1120 bytes for the screen (from #BB80 to #BFDF)
   // 1024 bytes for the default character set (from #B400 to #B7FF)
@@ -249,10 +279,10 @@ ORIC EXTENDED BASIC Vl.1
 
   // TODO: calling twice messes something up
   function TEXT() {
-    for(let row=0; row<28; row++) {
+    for(let row=0; row<ROWHEIGHT; row++) {
       let r = '';
       // lol, let's create one extra as the last character is kind of hidden...
-      for(let col=40; col>=0; col--) {
+      for(let col=COLWIDTH; col>=0; col--) {
 	c = '&nbsp;';
 	let id = `r${row}c${col}`;
 	r = `<span id='a${id}'><span id='c${id}' class='char'>${c}</span>${r}</span>`;
@@ -312,11 +342,13 @@ ORIC EXTENDED BASIC Vl.1
     let dc = domc(`cr${row}c${col}`);
     // read screen?
     if (ch === undefined) {
+      screen.readcount++;
       if (typeof dc.screenchar == 'number')
 	return dc.screenchar;
       else
 	return dc.screenchar = dc.textContent.charCodeAt(0);
     }
+    screen.writecount++;
     dc.screenchar = ch;
 
     let da = domc(`ar${row}c${col}`);
@@ -368,16 +400,18 @@ ORIC EXTENDED BASIC Vl.1
     else if (t !== undefined)
       dc.textContent = String.fromCharCode(t);
   }
+  screen.readcount = 0;
+  screen.writecount = 0;
 
   function INK(color) {
     // skip status line
-    for(let row=1; row<28; row++) {
+    for(let row=1; row<ROWHEIGHT; row++) {
       screen(row, 1, color);
     }
   }
   function PAPER(color) {
     // skip status line
-    for(let row=1; row<28; row++) {
+    for(let row=1; row<ROWHEIGHT; row++) {
       screen(row, 0, 16+color);
     }
   }
@@ -432,6 +466,9 @@ l0 FOR I=0 TO 7
     d.style.color = '';
   }
   function cursorShow() {
+    // TODO: right place? lol
+    dom('exp').value = line;
+    
     if (!cursor || cursorVisible) return;
     cursorVisible = true;
     let d = domc(`cr${row}c${col}`);
@@ -441,12 +478,11 @@ l0 FOR I=0 TO 7
     d.style.color = 'white';
   }
   
-  let dirty = 0;
   function putc(c) {
     if (typeof(c) !== 'number')
       alert('putc: only take nubmers: ' +  c);
-    dirty++;
-
+    putc.count++;
+    
     // TODO: how to handle inverse?
     let ch = c & 0x7f;
     if (ch === ESC) return raw = true;
@@ -469,14 +505,15 @@ l0 FOR I=0 TO 7
       screen(row, col, 32);
     }
 
-    // TODO: should be 40????
-    if (col >= 40) { row++; col = 2; }
+    // TODO: should be COLWIDTH????
+    if (col >= COLWIDTH) { row++; col = 2; }
 
     // scroll!
-    if (row >= 28) {
+    if (row >= ROWHEIGHT) {
+      putc.scrollcount++;
       let start = Date.now();
-      for(let r=2; r<28; r++) {
-	for(let c=0; c<40; c++) {
+      for(let r=2; r<ROWHEIGHT; r++) {
+	for(let c=0; c<COLWIDTH; c++) {
 	  let old = screen(r-1, c);
 	  let nw = screen(r,c);
 	  if (nw != old)
@@ -485,12 +522,14 @@ l0 FOR I=0 TO 7
       }
       // TODO: if not hidden column mode?
       row = 27;
-      for(let c=2; c<40; c++) {
+      for(let c=2; c<COLWIDTH; c++) {
 	screen(row, c, 32);
       }
       //dom('info', 'scroll time='+(Date.now()-start), 'lp');
     }
   }
+  putc.count = 0;
+  putc.scrollcount = 0;
 
   // 20LETSEL=0 => 20 LET SEL = 0
   // TODO: 63999 max
@@ -532,6 +571,10 @@ l0 FOR I=0 TO 7
     vars[n] = gen(...dims);
   }
 
+  // TEST:
+  //   LET IF=2 => ?Syntax...
+  //   LET THE=3 => ok
+  //   LET THENN=4 => ?Syntax...
   function LET(n) {
     let v = this;
     v = v.replace(/^\s*LET\s*\S+\s*=\s*/, '');
@@ -604,8 +647,8 @@ l0 FOR I=0 TO 7
     let start = Date.now();
     // TODO: does it scroll colors?
     // don't touch mode-line
-    for(let row=1; row<28; row++) {
-      for(let col=2; col<40; col++) {
+    for(let row=1; row<ROWHEIGHT; row++) {
+      for(let col=2; col<COLWIDTH; col++) {
 	screen(row, col, 32);
       }
     }
@@ -627,7 +670,7 @@ l0 FOR I=0 TO 7
     // without line breaks!
     if (typeof txt == 'number') {
       txt = ' ' + txt + ' ';
-      if (col + txt.length > 40) // ?
+      if (col + txt.length > COLWIDTH) // ?
 	putc(10);
     } else {
       txt = '' + txt;
@@ -644,7 +687,7 @@ l0 FOR I=0 TO 7
     // New: If no arg move to next column
     // New: -POS is using custom tabwidth POS
     // New: "3" means use 3 cols (=INT(-40/3))
-    if (typeof pos === 'string') pos = -INT(40/3);
+    if (typeof pos === 'string') pos = -INT(COLWIDTH/3);
     let width = (pos < 0) ? -pos : 8;
     while ((col-2) % width !== 0)
       putc(32);
@@ -679,7 +722,7 @@ l0 FOR I=0 TO 7
 	  let c = col;
 	  if (col < mincol) TAB();
 	  putc(ch);
-	  if (ch === 10 || col > 38) {
+	  if (ch === 10 || col > COLWIDTH-2) {
 	    //alert('NEWLINE: col='+col+' row='+row);
 	    //princ('[' + c + ']');
 	    TAB(); col++;
@@ -748,6 +791,8 @@ l0 FOR I=0 TO 7
   //   PRINT AB =>  75
   //   PRINT AB 5 =>  75
   //   PRINT AB C => 75
+  // TODO: PRINTAT
+  //  20 PRINT @X,10;·• WHIZZ2"
   function PRINT() {
     let line = this;
     line = line.replace(/^PRINT\s*/, '');
@@ -878,15 +923,23 @@ l0 FOR I=0 TO 7
     return !!RUN.interval;
   }
   
+  // TODO: like list but formats the code...
+  // prettyprint
+  // function PP()  {
+  //
+  //}
+
   function LIST(n) {
     line = '';
     lineno = -1;
+    print();
     RUN.interval = setInterval(_=>{
       for(let i=0; i>=0; i--) {
 	nextline();
 	if (!line) {
 	  lineno = 0;
 	  line = '';
+	  print(); // TODO: not best place
 	  stop();
 	} else {
 	  princ(lineno);
@@ -905,8 +958,21 @@ l0 FOR I=0 TO 7
     let l = line.replace(/^\s/, '');
     if (trace) print('saveline.l: ' + l);
 
-    // store instruction
-    lines[lno] = l;
+    // ? expansion! (short hand for PRINT)
+    // TODO: another day!
+    //line.replace(/^(([^"]*)(|"[^"]"))$/g,
+    // what does the function get?
+
+    // TODO: REM ?5 not expanded
+    // BUT: ' ?5 IS!
+    // NOT: ' sdfsdf "foo ?5 sdf" ISN'T!!!
+
+    // store line (or remove)
+    if (l.match(/^\s*$/))
+      delete lines[lno];
+    else
+      lines[lno] = l;
+      
   }
   
   function EDIT(lno) {
@@ -929,18 +995,22 @@ l0 FOR I=0 TO 7
     tron = false;
   }
 
+
+  function CLEAR() {
+    // DOC: Clears variables
+    lineno = 0;
+    line = '';
+    stack = [];
+    lineTodo = [];
+    vars = {}
+  }
+
   function RUN(lno) {
     // DOC: Runs program (from LINE)
     // END, STOP, or CTRL-C interrupts
     // Continue with CONT or GOTO num
-    
-    // init
-    lineno = (+lno || 0) - 1;
-    line = '';
-    stack = [];
-    vars = {}
-    
-    cont();
+    CLEAR();
+    GOTO(0);
   }
   
   // TODO: On ORIC you can CONT after END!
@@ -962,16 +1032,24 @@ l0 FOR I=0 TO 7
   }
 
   function cont() {
+    if (running()) return;
+    
     RUN.interval = setInterval(_=>{
+      cont.intervalcount++;
       let start = Date.now();
+      let millis;
       do {
 	nextline();
 	if (line && trace) print(lineno + ' ' + line)
 	if (tron) princ('[ '+lineno+']');
 	if (!run(line)) stop();
-      } while (Date.now() - start < TIMESLICE);
+	millis = Date.now() - start;
+      } while (!forceUpdate && millis  < TIMESLICE);
+      cont.millis += millis;
     }, 1);
   }
+  cont.intervalcount = 0;
+  cont.millis = 0;
   
   // TODO: if program edited?
   function CONT() {
@@ -1052,9 +1130,116 @@ l0 FOR I=0 TO 7
     return RETURN(); 
   }
 
-  function IF(e, t, e) {
+  // TEST:
+  //  IF 1 THEN ?1 ELSE ?2 => 1
+  //  IF 0 THEN ?1 ELSE ?2 => 2
+  //  IF1THENIF1THEN?1ELSE?2ELSE?3 => 1
+  //  IF1THENIF0THEN?1ELSE?2ELSE?3 => 2
+  //  IF0THENIF0THEN?1ELSE?2ELSE?3 =>>
+  //  IF0THENIF1THEN?1ELSE?2ELSE?3 =>>
+  
+
+  //  IF 1 THEN IF 1 THEN ?1 ELSE ?2 ELSE ?3=>1
+  //  IF 1 THEN IF 1 THEN ?1 ELSE ?2 ELSE ?3=>1
+  // IF 1 THEN ?2 : ?3 ELSE ?4 : ?5 : ?6
+  //   => 2 3 5 6
+  // IF "" THEN ?1 ELSE ?2 => 2
+  // IF ("") THEN ?1 ELSE ?2 => ?FORMULA COMPL
+  // IF "A" THEN ?1 ELSE ?2 => 1
+  // IF ("A") THEN ?1 ELSE ?2 => 1
+  
+  function IF(e) {
     let line = this;
-    
+    while(line.length) {
+      print('IF: ' + line);
+      line = line.trim();
+
+      // we're (maybe) in the THEN
+      // - skip the first statement after ELSE
+      // continue with the rest!
+      if (line.match(/^ELSE/)) {
+	print('ELSE: ' + line);
+	// remove anything before ':'
+	//   (':' inside "string" ok)
+	line = line.replace(
+	  /^[^:"]*("[^"]*"[^:"]*)\s*/,
+	  '');
+
+	print('ELSE.replace: ' + line);
+
+	// if just a single statement no ':'
+	if (line.length && line[0] != ':')
+	  return;
+
+	// we've skipped the ELSE part
+	// IF 1 THEN ?3:?4 ELSE ?5:?6:?7=>3467
+	// how to go to "run"?
+
+	// TODO: make cont()/nextline()
+	//   use queue to pull next thing?
+
+	lineToDo.unshift(line);
+	return;
+      }
+      
+      let exp, expr;
+      line = line.replace(
+	/^IF\s*(.*?)\s*THEN\s*/,
+	(_, e)=>{
+	  exp = e;
+	  // string constant, strange!
+	  if (exp.startsWith('"')) {
+	    // "" => false
+	    // "A" => true
+	    expr = (exp !== '""');
+	  } else if (exp.match(/^\w+$/)) {
+	    // any string variale => true
+	    expr = true;
+	  } else { // ok, let's guess number?
+	    let r = VAL(exp);
+	    expr = (r !== 0);
+	  }
+	  return '';
+	});
+
+      print('IF.match: ' + line);
+      print('IF.exp: ' + exp);
+      print('IF.expr: ' + expr);
+
+      // did we get it?
+      if (exp === undefined || expr === undefined)
+	syntax_error();
+
+      // not true => ELSE
+      if (!expr) {
+	print('IF.false ' + expr);
+	// TOOD: this cheats: "foo ELSE ..."
+	let t = line.indexOf('THEN');
+	let e = line.indexOf('ELSE');
+
+	print('IF.false t=' + t + ' e=' + e);
+
+	// no ELSE - we're done!
+	if (e < 0) return;
+
+	// TODO: check, for loop in THEN?
+	// and can it have ELSE inside? LOL
+	// see gphotos: IF-FOR-ELSE!!!
+	// seems
+	// IF THEN ?1:FORI=0:IF THEN ELSE:NEXT:?77 ELSE <never reached> - so it's OK!
+
+	// have more THEN - ELSE=not ours!
+	if (t >= 0) return;
+
+	// skip to after ELSE and do rest
+	line = line.substring(e+4);
+      }
+
+      // if true - just continue!
+      // but keep in mind that when
+      // reach 'ELSE ?3:?4:?5' skip to
+      // ?4 ...
+    }
   }
   
   function REPEAT() {}
@@ -1074,9 +1259,16 @@ l0 FOR I=0 TO 7
   }
   
   function GOTO(lno) {
+    // DOC: Goto given LINENO
+    // New: if no line, search next
     lineno = lno-1;
+
+    cont();
   }
 
+  function REM() {
+  }
+  
   function STOP() {
     cursorHide();
     let lno = lineno;
@@ -1354,20 +1546,26 @@ already,then skip
     function load(src) {
       if (!src) return;
       NEW();
+      let name = beautyname(names[0]);
+      print('Program ' + name + ' loading...');
       let n = 0;
       ('\n'+src).replace(
 	/\n\s*(\d+)(.*)/g,
 	(_, lno, l)=>{
 	  saveline(+lno, l);
+	  if (trace) { princ(+lno); print(l); }
 	  n++;
 	});
       princ(n); print('lines loaded');
       return true;
     }
     
+    // get names from window
     let names = Object.keys(window)
 	.filter(n=>n.startsWith('example'));
+    // add names from localstorage
     names = names.concat(lssearch('CSAVE:'));
+
     // filter matches
     if (name) {
       if (name.match(/^".*"/))
@@ -1378,37 +1576,45 @@ already,then skip
 	names = names.filter(n=>n.match(name));
     }
 
-    // try load if only one name
-    if (names.length === 1
-	&& window[names[0]]) {
-      name = names[0];
-      let src = window[name];
-      if (src) {
-	if (typeof src === 'function')
-	  src = src();
-	print('Loading ' + name);
-	if (load(src)) return;
-      }
+    // names are now "ugly" use this to show
+    function beautyname(n) {
+      return n
+	.replace(/^example_+/, '')
+	.replace(/^CSAVE:(.*)/, '"$1"');
     }
+      
+    // to load (instead of list, require match  to be proper prefix)
+    if (trace) { print("NAMES:"); print(names); }
+    
+    if (names.length == 1
+	&& names[0].match(RegExp(`^(?:example_*|CSAVE:)${name}`))) {
+      let src;
+      
+      // try load from examplesNAME...
+      src = window[names[0]];
+      if (src) {
+	// ok, it's not a string?
+	if (typeof src === 'function') try {
+	  src = src();
+	} catch(e) {}
+      }
 
-    if (lsget(names[0])) {
-      // localStorage
-      let src = lsget(names[0]);
+      // try localStorage
+      if (!src)
+	src = lsget(names[0]);
+
       if (load(src)) return;
     }
 
     // all else (and no return is:)
-    if (name) {
+    if (name)
       print('?CLOAD NAME ERRROR');
-    }
 
     // list'em
     print("Matching names:");
     print();
     names
-      .map(n=>n
-	   .replace(/^example_+/, '')
-	   .replace(/^CSAVE:(.*)/, '"$1"'))
+      .map(beautyname)
       .forEach(n=>(princ(n), TAB("3")));
     print();
   }
@@ -1419,15 +1625,18 @@ already,then skip
     // TODO: "foo.tap" - download
     if (!name) name = '';
     if (opt) return save_error('USING '+opt);
+    name = name.replace(/"/g, '');
     if (name.match(/^\w+/)) {
       let src = Object.keys(lines)
-	  .map(lno=>`${lno} ${lines[lno]}`)
-	  .join('\n') + '\n';
-      print(src);
+	  .map(lno=>`${lno} ${lines[lno]}\n`)
+	  .join('');
+      let lns = src.match(/\n/g).length;
+      if (trace) print(src);
       lsput('CSAVE:' + name, src);
-      print('Program ' + name + ' saved');
+      princ(lns); 
+      print('lines saved in ' + name);
     } else {
-      save_error(name);
+      save_error('BAD NAME: '+name);
     }
   }
 
@@ -1494,9 +1703,8 @@ errorObj : ${errorObj}
     dom('col', col);
     dom('vars', JSON.stringify(vars));
     
-    let now = Date.now();
     dom('stats', 'Statements: '+run.count+
-	' sps= ' + Math.floor(1000*(run.count-lastrun)/(now-lastnow)));
+	' sps= ' + Math.floor(1000*(run.count-lastrun)/(cont.millis)));
     
     lastnow = now;
     lastrun = run.count;
@@ -1514,6 +1722,7 @@ errorObj : ${errorObj}
       c = c.toLowerCase();
     line += c;
     putc(c.charCodeAt(0)); // lol
+
     cursorShow();
   }    
 
@@ -1530,6 +1739,7 @@ errorObj : ${errorObj}
       /\".?\"/g,
       s=>s.replace(/!/g, '!!')
 	.replace(/ /g, '!s!')
+	.replace(/'/g, '!q!')
 	.replace(/:/g, '!c!')
       	.replace(/\(/g, '!po!')
         .replace(/=/g, '!e!')
@@ -1543,6 +1753,7 @@ errorObj : ${errorObj}
       	.replace(/!po!/g, '(')
         .replace(/!pc!/g, ')')
         .replace(/!e!/g, '=')
+        .replace(/!q!)/g, "'")
         .replace(/!com!)/g, ',')
 	.replace(/!!/g, '!'));
   }
@@ -1559,21 +1770,33 @@ errorObj : ${errorObj}
   // END return false
   function run(line) {
     line = line.trim();
-    let orig = line;
+    // remove leading ':' (used for indent!)
+    line = line.replace(/^[\s:]*/, '');
+
+    // fast comments
+    if (line.match(/^(REM|')/))
+      return (cursorShow(), 'REM');
+	
     if (!line || line === '')
-      return cursorShow();
+      return (cursorShow(), '');
 
     // NN PRINT ... new line?
     // New: retains initial spacing! lola
     let linedef = line.match(/^\s*(\d+)(.*)$/);
     if (linedef) {
       saveline(+linedef[1], linedef[2]);
-      return prompt();
+      return (cursorShow(), 'EDIT');
     }
 
     line = line.trim();
+    let orig = line;
+
+    // ok, we have command  to execute
     line = quoteStrings(line);
 
+    // TODO: incorrect as F!
+    // if (1) THEN ?3:?4 ELSE ?5 : ?6 : ?7
+    //   ORIC => 3 4 6 7
     if (trace) print('LINE: ' + line);
     let many = line.split(':');
     if (trace) print('MANY: ' + many.length);
@@ -1601,7 +1824,7 @@ errorObj : ${errorObj}
     if (trace) print('------' + a.join(' | '));
 
     // hehe - crap!
-    if (!orig.match(/^(LET|INPUT|FOR|HELP|DIM|CLOAD|CSAVE)/)) {
+    if (!orig.match(/^(LET|INPUT|FOR|HELP|DIM|CLOAD|CSAVE|REM)/)) {
       if (trace) print('---EVAL---' + a.join(' | '));
       a = a.map((x,i)=>!i?x:EVAL(x));
     }
@@ -1677,17 +1900,20 @@ errorObj : ${errorObj}
   }
 
   function showStatus() {
-    // save ---
-    let r = row, c = col;
-    row = 0;
-    col = 36;
-
     // make modeline black w white text
     screen(0, 0, 0);
     screen(0, 1, 7);
     
+    // save ---
+    let r = row, c = col;
+
     // CTRL-Q: toggle cursor
+    row = 0; col = COLWIDTH-4;
     princ(caps?'CAPS':'    ');
+
+    // CTRL-S: toggle screen (centered)
+    row = 0; col = Math.floor(COLWIDTH-8)/2;
+    princ(scrn?'        ':'SCRN OFF');
 
     // TODO: column enable disable CTRL-J
     if (column) {
@@ -1722,7 +1948,7 @@ errorObj : ${errorObj}
     if (c && k=='f') click = !click;
     if (c && k=='q') cursorToggle();
     if (c && k=='t') showStatus(caps = !caps);
-    if (c && k=='s') screenTogge();
+    if (c && k=='s') showStatus(scrn = !scrn);
     if (c && k=='f') clickToggle();
     if (c && k=='d') doubleToggle();
     if (c && k=='g') bell();
@@ -1734,7 +1960,7 @@ errorObj : ${errorObj}
     if (c && k=='r') window.location.reload();
     if (c && k=='p') trace = !trace;
 
-    if (c) e.preventDefault();
+    //if (c) e.preventDefault();
   })
 
   dom('exp').addEventListener('keypress', function(e) {
@@ -1770,7 +1996,7 @@ errorObj : ${errorObj}
   if (0)
     setInterval(_=>{
       for(let i=0; i<100; i++)
-	screen(rand(28), rand(40), rand(256));
+	screen(rand(ROWHEIGHT), rand(COLWIDTH), rand(256));
       PAPER(rand(8));
       INK(rand(8));
     }, 0);
@@ -2096,6 +2322,93 @@ instruction
     n=>window[n]=()=>implemented_error(n));
 
 </script>
+
+<!--
+LLIST...
+
+LPRINT BASIC Token: 143
+Format: LPRINT A$
+
+This command works exactly the same as a PRINT statement except that it is used to send the print items to a printer. However, it is not possible to use an LPRINT@ statement. Used vvith the control codes listed in Appendix 1, LPRINT can be used to regulate the output to a variety of printers. It is possible to alter the line length of the printer output by using POKE #256,i where i is the required line length. 
+
+Related keywords: CHR$, LLIST, PRINT
+
+-->
+
+<!--
+
+MUSIC BASIC Token: 168
+Format: MUSIC c, o, n, v
+
+c=channel 0-3
+o=octave 0-7
+n=note 1-12
+v=volume 0-15
+
+This is one of the Oric's three major sound commands, and as its name implies it is used to generate musical output. The utilisation of the Oric's sound commands is relatively complex, and thus it is important that if you intend to take full advantage of these sophisticated facilities you should refer to the sound chapter. However it is possible here to outline the parameters of the command. 
+
+There are four variables involved in a MUSIC statement and the command itself is usually coupled with PLAY (which creates the "shape" of the sound and determines the number of sound channels in operation at any one time). As laid out in the command format above, c sets the tone channel to be used, whilst o determines which of the eight available octaves is to be used (0--7).
+
+The third variable, n, determines which of the twelve notes in a given octave will be generated ( 1-12).
+
+The last parameter, v, determines the volume of the sound produced (0--15). 
+
+Unless you have a good reason for wanting the last note of your musical masterpiece to drone on for eternity, you must close down all the tone channels by using the statement PLAY 0,0,0,0 to silence the computer.
+
+l REM***MUSIC***
+10 FOR 0=0 T0 6
+20 FOR N=l T0 12
+30 MUSIC l,O,N,10
+40 PLAY 3,0,7,0
+50 WAIT 30 
+60 NEXT N
+70 NEXT O
+80 PLAY 0,0,0,0
+90 EXPLODE
+
+ Related keywords: PLAY, SOUND
+
+----------------------------------------
+PLAY BASIC Token: 169
+Format: PLAY t, s, e, d
+
+t=tone channel 0-7 (bit value 111)
+s=sound channel 0-7 (bit value 111)
+e=envelope 0-7
+d=duration 0-32767
+
+This is one of the Oric's rather complex sound commands which, once you get used to them, offer a music/sound potential well in advance of the machine's competitors. However, the commands are a little difficult to grasp, particularly if you're not musically minded, so it is well worth spending some time working your way through Chapter 7. For the present we will restrict ourselves to clarifying the format of the command. 
+Your Orie is endowed with three sound/tone channels and PLAY is the command which determines the combination of these channels. In terms of the command format at the top of the page, t (tone) ands (sound) determine which channels are activated (0--7). The effects of the combination of channels is really only comprehensible· after a little experimentation, but the following chart will be of some use for future reference.
+
+The column on the left represents the value oft or s, whilst the righthand column tells you which combination of channels are activated by this value. 
+
+channel combination
+0 no channels I
+1 2 2 3 1and2 4 3 s 1and3 6 2and3 7 1, 2 and 3 
+
+PLAY's third parameter, e, is probably the most difficult to understand, since it is the integer which determines the "shape" of the sound which the Orie produces. Once again the sound chapter should be consulted for a full explanation of this feature.
+
+However, variable e (0-7) when set at 1 or 2 produces what are known as sound envelopes of a fixed length, whilst all other settings generate continuous sounds of various types. The example program below will hopefully clarify the effect of the different PLAY set-tings. Finally d (0-32767) sets the duration of the sound envelope. 
+
+When using either MUSIC or SOUND at some point in the course of your program you will want to turn off the sound channels, which can be achieved by the statement PLAY 0,0,0,0. 
+
+l REM***PLAY***
+5 CLS
+10 CLS:PRINT:PRJNT
+20 INPLJT"ENTER NUMBER C0-7J FDR SOUND S HAPE" ;E
+30 JFE<0 DR E>7THEN20
+40 INPUT"ENTER A NUMBER C0-65535J FDR D URAT JON" ;O
+50 PRINT"THIS IS SOUND ENVELOPE ";E;" W ITH A 11 ;O; II DURATION"
+60 SOUND l,1500,0
+70 PLAY l,0,E,D
+80 PRJNT"PRESS ANY KEY TO STOP PLAY''
+90 GETA$: GOT05
+
+Related keywords: MUSIC, SOUND
+  -->
+<script>
+</script>
+
 
 </body>
 
