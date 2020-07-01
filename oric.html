@@ -1939,6 +1939,9 @@ errorObj : ${errorObj}
     // TODO: remove ll cursorShow from here...
     
     // fast comments
+    // TODO: inncorrect REM is a statement...
+    //   PRINT 33 : REM foo
+    //   PRINT 33 ' foo
     if (line.match(/^(REM|')/))
       return (cursorShow(), 'REM');
 	
