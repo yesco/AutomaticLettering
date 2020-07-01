@@ -2,7 +2,95 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <head>
+<script>
+  // this gives syntax errors while loading
+  // put this as first script
+  // then at end we change to capture runtime errors
+  window.onerror = (...args)=>{
+    // let t = ''+args[0];
+    let t = args.toString();
+    let b = document.body;
+    t = `<div style='background:red;''>${t}</div>`;
+    b.insertAdjacentHTML('afterbegin', t);
+  };
+</script>
 
+<script id='help'>
+  function HELP(cmd) {
+    if (cmd) {
+      // extract DOC string from function!
+      let f = window[cmd];
+      if (f) {
+	let s = f.toString();
+	if (trace) print('FUN=' + f.toString());
+	s = s.match(/\/\/\s*DOC\s*:?\s*([\s\S]+)/i);
+	let doc;
+	if (!s) {
+	  doc = '- NO DOCS';
+	} else {
+	  s = s.join('').replace(/\n\s*[^\s\/][\s\S]*$/, '');
+	  s = s.replace(/\n\s*\n[\s\S]*/, '');
+	  s = ('\n'+s).replace(/\n\s*\/\/\s*/g, '\n');
+	  s = s.replace(/^[\n]DOC[\s:]*/, '');
+	  doc = s;
+	}
+
+	princ(cmd); TAB();
+
+	// indent paragraph!
+	let mincol = col;
+	for(let i=0; i<doc.length; i++) {
+	  let ch = doc.charCodeAt(i)
+
+	  TAB(mincol);
+	  if (ch == 10 & col > SCREEN_COLS-1)
+	    ;
+	  else
+	    putc(ch);
+
+	}
+	print();
+
+	// related
+	let rel = HELP.related.filter(
+	  g=>g.match(RegExp(`\\b${cmd}\\b`))
+	);
+	if (rel)  {
+	  print('\nRelated:');
+	  rel.forEach(r=>print(r));
+	}
+	return;
+      } else {
+	print('?NO SUCH NAME');
+      }
+    }
+
+    // list names!
+    
+    function printkeys(msg, k) {
+      let num = 0;
+      k.forEach(n=>{
+	if (cmd && !n.match(cmd)) return;
+	princ(n);TAB();
+	num++;
+      });
+      if (num) {
+	if (col > 2) print();
+	princ(num);
+	print('WORDS ' + msg);
+      }
+    }
+
+    printkeys(
+      'MISSING', OKK(/(dummy|missing|impl|UNKN)/i));
+    printkeys(
+      'DEFINED', OKK(/(const|defined|native|innov)/i));
+    //print('Usage: HELP [cmd]');
+
+  }
+  // push related words (space separated) on this!
+  HELP.related = [];
+</script>
 <script>
   // -- Simplified testing of types and values
   function tType(t, x, err) {
@@ -15,6 +103,12 @@
     tType('string', s, err);
   }
   function tNum(n, err) {
+    tType('number', n, err);
+  }
+  function tInt(n, err) {
+    n = Math.floor(r);
+    if (n > 32767 || r < - 32769)
+      quantity_error()
     tType('number', n, err);
   }
   function tPos(n, err) {
@@ -157,7 +251,8 @@ span, div { font-family: 'oric-atmos', monospace; }
 <div style='width:100%'>
   <img width='20%' src='oric-logo-black-export.svg'/>
   <div style='float:right; top:0; width:80%; text-align:center; font-decoration:bold; text-justify:inter-word; font-size:3rem;'>W E B - B A S I C
-<div style='font-size:1rem;'>jsk@yesco.org</div>
+<sup><a tabindex='-1' target='oricman' style='text-decoration:none; font-size:1.5rem; padding:0.3rem; padding-bottom:0.1rem; color:black; background:white;' href='http://www.defence-force.org/computing/oric/library/lib_manual_oric/files/manual_atmos.pdf'>PDF</a></sup>
+<div style='font-size:1rem;'>&copy;jsk@yesco.org</div>
   </div>
 <span style='transform-origin:left; transform:scale(1.8, 1);'><b>&nbsp;&nbsp;B A S I C</b></span>
 </div>
@@ -183,12 +278,38 @@ span, div { font-family: 'oric-atmos', monospace; }
   // call an initial time after first render
   setTimeout(x=>window.onresize(), 1000);
 </script>
-
-<br><br>
 <!-- id=exp is magical for jsconsole - it returns focus there -->
 <div style='display:flex; width:100%;'>
-  <input id='exp' autofocus style='flex:1; xbackground:black; color:black; border:none; width:100; float:right;'>
+  <input id='exp' autofocus style='flex:1; background:black; color:lightgreen; border:none; width:100; float:right;'>
 </div>
+<script>
+  {
+    let s = dom('screen').style;
+    let e = dom('exp');
+
+    // not good idea as it scrolls down...
+    //dom('screen').onclick =
+    //()=>e.focus();
+
+    let sfilter;
+    e.onblur = function() {
+      sfilter = s.filter;
+      // not working?
+      s.filter = 'blur(2px)';
+    }
+    e.onfocus = function() {
+      //s.background = '';
+      s.filter = sfilter;
+    }
+
+    e.onblur();
+    // can't force on opera :-(
+    // and it's not default
+    e.focus();
+  }
+  
+</script>
+
 <!---input id="file" type="file"/-->
 <script>
   // inspired by https://stackoverflow.com/questions/16495125/parsing-binary-files-in-client-side-js
@@ -232,13 +353,16 @@ INFO:<br><span id='info'></span>
 <script src='jsconsole.js'>
   //loadScript('jsconsole.js');
 </script>
-  
+<script>
+  DBG('logerr', true);
+</script>
+
 <script>
   // Configuration
   let TIMESLICE = 20; // run about X ms
 
-  const COLWIDTH = 40, // ORIC: 40
-	ROWHEIGHT = 28, // ORIC: 28
+  const SCREEN_COLS = 40, // ORIC: 40
+	SCREEN_ROWS = 28, // ORIC: 28
 	
 	LastOne = 'foo';
   
@@ -301,28 +425,18 @@ INFO:<br><span id='info'></span>
 ORIC EXTENDED BASIC Vl.1
 (C) 1983 TANGERINE
 
-373188 BYTES FREE`);
+372631 BYTES FREE`);
   }
-
-  // https://osdk.org/index.php?page=articles&ref=ART9.
-  // From a memory point of view, TEXT mode requires 1120 bytes for display (ROWHEIGHT lines of 40 columns)
-  // and 1920 bytes for storing the character set
-  // 1120 bytes for the screen (from #BB80 to #BFDF)
-  // 1024 bytes for the default character set (from #B400 to #B7FF)
-  // 896 bytes for the secondary ("alternate") character set (from #B800 to #BB7F)
-  // This makes a total of 3040 bytes.
-  
-  // So if the first byte of the screen (#BB80), contains the value 65 (ASCII code for the upper case A letter), we know that this block of 6x8 pixels will be filled with graphical information stored at the address #B400+(8*65).
 
   // TODO: define imgs for each character?
   // then we can 'poke' to change them?
 
   // TODO: calling twice messes something up
   function TEXT() {
-    for(let row=0; row<ROWHEIGHT; row++) {
+    for(let row=0; row<SCREEN_ROWS; row++) {
       let r = '';
       // lol, let's create one extra as the last character is kind of hidden...
-      for(let col=COLWIDTH; col>=0; col--) {
+      for(let col=SCREEN_COLS; col>=0; col--) {
 	c = '&nbsp;';
 	let id = `r${row}c${col}`;
 	r = `<span id='a${id}'><span id='c${id}' class='char'>${c}</span>${r}</span>`;
@@ -331,6 +445,8 @@ ORIC EXTENDED BASIC Vl.1
     }
     cache = {};
   }
+  TEXT.hires = false;
+  
   // mode: 0 or 1
   //function LORES(mode) {
   //throw "LORES: Not implemented!";
@@ -352,7 +468,52 @@ ORIC EXTENDED BASIC Vl.1
   //function HIRES() {
   //implemented_error('HIRES');
   //throw "HIRES: Not implemented!";
+  // SCREEN.hires = true;
   //}
+  
+/*
+ince we can POKE any value we like to the screen we can use this to set up a 
+High RESolution colour display using all eight colours. The following 
+program produces a sinusoidal striation of colour down the screen in this 
+manner. 
+10 HIRES 
+20 FORY=0T0199 
+30 S=INTCSINCY/l0J*8J 
+40 FORX=0T039 
+50 P=#A000+Y*40+X 
+60 Q=CS+XJ-INTCCS+XJ/8J*8+16 
+70 POKE P,Q 
+80 NEXT 
+90 NEXT 
+By using this method of placing attributes on the HIRES screen we can 
+produce more colours from the Orie. We simply mix two different colours 
+together on alternate lines and we can make at least 36 different colours. 
+The following program demonstrates some of the colours which can be 
+achieved. Even more shades can be accessed by overlaying patterns of 
+foreground colours on these striped backgrounds! 
+t 'COPYRIGHT PAN LTD 
+10 PAPER 0: INK 7 
+20 HIRES 
+30 FOR A=0 TO 7 
+40 FOR 8=0 TO 7 
+50 FOR 1=8*20 TO 8*20+20 
+60 P=#A000+Y*40+A*5 
+70 IF INTCY/2)=1/2 THEN Q=l6+A 
+=-16+8 
+80 POKEP,Q 
+90 NEXT 
+100 NEXT 
+110 NEXT 
+ELSE Q 
+So far the subject of writing
+*/
+
+  HELP.related.push('HIRES TEXT LORES GRAB HIMEM RELEASE');
+  HELP.related.push('HIRES CIRCLE CHAR CURMOV CURSET DRAW FILL PATTERN POINT  ');
+  HELP.related.push('RUN CLEAR GOTO GOSUB RETURN POP IF THEN ELSE ON FOR TO STEP NEXT REPEAT UNTIL PULL');
+  HELP.related.push('RUN STOP CONT GOTO TRON TROFF');
+  HELP.related.push('LOAD AUTO CSAVE STORE RECALL NEW DIM CLEAR');
+  HELP.related.push('INPUT GET KEY$');
   
   const color = {
     black:   '#000000', 0: '#000000',
@@ -443,8 +604,13 @@ ORIC EXTENDED BASIC Vl.1
     let c = ch & 0x7f;
 
     if (ch > 255) { // unicode! lol
-      // pass through, we don't c(h)ar(e)
-      t = ch;
+      if (ch == 127) {
+	// ATMOS font put it in unicode place!
+	t = '&copy;';
+      } else {
+	// pass through, we don't c(h)ar(e)
+	t = ch;
+      }
     } else if (c >= 32) { // ascii
       // TODO: implement inverse!
       // remove high-bit as it means inverse
@@ -497,13 +663,13 @@ ORIC EXTENDED BASIC Vl.1
 
   function INK(color) {
     // skip status line
-    for(let row=1; row<ROWHEIGHT; row++) {
+    for(let row=1; row<SCREEN_ROWS; row++) {
       screen(row, 1, color);
     }
   }
   function PAPER(color) {
     // skip status line
-    for(let row=1; row<ROWHEIGHT; row++) {
+    for(let row=1; row<SCREEN_ROWS; row++) {
       screen(row, 0, 16+color);
     }
   }
@@ -597,15 +763,15 @@ l0 FOR I=0 TO 7
       screen(row, col, 32);
     }
 
-    // TODO: should be COLWIDTH????
-    if (col >= COLWIDTH) { row++; col = 2; }
+    // TODO: should be SCREEN_COLS????
+    if (col >= SCREEN_COLS) { row++; col = 2; }
 
     // scroll!
-    if (row >= ROWHEIGHT) {
+    if (row >= SCREEN_ROWS) {
       putc.scrollcount++;
       let start = Date.now();
-      for(let r=2; r<ROWHEIGHT; r++) {
-	for(let c=0; c<COLWIDTH; c++) {
+      for(let r=2; r<SCREEN_ROWS; r++) {
+	for(let c=0; c<SCREEN_COLS; c++) {
 	  let old = screen(r-1, c);
 	  let nw = screen(r,c);
 	  if (nw != old)
@@ -614,7 +780,7 @@ l0 FOR I=0 TO 7
       }
       // TODO: if not hidden column mode?
       row = 27;
-      for(let c=2; c<COLWIDTH; c++) {
+      for(let c=2; c<SCREEN_COLS; c++) {
 	screen(row, c, 32);
       }
       //dom('info', 'scroll time='+(Date.now()-start), 'lp');
@@ -674,7 +840,11 @@ l0 FOR I=0 TO 7
     let r = EVAL(v);
     if (r === undefined) return;
 
-    if (n.endsWith('%')) r = Math.floor(r);
+    // make sure type fit
+    if (n.endsWith('%')) {
+      tInt(r);
+      r = INT(r);
+    }
     if (n.endsWith('$')) r = ''+r;
 
     // indexing (interpolate using fixpoint!)
@@ -685,8 +855,13 @@ l0 FOR I=0 TO 7
       lastn = n;
     }
 
-    // set
+    // okay, have value, try to set it
     if (trace) print('SET: ' + n);
+
+    // array A(3,4)=77 complicates things...
+    // TOOO: make a ref('A$', val)
+    // or replace A$ with a function
+    // ARRAY_A$
     let path = n.replace(/[\[\]]/g, ' ').trim()
 	.split(/\s+/g);
     if (trace) print('PATH: ' + JSON.stringify(path));
@@ -720,9 +895,26 @@ l0 FOR I=0 TO 7
 	}
       })(x);
       if (trace) print('-->: ' + r);
+
+      // check illegal values
+      if (r === Number.NEGATIVE_INFINITY ||
+	  r === Number.POSITIVE_INFINITY)
+	div_error();
+      if (Number.isNaN(r))
+	type_error();
+      if (r === undefined) // ???
+	type_error();
+
+      // TODO: overflow wraparound?
+      
+      // should we allow extensions?
+      if (typeof r === 'object')
+	type_error();
+
       return r;
     } catch(e) {
       console.log('?EVAL: ' + x);
+      console.log('ERR=', e);
       //eval_error('' + e);
       //stop();
       throw e;
@@ -739,8 +931,8 @@ l0 FOR I=0 TO 7
     let start = Date.now();
     // TODO: does it scroll colors?
     // don't touch mode-line
-    for(let row=1; row<ROWHEIGHT; row++) {
-      for(let col=2; col<COLWIDTH; col++) {
+    for(let row=1; row<SCREEN_ROWS; row++) {
+      for(let col=2; col<SCREEN_COLS; col++) {
 	screen(row, col, 32);
       }
     }
@@ -762,7 +954,7 @@ l0 FOR I=0 TO 7
     // without line breaks!
     if (typeof txt == 'number') {
       txt = ' ' + txt + ' ';
-      if (col + txt.length > COLWIDTH) // ?
+      if (col + txt.length > SCREEN_COLS) // ?
 	putc(10);
     } else {
       txt = '' + txt;
@@ -779,81 +971,24 @@ l0 FOR I=0 TO 7
     // New: If no arg move to next column
     // New: -POS is using custom tabwidth POS
     // New: "3" means use 3 cols (=INT(-40/3))
-    if (typeof pos === 'string') pos = -INT(COLWIDTH/3);
+    
+    // positive number
+    if (+pos===pos && +pos > 0) {
+      while(col < pos)putc(32);
+      return;
+    }
+
+    // use columns
+    if (typeof pos === 'string')
+      pos = -INT(SCREEN_COLS/(+pos));
     let width = (pos < 0) ? -pos : 8;
-    while ((col-2) % width !== 0)
+    while((col-2) % width !== 0)
       putc(32);
     
     // return '' as I think it's used in PRINT
     return '';
   }
   
-  function HELP(cmd) {
-    if (cmd) {
-      // extract DOC string from function!
-      let f = window[cmd];
-      if (f) {
-	let s = f.toString();
-	if (trace) print('FUN=' + f.toString());
-	s = s.match(/\/\/\s*DOC\s*:?\s*([\s\S]+)/i);
-	let doc;
-	if (!s) {
-	  doc = '- NO DOCS';
-	} else {
-	  s = s.join('').replace(/\n\s*[^\s\/][\s\S]*$/, '');
-	  s = s.replace(/\n\s*\n[\s\S]*/, '');
-	  s = ('\n'+s).replace(/\n\s*\/\/\s*/g, '\n');
-	  s = s.replace(/^[\n]DOC[\s:]*/, '');
-	  doc = s;
-	}
-
-	princ(cmd); TAB();
-
-	// indent paragraph!
-	let mincol = col;
-	for(let i=0; i<doc.length; i++) {
-	  let ch = doc.charCodeAt(i)
-	  let c = col;
-	  if (col < mincol) TAB();
-	  putc(ch);
-	  if (ch === 10 || col > COLWIDTH-2) {
-	    //alert('NEWLINE: col='+col+' row='+row);
-	    //princ('[' + c + ']');
-	    TAB(); col++;
-	  }
-	}
-	print();
-	return;
-      } else {
-	print('?NO SUCH NAME');
-      }
-    }
-
-    // list names!
-    
-    function printkeys(msg, k) {
-      let num = 0;
-      k.forEach(n=>{
-	if (cmd && !n.match(cmd)) return;
-	princ(n);TAB();
-	num++;
-      });
-      if (num) {
-	if (col > 2) print();
-	princ(num);
-	print('WORDS ' + msg);
-      }
-    }
-
-    printkeys(
-      'MISSING', OKK(/(dummy|missing|impl|UNKN)/i));
-    printkeys(
-      'DEFINED', OKK(/(const|defined|native|innov)/i));
-
-    print('Usage: HELP [cmd]');
-
-  }
-
   
   // #FFFFF 
   // PRINT "FOO"BAR"
@@ -982,6 +1117,20 @@ l0 FOR I=0 TO 7
       putc(10);
   }
 
+  HELP.related.push('LIST LLIST EDIT CLOAD CSAVE');
+  HELP.related.push('TEXT PRINT LPRINT CLS INK PAPER SCRN PLOT POS TAB SPC');
+  /*
+LPRINT, LLIST...
+
+LPRINT BASIC Token: 143
+Format: LPRINT A$
+
+This command works exactly the same as a PRINT statement except that it is used to send the print items to a printer. However, it is not possible to use an LPRINT@ statement. Used vvith the control codes listed in Appendix 1, LPRINT can be used to regulate the output to a variety of printers. It is possible to alter the line length of the printer output by using POKE #256,i where i is the required line length. 
+
+  Related keywords: CHR$, LLIST, PRINT
+  */
+
+
   // TODO: Basic Lines max 80 chars bell at 79?
 
   // LIST -100
@@ -1036,7 +1185,6 @@ l0 FOR I=0 TO 7
 	if (!line) {
 	  lineno = 0;
 	  line = '';
-	  print(); // TODO: not best place
 	  stop();
 	} else {
 	  princ(lineno);
@@ -1160,7 +1308,6 @@ l0 FOR I=0 TO 7
 
     cont();
   }
-  function ON_GOTO() { }
 
   function GOSUB(lno) {
     stack.push(['RETURN', lineno, line]);
@@ -1619,50 +1766,96 @@ already,then skip
     
   }    
   
-  function INT(n) {
-    tNum(n);
-    return Math.floor(n);
-  }
-  
   // REM comment
   // ' commment
   function REM() {}
 
-  // MATH
+  // ---------------- MATH
+  // NOTE: All math (even I%+1) is performed
+  // using floating numbers, only when LET
+  // is the quantity checked
+  //
   // + - * / ^
   //   / == div_error()... check...
   
   // Oric BASIC has the following built-in numeric functions: 
-  ABS = Math.abs;
-  ATN = Math.atan;
-  COS = Math.cos;
-  EXP = Math.exp;
-  INT = Math.floor;
-  LN = Math.ln;
-  LOG = Math.ln10;
-  PI = Math.PI;
-  TRUE = -1;
-  FALSE = 0;
-  SGN = n=>(n>0)?+1:(n<0)?-1:0;
-  SIN = Math.sin;
-  SQR = Math.sqrt;
-  TAN = Math.tan;
-  function RND(n) {
-    if (!n) return Math.random();
-    return Math.floor(n * Math.random());
+
+  HELP.related.push('ABS INT'); {
+    ABS = Math.abs;
+    function INT(n) {
+      // DOC: Removes the decimals
+      // (it may not fit into I%)
+      tNum(n);
+      return Math.floor(n);
+    }
+    SGN = n=>(n>0)?+1:(n<0)?-1:0;
   }
 
-  function AND(a, b) {
-    // DOC: bitwise and 2 values
-    return a & b;
+  HELP.related.push('EXP LN LOG ^'); {
+    EXP = Math.exp;
+    LN = Math.ln;
+    LOG = Math.ln10;
   }
-  function OR(a, b) {
-    // DOC: bitwise or 2 values
-    return a | b;
+
+  HELP.related.push('PI SIN COS ATN TAN'); {
+    ATN = Math.atan;
+    COS = Math.cos;
+    PI = Math.PI;
+    HELP.PI = `
+// DOC: Mathematical pi
+`;
+    SIN = Math.sin;
+    TAN = Math.tan;
   }
-  function NOT() {
-    // DOC: negate all bits (0 <=> -1)
-    return ~a;
+
+  HELP.related.push('TRUE FALSE AND OR NOT'); {
+    TRUE = -1;
+    HELP.TRUE = `
+// DOC: True value
+// (actually -1 == all bits set!)
+`;
+
+    FALSE = 0;
+    HELP.FALSE = `
+// DOC: False value
+// (actually 0 == all bits zero!)
+`;
+
+    function AND(a, b) {
+      // DOC:And two expressions
+      // (bitwise 'and' 2 values)
+      // Related: AND OR NOT TRUE FALSE
+      return a & b;
+    }
+    function OR(a, b) {
+      // DOC: Or of two expressions
+      // (bitwise 'or' 2 values)
+      // Related: AND OR NOT TRUE FALSE
+      return a | b;
+    }
+    function NOT() {
+      // DOC: Not and expression
+      // negate all bits (0 <=> -1)
+      // Related: AND OR NOT TRUE FALSE
+      return ~a;
+    }
+  }
+
+  SQR = Math.sqrt;
+
+  // TODO: neg seeds!
+  // TODO: find original algrithm
+  function RND(n) {
+    // DOC: RND(0) - random number [0, 1[
+    // TOOD:
+    // RND(-N) always starts same sequence
+    tNum(n);
+    if (n < 0)
+      error('?RND(-SEED) not implemented');
+    //if (!n)
+    return Math.random();
+    //return Math.floor(n * Math.random());
+    // Too bad it's not there... lol
   }
 
   // tested by means of conditional operators: 
@@ -1676,7 +1869,7 @@ already,then skip
   // need to be remembered, however. The fir
 
   // 10 DEF FNMCFEETJ=FEET*0.3048 
-  function DEFFN(n, exp) {}
+  //function DEFFN(n, exp) {}
 
   function example_ONGOTO() {
     return `
@@ -1691,9 +1884,84 @@ already,then skip
 `;
   }
 
-  function PEEK() {}
-  function POKE() {}
+  // https://osdk.org/index.php?page=articles&ref=ART9.
+  
+  // So if the first byte of the screen (#BB80), contains the value 65 (ASCII code for the upper case A letter), we know that this block of 6x8 pixels will be filled with graphical information stored at the address #B400+(8*65).
 
+  HELP.related.push('PEEK POKE DEEK DOKE SCRN'); {
+    const SCREEN = 0x0BB80;
+    const SCREEN_LEN = SCREEN_ROWS * SCREEN_COLS;
+    //const SCREEN_LEN = 1120;
+    const CHARS = 0xB400;
+    const CHARS_LEN = 1024;
+    const ALTS = 0xB800;
+    const ALTS_LEN = 896;
+
+    const HIRES = 0xA000;
+    const HIRES_LEN = 8000;
+    const HIRES_TEXT = 0xBF68;
+    const HIRES_TEXT_LEN = 120;
+
+    // TODO: charset moves?
+    const HIRES_CHARS = 0x9800;
+    const HIRES_CHARS_LEN = 1024;
+    const HIRES_ALTS = 0x9C00;
+    const HIRES_ALTS_LEN = 1024;    
+    
+    function PEEK(a, v) { // LOL
+      print(`PEEK ${a} ${v} ${HEX$(a)}`);
+      // DOC: Read memory byte at ADDR
+      // Simulator: only screen memory value!
+      if (SCREEN.hires)
+	error('?PEEK/POKE not defined for HIRES mode');
+	
+      if (a >= SCREEN &&
+	  a <= SCREEN + SCREEN_LEN) {
+	let o = a - SCREEN;
+	print(`PEEK in screen o = ${o}`);
+	// TODO: this may overlap! LOL
+	let row = INT(o / SCREEN_COLS);
+	print(`PEEK in screen row = ${row}`);
+	let col = o % SCREEN_COLS;
+	print(`PEEK: row=${row} col=${col}`);
+	let x = screen(row, col, v);
+	print(`PEEK: => ${x}`);
+	return  x;
+      }
+
+      // easter egg!
+      return PEEK(
+	(a % SCREEN_LEN) + SCREEN, v);
+
+      error('?PEEK/POKE not defined for this address');
+    }
+/*  
+(ASCII A) which is (in decimal) 46600. Try the following program which 
+POKES new values into these locations and then PRINTS an A. The A should 
+appear as an italic A because we have now redefined the way Orie draws an 
+A. Try switching to HIRES mode and use CHAR to place an A on the screen to 
+prove that the characters have been copied down correctly. 
+10 FOR A=0 TO 7 
+20 READ B 
+30 POKE 46600+A,B 
+40 NEXT 
+50 DATA 14,17, 17,17,62,34,34,0 
+To take full advantage of
+    */
+    function POKE(a, v) {
+      // DOC: Set memory ADDR byte to VAL
+      // Simulator: only screen access!
+      PEEK(a, v); // LOL
+    }
+
+    function DOKE(a) {
+
+    }
+
+    function DOKE(a) {
+    }
+  }
+  
   function NEW() {
     stop(true);
     lines = {};
@@ -1784,10 +2052,18 @@ already,then skip
     print();
   }
   
+  // For the HIRES screen: 
+  // CSAVE"filename" ,A40960,E48000 ( 48K Orie)
+  // CSAVE"filename" ,A8192,EIS232 (16K Orie)
+  // For the TEXT and LORES screens: 
+  // CSAVE"filename" ,A48000,E49119 ( 48K Orie)
+  // CSA VE"filename" ,Al5232,El635 l (16K Oriek) 
+  // The start Address and End address will accept either decim
   function CSAVE(name, opt) {
     // DOC: Save program lines
     // "foo" - in localStorage
     // TODO: "foo.tap" - download
+    // TOOD: load/save memory (screens)
     if (!name) name = '';
     if (opt) return save_error('USING '+opt);
     name = name.replace(/"/g, '');
@@ -1825,10 +2101,87 @@ HELLO
   // sounds
   // https://bulba.untergrund.net/emulator_e.htm
   // The PLAY command allows you to mix tones and gives access to eight preset envelope shapes.
-  function PLAY() {}
   // After using MUSIC and SOUND to set channel and select the tones and noise you want, you use PLAY to mix the channels, select an envelope and control the duration of the final sound. In this way, quite complex sounds can be built up even considering the limitations of the single voice and the pre-set envelopes. The three main sound commands can be used in programs written in
-  function MUSIC() {}
-  function SOUND() {}
+  /* 
+PLAY BASIC Token: 169
+Format: PLAY t, s, e, d
+
+t=tone channel 0-7 (bit value 111)
+s=sound channel 0-7 (bit value 111)
+e=envelope 0-7
+d=duration 0-32767
+
+This is one of the Oric's rather complex sound commands which, once you get used to them, offer a music/sound potential well in advance of the machine's competitors. However, the commands are a little difficult to grasp, particularly if you're not musically minded, so it is well worth spending some time working your way through Chapter 7. For the present we will restrict ourselves to clarifying the format of the command. 
+Your Orie is endowed with three sound/tone channels and PLAY is the command which determines the combination of these channels. In terms of the command format at the top of the page, t (tone) ands (sound) determine which channels are activated (0--7). The effects of the combination of channels is really only comprehensible· after a little experimentation, but the following chart will be of some use for future reference.
+
+The column on the left represents the value oft or s, whilst the righthand column tells you which combination of channels are activated by this value. 
+
+channel combination
+0 no channels I
+1 2 2 3 1and2 4 3 s 1and3 6 2and3 7 1, 2 and 3 
+
+
+*/
+  function PLAY(channels, noise, envelope, duration) {
+    // DOC: Set the "shape" of the sound using
+    // CHANNELS 0-7 : 1 (first) + 2 (second) + 4 (third)
+    // ENVELOPE 0--7 the shape of the sound
+    // fixed length: 1,2 while 1--7 repeats
+    // DURATION 0--32767
+
+    // TIP: PLAY 0,0,0,0 'OFF
+    // Related: MUSIC, SOUND
+  }
+
+  let example_PLAY = `
+l REM ***PLAY***
+5 CLS
+10 CLS:PRINT:PRJNT
+20 INPLUT"ENTER NUMBER (0-7) FDR SOUND SHAPE"; E
+30 IF E<0 DR E>7 THEN 20
+40 INPUT "ENTER A NUMBER (0-65535) FOR DURATION"; O
+50 PRINT "THIS IS SOUND ENVELOPE "; E; " WITH A "; O; " DURATION"
+60 SOUND 1, 1500, 0
+70 PLAY l, 0, E, D
+80 PRJNT "PRESS ANY KEY TO STOP PLAY"
+90 GET A$: GOT0 5
+`;
+
+  let example_CHROMATIC = `
+l REM *** CHROMATIC SCALE *** 
+5 CLS 
+10 PAPER 5 
+20 FOR 0=0 TO 6 
+30 FOR N=l TO 12 
+40 MUSIC 1,0,N,10 
+50 WAIT 30 
+60 NEXT N 
+70 NEXT 0 
+75 END 
+`;
+
+  HELP.related.push('SOUND MUSIC PLAY');
+  HELP.related.push('PING ZAP EXPLODE SHOOT SOUND');
+  
+  function MUSIC(c, o, n, v) {
+    // DOC:Make music using:
+    // CHANNEL 0--3
+    // OCTAVE 0--7
+    // NOTE 1--12 see below
+    // VOLUME 0--15
+    // Imagine a piano keyboard:
+    // _   2   4       7  9   11
+    // | |C# |D# | | |F# |G# |A# | |
+    // | |   |   | | |   |   |   | |
+    // | \-------/ | \-----------/ |
+    // |   |   |   |   |   |   |   |
+    // | C | D | E | F | G | A | H |
+    // \---------------------------/
+    // _ 1   3   5   6   8  10  12
+  }
+
+  function SOUND() {
+  }
 
   function ZAP() {}
   function PING() {}
@@ -1839,8 +2192,6 @@ HELLO
 </script>
 
 <script>
-  DBG('logerr', true);
-  
   function rand(n) {
     return Math.floor(Math.random()*n);
   }
@@ -1850,7 +2201,7 @@ HELLO
 
   run('boot');
 
-  window.onerror = function(message, url, line, col, errorObj) {
+  if (0)  window.onerror = function(message, url, line, col, errorObj) {
     dom('error', `WINDOW.ERROR:
 message  : ${message}
 url      : ${url}
@@ -1892,6 +2243,10 @@ errorObj : ${errorObj}
   function editEnter() {
     cursorHide(); // turned on by run/stop
     print();
+    // TODO: right place? lol
+    // (we hide it in case of error)
+    dom('exp').value = line;
+    
     run(line);
     line = '';
   }
@@ -1923,7 +2278,9 @@ errorObj : ${errorObj}
 
   function prompt(noprompt) {
     if (!noprompt) {
-      if (col > 2) print();
+      // why was added? because break?
+      //if (col > 2)
+      print();
       print('Ready');
     }
     cursorShow();
@@ -2078,11 +2435,11 @@ errorObj : ${errorObj}
     let r = row, c = col;
 
     // CTRL-Q: toggle cursor
-    row = 0; col = COLWIDTH-4;
+    row = 0; col = SCREEN_COLS-4;
     princ(caps?'CAPS':'    ');
 
     // CTRL-S: toggle screen (centered)
-    row = 0; col = Math.floor(COLWIDTH-8)/2;
+    row = 0; col = Math.floor(SCREEN_COLS-8)/2;
     princ(scrn?'        ':'SCRN OFF');
 
     // TODO: column enable disable CTRL-J
@@ -2101,12 +2458,27 @@ errorObj : ${errorObj}
     let s = e.shiftKey, ch = e.code;
     let kc = e.keyCode;
 
+    // editing
     if (kc==13) editEnter();
     if (kc==8) editBackspace();
+    if (37 <= kc && kc <= 40) editArrow(kc);
 
+    // my extensions
+    if (c && k=='r') window.location.reload();
+    if (c && a && k=='p') trace = !trace;
+
+    // ALT-
+    if (a) {
+      
+
+      return;
+    }
     // WARNING: NO ALT (below here)
-    if (a) return;
     
+    // CTRL-
+    if (!c) return;
+    
+    if (c && k=='h') editBackspace();
     if (c && k=='c') STOP();
     if (c && k=='x') editCancel();
     if (c && k=='l') {
@@ -2114,21 +2486,17 @@ errorObj : ${errorObj}
       CLS();
       cursorShow();
     }
-    if (c && k=='a') editCopy();
-    if (c && k=='f') click = !click;
-    if (c && k=='q') cursorToggle();
-    if (c && k=='t') showStatus(caps = !caps);
-    if (c && k=='s') showStatus(scrn = !scrn);
-    if (c && k=='f') clickToggle();
-    if (c && k=='d') doubleToggle();
-    if (c && k=='g') bell();
+    if (k=='a') editCopy();
+    if (k=='f') click = !click;
+    if (k=='q') cursorToggle();
+    if (k=='t') showStatus(caps = !caps);
+    if (k=='s') showStatus(scrn = !scrn);
+    if (k=='p') showStatus(printer != printer);
+    if (k=='f') clickToggle();
+    if (k=='d') doubleToggle();
+    if (k=='g') bell();
 
-    if (c && k=='j') showStatus(column = !column);
-    if (37 <= kc && kc <= 40) editArrow(kc);
-
-    // my extensions
-    if (c && k=='r') window.location.reload();
-    if (c && k=='p') trace = !trace;
+    if (k=='j') showStatus(column = !column);
 
     //if (c) e.preventDefault();
   })
@@ -2143,6 +2511,8 @@ errorObj : ${errorObj}
     // and don't reflect shift
     if (e.keyCode==13) return;
     editChar(legc) // , e.getModifierState("CapsLock"));
+    // hmmm, doesn't work?
+    //if (c) e.preventDefault();
   });
 
   // TODO: this shouldn't be needed,
@@ -2151,7 +2521,7 @@ errorObj : ${errorObj}
   PAPER(7);
   INK(0);
 
-  window.onerror = function(e) {
+  if (0) window.onerror = function(e) {
     dom('error', ''+e);
   };
   
@@ -2166,7 +2536,10 @@ errorObj : ${errorObj}
   if (0)
     setInterval(_=>{
       for(let i=0; i<100; i++)
-	screen(rand(ROWHEIGHT), rand(COLWIDTH), rand(256));
+	screen(
+	  rand(SCREEN_ROWS),
+	  rand(SCREEN_COLS),
+	  rand(256));
       PAPER(rand(8));
       INK(rand(8));
     }, 0);
@@ -2513,36 +2886,9 @@ instruction
 </script>
 
 <!--
-LLIST...
-
-LPRINT BASIC Token: 143
-Format: LPRINT A$
-
-This command works exactly the same as a PRINT statement except that it is used to send the print items to a printer. However, it is not possible to use an LPRINT@ statement. Used vvith the control codes listed in Appendix 1, LPRINT can be used to regulate the output to a variety of printers. It is possible to alter the line length of the printer output by using POKE #256,i where i is the required line length. 
-
-Related keywords: CHR$, LLIST, PRINT
-
--->
-
 <!--
 
-MUSIC BASIC Token: 168
-Format: MUSIC c, o, n, v
 
-c=channel 0-3
-o=octave 0-7
-n=note 1-12
-v=volume 0-15
-
-This is one of the Oric's three major sound commands, and as its name implies it is used to generate musical output. The utilisation of the Oric's sound commands is relatively complex, and thus it is important that if you intend to take full advantage of these sophisticated facilities you should refer to the sound chapter. However it is possible here to outline the parameters of the command. 
-
-There are four variables involved in a MUSIC statement and the command itself is usually coupled with PLAY (which creates the "shape" of the sound and determines the number of sound channels in operation at any one time). As laid out in the command format above, c sets the tone channel to be used, whilst o determines which of the eight available octaves is to be used (0--7).
-
-The third variable, n, determines which of the twelve notes in a given octave will be generated ( 1-12).
-
-The last parameter, v, determines the volume of the sound produced (0--15). 
-
-Unless you have a good reason for wanting the last note of your musical masterpiece to drone on for eternity, you must close down all the tone channels by using the statement PLAY 0,0,0,0 to silence the computer.
 
 l REM***MUSIC***
 10 FOR 0=0 T0 6
@@ -2555,49 +2901,24 @@ l REM***MUSIC***
 80 PLAY 0,0,0,0
 90 EXPLODE
 
- Related keywords: PLAY, SOUND
-
-----------------------------------------
-PLAY BASIC Token: 169
-Format: PLAY t, s, e, d
-
-t=tone channel 0-7 (bit value 111)
-s=sound channel 0-7 (bit value 111)
-e=envelope 0-7
-d=duration 0-32767
-
-This is one of the Oric's rather complex sound commands which, once you get used to them, offer a music/sound potential well in advance of the machine's competitors. However, the commands are a little difficult to grasp, particularly if you're not musically minded, so it is well worth spending some time working your way through Chapter 7. For the present we will restrict ourselves to clarifying the format of the command. 
-Your Orie is endowed with three sound/tone channels and PLAY is the command which determines the combination of these channels. In terms of the command format at the top of the page, t (tone) ands (sound) determine which channels are activated (0--7). The effects of the combination of channels is really only comprehensible· after a little experimentation, but the following chart will be of some use for future reference.
-
-The column on the left represents the value oft or s, whilst the righthand column tells you which combination of channels are activated by this value. 
-
-channel combination
-0 no channels I
-1 2 2 3 1and2 4 3 s 1and3 6 2and3 7 1, 2 and 3 
-
-PLAY's third parameter, e, is probably the most difficult to understand, since it is the integer which determines the "shape" of the sound which the Orie produces. Once again the sound chapter should be consulted for a full explanation of this feature.
-
-However, variable e (0-7) when set at 1 or 2 produces what are known as sound envelopes of a fixed length, whilst all other settings generate continuous sounds of various types. The example program below will hopefully clarify the effect of the different PLAY set-tings. Finally d (0-32767) sets the duration of the sound envelope. 
-
-When using either MUSIC or SOUND at some point in the course of your program you will want to turn off the sound channels, which can be achieved by the statement PLAY 0,0,0,0. 
-
-l REM***PLAY***
-5 CLS
-10 CLS:PRINT:PRJNT
-20 INPLJT"ENTER NUMBER C0-7J FDR SOUND S HAPE" ;E
-30 JFE<0 DR E>7THEN20
-40 INPUT"ENTER A NUMBER C0-65535J FDR D URAT JON" ;O
-50 PRINT"THIS IS SOUND ENVELOPE ";E;" W ITH A 11 ;O; II DURATION"
-60 SOUND l,1500,0
-70 PLAY l,0,E,D
-80 PRJNT"PRESS ANY KEY TO STOP PLAY''
-90 GETA$: GOT05
-
-Related keywords: MUSIC, SOUND
   -->
+
 <script>
 </script>
 
+<script>
+  // place this at end to log runtime errors at end!
+  // this will catch any runtime errors
+  // syntax errors excluded (see above)
+  window.onerror = (...args)=>{
+    let t = args.toString();
+    // let t = ''+args[0];
+    let b = document.body;
+    t = `<div style='color:red;background:white;'>E:${t}</div>`;
+    b.insertAdjacentHTML('afterend', t);
+    return false;
+  };
+</script>
 
 </body>
 

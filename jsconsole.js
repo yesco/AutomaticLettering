@@ -188,11 +188,14 @@ scroll -  by sliding</br>
       //	    DBG.oldCaretPos = window.getSelection();
       DBG.cmd.focus();
       //	    dom('DBGcmd').focus();
+      // avoid tab giving focus
+      DBG.cmd.tabindex = 0;
     } else {
       // TODO: restore cursor
       // TODO: move out of there, this is automatic specific!
       let d = document.getElementById('exp');
       if (d) d.focus();
+      DBG.cmd.tabindex = -1;
     }
     return;
   }
@@ -261,7 +264,7 @@ scroll -  by sliding</br>
       // TODO: make this default during load
       // and then, later, each time minimized reset counter to 0
       // if minimized, show red counter, don't auto-show
-      if (DBG.logerr) return false;
+      if (DBG.logerr) return;
       DBG.toggle(true);
     } catch(ee) {
       dom('DBGout', ['dom function error', ''+ee], 't');
