@@ -983,7 +983,7 @@ l0 FOR I=0 TO 7
     // positive number
     if (+pos===pos && +pos > 0) {
       while(col < pos)putc(32);
-      return;
+      return '';
     }
 
     // use columns
@@ -1088,13 +1088,15 @@ l0 FOR I=0 TO 7
 	
 	switch(c) {
 	case '\\': return unexpected_error('\\');
-	case ';': if (par) return unexpected_error(';');
-	  
+  
 	case '(': par += ')'; break;
 	case '[': par += ']'; break;
 	case '"': par += '"'; break;
 	  
-	case ',':
+	case ';':
+	  if (par) return unexpected_error(';');
+	  // else! fallthrough
+ 	case ',':
 	case ' ': {
 	  if (exp.length && !par.length) {
 	    princ(EVAL(exp))
@@ -1263,7 +1265,7 @@ This command works exactly the same as a PRINT statement except that it is used 
     // END, STOP, or CTRL-C interrupts
     // Continue with CONT or GOTO num
     CLEAR();
-    GOTO(0);
+    GOTO(lno || 0);
   }
   
   // TODO: On ORIC you can CONT after END!
@@ -1401,8 +1403,9 @@ This command works exactly the same as a PRINT statement except that it is used 
   // IF ("A") THEN ?1 ELSE ?2 => 1
   
   function IF(e) {
+    print("IF.hello");
     let line = this;
-    while(line.length) {
+    while (line.match(/(IF|THEN|ELSE)/)) {
       print('IF: ' + line);
       line = line.trim();
 
@@ -1443,18 +1446,18 @@ This command works exactly the same as a PRINT statement except that it is used 
 	  if (exp.startsWith('"')) {
 	    // "" => false
 	    // "A" => true
-	    expr = (exp !== '""');
-	  } else if (exp.match(/^\w+$/)) {
+	    expr = (exp !== '""')?-1:0;
+	  } else if (exp.match(/^[A-Z]\w*\$/)) {
 	    // any string variale => true
-	    expr = true;
+	    expr = -1;
 	  } else { // ok, let's guess number?
-	    let r = VAL(exp);
-	    expr = (r !== 0);
+	    expr = EVAL(exp);
 	  }
 	  return '';
 	});
 
-      print('IF.match: ' + line);
+      print('------------');
+      print('IF.left: >' + line);
       print('IF.exp: ' + exp);
       print('IF.expr: ' + expr);
 
@@ -1485,13 +1488,31 @@ This command works exactly the same as a PRINT statement except that it is used 
 
 	// skip to after ELSE and do rest
 	line = line.substring(e+4);
+	
+	let g = line.match(/^\s*(\d+)\s*/);
+	if (g) return GOTO(+g)
       }
 
+      line = line.trim();
+
       // if true - just continue!
+      // TODO: this doesn't work for nested...
+      line = line.replace(
+	/^\s*(.*?)\s*(ELSE.*)\s*$/,
+	(_, th, el)=>{
+	  if (+th == th)
+	    GOTO(+th);
+	  else
+	    run(th);
+	  return ''
+	});
       // but keep in mind that when
       // reach 'ELSE ?3:?4:?5' skip to
       // ?4 ...
     }
+    // remaining to run!
+    // TODO: ok, false for ?35 ELSE ?35:?36
+    run(line);
   }
   
   function REPEAT() {}
@@ -1511,6 +1532,7 @@ This command works exactly the same as a PRINT statement except that it is used 
   }
   
   function GOTO(lno) {
+    tPos(lno);
     // DOC: Goto given LINENO
     // New: if no line, search next
     lineno = lno-1;
@@ -2420,13 +2442,15 @@ errorObj : ${errorObj}
     // if (1) THEN ?3:?4 ELSE ?5 : ?6 : ?7
     //   ORIC => 3 4 6 7
     if (trace) print('LINE: ' + line);
-    let many = line.split(':');
-    if (trace) print('MANY: ' + many.length);
-    // TODO: incorrect, and can't CTRL-C!
-    if (many.length > 1) {
-      let r= many.map(unquoteStrings)
-	  .some(x=>!run_h(x));
-      return r;
+    if (0) {
+      let many = line.split(':');
+      if (trace) print('MANY: ' + many.length);
+      // TODO: incorrect, and can't CTRL-C!
+      if (many.length > 1) {
+	let r= many.map(unquoteStrings)
+	    .some(x=>!run_h(x));
+	return r;
+      }
     }
 
     let cmd = run_h(line, orig);
@@ -2446,7 +2470,7 @@ errorObj : ${errorObj}
     if (trace) print('------' + a.join(' | '));
 
     // hehe - crap!
-    if (!orig.match(/^(LPRINT|PRINT|LET|INPUT|FOR|HELP|DIM|CLOAD|CSAVE|REM)/)) {
+    if (!orig.match(/^(LPRINT|PRINT|LET|INPUT|FOR|HELP|DIM|CLOAD|CSAVE|REM|IF|REPEAT|WHILE|UNTIL|NEXT|GET)/)) {
       if (trace) print('---EVAL---' + a.join(' | '));
       a = a.map((x,i)=>!i?x:EVAL(x));
     }
