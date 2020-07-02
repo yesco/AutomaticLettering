@@ -377,7 +377,7 @@ INFO:<br><span id='info'></span>
       caps = true,
       click = true,
       column = false,
-      scrn = true,
+      scoff = 0, // screen off if > 0 (count!)
       trace = false, // debug tracing CTRL-P
       tron = false, // TRON/TROFF
       forceUpdate = false,
@@ -443,7 +443,8 @@ ORIC EXTENDED BASIC Vl.1
       }
       dom('screen', r+'</br>', 'ah');
     }
-    cache = {};
+
+    domc.cache = {};
   }
   TEXT.hires = false;
   
@@ -596,6 +597,9 @@ So far the subject of writing
     screen.writecount++;
     dc.screenchar = ch;
 
+    // write
+    if (scoff) return scoff++;
+    
     let da = domc(`ar${row}c${col}`);
 
     let t;
@@ -740,6 +744,7 @@ l0 FOR I=0 TO 7
     if (typeof(c) !== 'number')
       alert('putc: only take nubmers: ' +  c);
     putc.count++;
+    if (scoff) return scoff++;
     
     // TODO: how to handle inverse?
     let ch = c & 0x7f;
@@ -883,7 +888,7 @@ l0 FOR I=0 TO 7
       if (trace) print('VARS: ' + JSON.stringify(vars));
       // pow!
       x = x.replace(/\^/g, '**');
-      if (trace) print('EXP: ' + x);
+      if (trace) print('EXP: >' + x + '<');
       // TOOD: not correct comparisons
       // as ORIC returns 0/-1 for false/true
       if (x.match(/(<|=|>)/))
@@ -927,6 +932,8 @@ l0 FOR I=0 TO 7
   }
   
   // Also CTRL-L
+  // TODO: manual says it'll clear screen
+  // AND: set it to current INK/PAPER!!!?
   function CLS() {
     let start = Date.now();
     // TODO: does it scroll colors?
@@ -1036,7 +1043,7 @@ l0 FOR I=0 TO 7
       if (trace) print('PRINT.c: ' + c);
 
       function finish(ev) {
-	if (exp.length)
+	if (exp.length && !exp.match(/^\s*$/))
 	  princ(ev?EVAL(exp):exp);
 	exp = '';
 	if (c === ',') TAB();
@@ -1518,6 +1525,8 @@ This command works exactly the same as a PRINT statement except that it is used 
   function AUTO() {
     // DOC: CSAVE "fnme", AUTO autoruns!
   }
+  // CALL DEEK (#FFFC) ' HARD RESET
+  // CALL DEEK (#FFFA2 ' WARM RESTART
   function CALL() {
     error("?WHO'RE YOU GONNA CALL? STEVE?");
   }
@@ -1935,39 +1944,42 @@ already,then skip
 
       error('?PEEK/POKE not defined for this address');
     }
-/*  
-(ASCII A) which is (in decimal) 46600. Try the following program which 
-POKES new values into these locations and then PRINTS an A. The A should 
-appear as an italic A because we have now redefined the way Orie draws an 
-A. Try switching to HIRES mode and use CHAR to place an A on the screen to 
-prove that the characters have been copied down correctly. 
-10 FOR A=0 TO 7 
-20 READ B 
-30 POKE 46600+A,B 
-40 NEXT 
-50 DATA 14,17, 17,17,62,34,34,0 
-To take full advantage of
-    */
     function POKE(a, v) {
       // DOC: Set memory ADDR byte to VAL
       // Simulator: only screen access!
       PEEK(a, v); // LOL
     }
 
-    function DOKE(a) {
-
+    function DEEK(a, v) {
+      return 256*PEEK(a+1) + PEEK(a);
     }
 
-    function DOKE(a) {
+    function DOKE(a, v) {
+      POKE(a, v % 256);
+      POKE(a+1, INT(v / 256));
     }
   }
   
+  /* (ASCII A) which is (in decimal) 46600. Try the following program which POKES new values into these locations and then PRINTS an A. The A should appear as an italic A because we have now redefined the way Orie draws an A. Try switching to HIRES mode and use CHAR to place an A on the screen to prove that the characters have been copied down correctly.*/
+  
+  example_CHARDEF = `
+10 FOR A=0 TO 7 
+20 READ B 
+30 POKE 46600+A,B 
+40 NEXT 
+50 DATA 14,17, 17,17,62,34,34,0 
+`;
+
   function NEW() {
     stop(true);
     lines = {};
   }
   
   // TODO: load basic from any URL!
+  // CLOAD "filename" [,S] 
+  // CLOAD "" [,S] - search/list
+  // CLOAD "filename", J [,S] - join! 
+  // CLOAD "filename", V [,S] - verify
   function CLOAD(name, info) {
     // DOC: Loads a file "NAME"
     // New: Without arguments lists examples
@@ -2061,7 +2073,8 @@ To take full advantage of
   // The start Address and End address will accept either decim
   function CSAVE(name, opt) {
     // DOC: Save program lines
-    // "foo" - in localStorage
+    // foo - in localStorage
+    // TODO: Implement AUTO
     // TODO: "foo.tap" - download
     // TOOD: load/save memory (screens)
     if (!name) name = '';
@@ -2122,16 +2135,67 @@ channel combination
 
 
 */
+  example_CHORD = `
+90 REM*** CHORD *** 
+99 PLAY 7,0,0,0 
+100 MUSIC 1,4,1,5 
+110 MUSIC 2,4,5,5 
+120 MUSIC3,4,8,S 
+140 STOP
+`;
+  
+  example_ANDROID = `
+5 REM *** ANDROIDS *** 
+10 A=l 
+50 REPEAT 
+60 LET A=A+l 
+90 READ X,Y 
+100 PLAY 3,0,0,0 
+110 MUSIC 1,1,X,6 
+120 MUSIC 2,4,Y,5 
+140 WA1T 15 
+150 UNTIL A=193 
+160 RESTORE
+170 GOT0 10 
+1000 DATAl, 8, 8, 8, 1, 8, 8, 8, 1, 8, 8, 8, 1, 8, 8,8, 1,8,8,8, 1,8,8,8,3,6, 10,5,3,3, 10,3 
+1010 DATA 1, 10, 8, 10, 1, 10, 8 , 10, 1, 8, 8, 8, 1 ,8,8,8,1,8,8,8,1,8,8,8 
+1020 DATA 3,3, 10,5,3,6, 10,6, 1, 10,8, 10, 1 ,10,s,10
+1030 DATA 1,8,8,8,1,8,8,8,1,8,8,8,1,8,8,8,3,3, 10,5,3,3, 10,3 
+1040 DATA 1,1,8,1,·1,1,8,l,l,l,8,l,l,l,8 , 1, 1, 1,8, 1, 1, 1,8, 1, 1, 1,8, 1, 1, 1,8, 1 
+1050 DATAl,8,8,8, 1,8,8,8, 1,8,8,8, 1,8,8, 8, 1, 8, 8, 8, 1, 8, 8, 8, 3, 6, 10, 5, 3, 3, 10, 3 
+1060 DATA 1, 10, 8, 10, 1, 10, 8, 10, 1, 8, 8, 8, 1 ,8,8,8, 1,8,8,8, 1,8,8,8 
+1070 DATA 3, 3, 10, 5, 3, 6, 10, 6, 1, 10, 8, 10, 1 ,10,8,10 
+1080 DATA 1,8,8,8,1,8,8,8,l,8,8,8,l,8,8 
+,8,3,3, 10,5,3,3, 10,3 
+1085 DATA 1,1,8,l,1,l,8,l,l,l,8,l,l,l,8,1, 1, 1, 8, 1, 1, 1, 8, 1, 1, 1, 8, 1, 1, 1, 8, 1 
+1090 DATA 3, 3, 10, 3, 3, 3, 10, 3, 5, 5, 12, 5,5,5,12,5 
+2000 DATA 6,6,1,6,6,6,1,6,1,l,8,1,1,l,8,1 
+2010 DATA 3,3,10,3,3,3,10,3,5,5,12,5,5,5,12,5 
+2020 DATA 6,6,1,6,6,6,1,6,1,1,8,1,1,1,8,1 
+2030 DATA 3,3,10,3,3,3,10,3,5,5,12,5,5,5,12,5 
+2040 DATA 6,6,1,6,6,6,1,6,1,1,8,1,1,1,8,l 
+2050 DATA 3,3,10,3,3,3,10,3,5,5,12,5,5,5,12,5 
+2060 DATA 6,6,1,6,6,6,1,6,8,8,~,8,8,8,3,8
+`;
   function PLAY(channels, noise, envelope, duration) {
-    // DOC: Set the "shape" of the sound using
-    // CHANNELS 0-7 : 1 (first) + 2 (second) + 4 (third)
-    // ENVELOPE 0--7 the shape of the sound
-    // fixed length: 1,2 while 1--7 repeats
+    // DOC: "shape" of the sound:
+    // CHANNELS 0-7 : 1 (1st) + 2 (2nd) + 4 (3rd)
+    // ENVELOPE 0--7 shape, see below
     // DURATION 0--32767
-
-    // TIP: PLAY 0,0,0,0 'OFF
-    // Related: MUSIC, SOUND
-  }
+    // _ banjo  : env 1, dur 1000
+    // _ machine: env 6, dur 19
+    
+    // Tip: PLAY 0,0,0,0 'OFF
+    // Note: MUSIC C,3,4,0 '0 = Use envelope
+    // Envelopes (firist shape same length)
+    // 1 |\             "slow-die"
+    // 2 /|             "slow-start"
+    // 3 |\    |\|\ ... "saw"
+    // 4 /\    /\/\ ... "sine"
+    // 5 |\|~  ~~~~ ... 
+    // 6 /|    /|/| ... "saw"
+    // 7 /     ~~~~ ... "slow-start"
+  } 
 
   let example_PLAY = `
 l REM ***PLAY***
@@ -2160,8 +2224,21 @@ l REM *** CHROMATIC SCALE ***
 75 END 
 `;
 
+  let example_KEYBOARD =`
+10 REM *** KEYBOARD ***
+11 PRINT "0 1 2 .. - = /"
+20 GET A$
+30 A=VAL(A$)
+40 IF A$="- " THEN A=11
+50 IF A$="=" THEN A=12
+60 IF A$="/" THEN PLAY 0,0,0,0: STOP
+70 IF A=0 THEN A=10
+80 MUSIC 1, 3, A, 8
+85 WAIT 20: PLAY 0,0,0,0
+90 GOTO 20 
+`;
+  
   HELP.related.push('SOUND MUSIC PLAY');
-  HELP.related.push('PING ZAP EXPLODE SHOOT SOUND');
   
   function MUSIC(c, o, n, v) {
     // DOC:Make music using:
@@ -2180,8 +2257,26 @@ l REM *** CHROMATIC SCALE ***
     // _ 1   3   5   6   8  10  12
   }
 
-  function SOUND() {
+  example_WAVES = `
+l80 REM*** WAUES *** 
+181 REM page 106
+200 PLAY 0, 1.•0,0 
+205 Z=NT(RND(1)*20)
+210 FOR I=0 TO 31
+220 SOUND 4,I,7 
+230 WAIT Z
+240 NEXT I 
+250 GOT0 205
+`;
+  
+  function SOUND(chan, pitch, vol) {
+    // DOC: Make pitch (X/freq) and noise
+    // CHAN:1--3 + 4 (noise!)
+    // PITCH: 0--65536 X/freq
+    // 
   }
+
+  HELP.related.push('PING ZAP EXPLODE SHOOT SOUND');
 
   function ZAP() {}
   function PING() {}
@@ -2219,7 +2314,8 @@ errorObj : ${errorObj}
     dom('vars', JSON.stringify(vars));
     
     dom('stats', 'Statements: '+run.count+
-	' sps= ' + Math.floor(1000*(run.count-lastrun)/(cont.millis)));
+	' sps= ' + Math.floor(1000*(run.count-lastrun)/(cont.millis)) +
+	' scoff= ' + scoff);
     lastrun = run.count;
     
   }, 100);
@@ -2349,7 +2445,7 @@ errorObj : ${errorObj}
     if (trace) print('------' + a.join(' | '));
 
     // hehe - crap!
-    if (!orig.match(/^(LET|INPUT|FOR|HELP|DIM|CLOAD|CSAVE|REM)/)) {
+    if (!orig.match(/^(LPRINT|PRINT|LET|INPUT|FOR|HELP|DIM|CLOAD|CSAVE|REM)/)) {
       if (trace) print('---EVAL---' + a.join(' | '));
       a = a.map((x,i)=>!i?x:EVAL(x));
     }
@@ -2431,25 +2527,34 @@ errorObj : ${errorObj}
     screen(0, 0, 0);
     screen(0, 1, 7);
     
-    // save ---
-    let r = row, c = col;
+    // save --- restore
+    {
+      let r = row, c = col;
 
-    // CTRL-Q: toggle cursor
-    row = 0; col = SCREEN_COLS-4;
-    princ(caps?'CAPS':'    ');
+      // CTRL-Q: toggle cursor
+      row = 0; col = SCREEN_COLS-4;
+      princ(caps?'CAPS':'    ');
 
-    // CTRL-S: toggle screen (centered)
-    row = 0; col = Math.floor(SCREEN_COLS-8)/2;
-    princ(scrn?'        ':'SCRN OFF');
+      // CTRL-S: toggle screen (centered)
+      row = 0;
+      col = Math.floor(SCREEN_COLS-10)/2;
+      {
+	// TODO: something goes wrong with
+	// screen when off?
+	
+	// difficult to update if OFF!
+	let saved = scoff; scoff = 0;
+	princ(saved?'SCREEN OFF':'          ');
+	scoff = saved;
+      }
+      // TODO: column enable disable CTRL-J
+      if (column) {
+      } else {
+      }
 
-    // TODO: column enable disable CTRL-J
-    if (column) {
-    } else {
+      // --- and restore
+      row = r; col = c;
     }
-
-    // --- and restore
-    row = r;
-    col = c;
   }
   
   dom('exp').addEventListener('keydown', function(e) {
@@ -2490,7 +2595,7 @@ errorObj : ${errorObj}
     if (k=='f') click = !click;
     if (k=='q') cursorToggle();
     if (k=='t') showStatus(caps = !caps);
-    if (k=='s') showStatus(scrn = !scrn);
+    if (k=='s') showStatus(scoff=scoff?0:1);
     if (k=='p') showStatus(printer != printer);
     if (k=='f') clickToggle();
     if (k=='d') doubleToggle();
