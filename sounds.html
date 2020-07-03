@@ -1,76 +1,28 @@
 <!-- also stored at codepen -->
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <html>
-<head>
-</head>
-<body style='zoom:1.3;'>
-<center>
-  <div>
-<button onclick='sounds(3);'>init</button>
-<button onclick='sounds.mute();'>mute</button>
-<button onclick='sounds.volume(channel, -1)'>-1</button>
-<button onclick='sounds.volume(channel, 0)'>0</button>
-<button onclick='sounds.volume(channel, 0.1)'>0.1</button>
-<button onclick='sounds.volume(channel, 0.2)'>0.2</button>
-<button onclick='sounds.volume(channel, 0.5)'>0.5</button>
-<button onclick='sounds.volume(channel, 1)'>1</button>
-  </div><br><div>
-<button id=c0 onclick='ch(0);'>0</button>
-<button id=c1 onclick='ch(1);'>1</button>
-<button id=c2 onclick='ch(2);'>2</button>
-  </div><br><div>
-<button onclick='env("sine")'>sine</button>
-<button onclick='env("square")'>square</button>
-<button onclick='env("triangle")'>triangle</button>
-<button onclick='env("saw")'>saw</button>
-  </div><br><div>
-<button onclick='freq(261.6)'>C4</button>
-<button onclick='freq(261.6*2)'>C5</button>
-<button onclick='freq(261.6*4)'>C6</button>
-<button onclick='freq(220)'>A3</button>
-<button onclick='freq(440)'>A4</button>
-<button onclick='freq(880)'>A5</button>
-<button onclick='freq(1760)'>A6</button>
-<button onclick='freq(830.6)'>G#5</button>
-  </div><br><div>
-<button onclick='stop()'>stop</button>
-<button onclick='stop(0.1)'>stop 0.1</button>
-<button onclick='stop1)'>stop 1</button>
-<button onclick='stop(5)'>stop 5</button>
-<button onclick='stop(10)'>stop 10</button>
-  </div><br><div>
-<button onclick='ping()'>ping</button>
-<button onclick='handping()'>handping</button>
-<button onclick='mysound()'>mysound</button>
-</div>
-
-<br><div>
-    VolMul<br>
-    <input id=vmul size=5 value='0.3'><br>
-</div>
-</center>
-<div>
-    Sequencer<br>
-    <textarea id=seq size=60 style='font-weight:bold; font-size:2rem;'>
-1f2612qv1s4
-    </textarea>
-</div>
-
-      
+  <head>
 <script>
-  {
-    seq.onkeypress = function(k) {
-      if (k.ctrlKey && k.keyCode == 13)
-	sounds(seq.value);
+  // Place this before all other script:
+  // This will catch syntax errors when loading
+  //window.onerror = (...args)=>{
+  window.addEventListener('error', (...args)=>{
+    alert(''+args[0].type);
+    // how to debug your debugger!
+    try {
+      insertError('afterbegin', args);
+      return true; // ?
+    } catch(e) {
+      alert('window.onerror: \n'+e);
     }
-  }
-</script>
+  }, true);
 
-<script>
   function insertError(where, args, style) {
     // add script id info if have
-    let csid = document.currentScript.id;
-    let lsid = document.scripts[document.scripts.length-1].id;
+    let csid = document.currentScript &&
+	document.currentScript.id;
+    let script = document.scripts[document.scripts.length-1];
+    let lsid = script && script.id;
     if (csid) args.unshift(`script.id=${csid} (current)`);
     if (lsid != csid) args.unshift(`script.id=${csid} (last)`);
 
@@ -83,195 +35,110 @@
     args.push(`Event: ${event}`);
 
     // insert
-    let b = document.body;
     if (!style) style = 'color:red;';
     // no use: this ${typeof this}: ${this}\n
 
     let t = `<pre style='${style}'>
 ${args.map((x,i)=>`${i} ${typeof x}: ${x}\n`).join('')}
 </pre>`;
-    b.insertAdjacentHTML(where, t);
+    //document.body.insertAdjacentHTML(where, t);
+    if (document.body)
+      document.body.insertAdjacentHTML(where, t);
+    else 
+      document.write(t);
   }
-
-  // this gives tons of irriating syntax...
-  window.onerror = (...args)=>{
-    try {
-      insertError('afterbegin', args);
-      return true; // ?
-    } catch(e) { alert('window.onerror: \n'+e); }
-  };
-
 </script>
-<!script src='misc.js')></script>
-<!script src='jsconsole.js')></script>
+
+
+<!-- The MEAT of the project -->
+<script src='sounds.js')>
+</script>
+<!-- End MEAT -->
+
+</head>
+
+<body style='zoom:1.3;'>
+
+<center>
+  <div>
+    <button onclick='sounds(3);'>init</button>
+    <button onclick='sounds.mute();'>mute</button>
+    <button onclick='sounds.volume(channel, -1)'>-1</button>
+    <button onclick='sounds.volume(channel, 0)'>0</button>
+    <button onclick='sounds.volume(channel, 0.1)'>0.1</button>
+    <button onclick='sounds.volume(channel, 0.2)'>0.2</button>
+    <button onclick='sounds.volume(channel, 0.5)'>0.5</button>
+    <button onclick='sounds.volume(channel, 1)'>1</button>
+  </div><br><div>
+    <button id=c0 onclick='ch(0);'>0</button>
+    <button id=c1 onclick='ch(1);'>1</button>
+    <button id=c2 onclick='ch(2);'>2</button>
+  </div><br><div>
+    <button onclick='env("sine")'>sine</button>
+    <button onclick='env("square")'>square</button>
+    <button onclick='env("triangle")'>triangle</button>
+    <button onclick='env("saw")'>saw</button>
+  </div><br><div>
+    <button onclick='freq(261.6)'>C4</button>
+    <button onclick='freq(261.6*2)'>C5</button>
+    <button onclick='freq(261.6*4)'>C6</button>
+    <button onclick='freq(220)'>A3</button>
+    <button onclick='freq(440)'>A4</button>
+    <button onclick='freq(880)'>A5</button>
+    <button onclick='freq(1760)'>A6</button>
+    <button onclick='freq(830.6)'>G#5</button>
+  </div><br><div>
+    <button onclick='stop()'>stop</button>
+    <button onclick='stop(0.1)'>stop 0.1</button>
+    <button onclick='stop(1)'>stop 1</button>
+    <button onclick='stop(5)'>stop 5</button>
+    <button onclick='stop(10)'>stop 10</button>
+  </div><br><div>
+    <button onclick='handping()'>handping</button>
+    <button onclick='mysound()'>mysound</button>
+
+  </div>
+
+  <br><div>
+    VolMul<br>
+    <input id=vmul size=5 value='0.3'><br>
+  </div>
+</center>
+<br>
+<div>
+  Sequencer
+  <button onclick='sounds(seq.value)'>run</button> (or CTRL-ENTER)<br>
+  <textarea id=seq size=60 style='font-weight:bold; font-size:2rem;'>1f2612qv1~4v0
+2f3v1~6v0</textarea>
+</div>
+  
 <script>
-  // this will catch any runtime errors
-  // syntax errors excluded (see above)
-  window.onerror = (...args)=>{
+  seq.onkeypress = function(k) {
+    if (k.ctrlKey && k.keyCode == 13) {
+      try {
+	sounds(seq.value);
+      } catch(e) { alert('SEQ:' + e); }
+    }
+  }
+</script>
+
+</body>
+
+<script>
+  // Place this as last script (after body):
+  // This will catch runtime errors
+//  window.onerror = (...args)=>{
+
+  window.addEventListener('error', (...args)=>{
+    //alert(args[0].message);
+    // how to debug your debugger!
     try {
       insertError('beforeend', args);
       return true; // ?
-    } catch(e) { alert('window.onerror: \n'+ee); }
-  };
-
-  function sounds(x) {
-    if (!sounds.ctx) {
-      let channels = (typeof x === 'integer') ? x : 3;
-      sounds.channels = channels;
-      let ctx = sounds.ctx = new AudioContext();
-      sounds.o = [];
-      sounds.g = [];
-      // https://mdn.github.io/webaudio-examples/audio-param/
-      sounds.volume = function(c, v=0) {
-        sounds.g[c].gain.value = v;
-      }
-      sounds.mute = function() {
-        for(let i=0; i<channels; i++)
-          sounds.volume(i);
-      }
-
-      for(let i=0; i<channels; i++) {
-        let o = sounds.o[i] = ctx.createOscillator();
-        let g = sounds.g[i] = ctx.createGain();
-        o.connect(g);
-        sounds.volume(i, 0.3);
-        g.connect(ctx.destination);
-        o.start(0);
-      }
-      sounds.mute();
+    } catch(e) {
+      alert('window.onerror: \n'+ee);
     }
-    try {
-    if (typeof x === 'string')
-      sequencer(x);
-    } catch(e) { alert("SEQ:" + e); }
-  }
-  // init
-  var channel = 0;
-  function stop(s) {
-    try {
-    s = s || 0.04;
-    let g = sounds.g[channel];
-    if (typeof g == 'undefined') return;
-    g.gain.exponentialRampToValueAtTime(
-      0.00001, sounds.ctx.currentTime + s);
-    } catch(e) { alert("silence:", e); }
- }
- function freq(f) {
-   if (f) {
-     let ff = sounds.o[channel].frequency;
-     ff.exponentialRampToValueAtTime(
-       f, sounds.ctx.currentTime + 5);
-   }
-   if (f) sounds.o[channel].frequency.value =
-     Math.floor(f) || 0;
-  }
-  function env(e) {
-    if (e) sounds.o[channel].type = e || "sine";
-  }
-  function play() {
-    freq();
-    try {
-    //sounds.o[channel].start(0);
-    } catch(e) { alert("note:" + e); }
-  }
-  function ch(c) {
-    function bg(c, col) {
-      window['c' + c].style.background = col ||  '';
-    }
-    bg(0); bg(1); bg(2);
-    bg(c, 'green');
-    channel = c;
-  }
-  function detune() {
-    let d = sounds.o[channel].detune;
-    if (detune.state = !!detune.state)
-      d.setValueAtTime(100, ctx.currentTime);
-    else
-      d.value = '';
-  }
+  }, true);
+</script>
 
-  function sequencer(s) {
-    let orig = s;
-
-    sounds(3);
-    
-    // 1-9 channels
-    // SqUARE, tTRIANGLE, SAw (sine default)
-    // vnum  (volume)
-    // ssecs (stop exponential)
-    // m (mute)
-
-    // TODO: make more envelopes
-    // - https://blog.chrislowis.co.uk/2013/06/17/synthesis-web-audio-api-envelopes.html
-
-    function num() {
-      let n;
-      s = s.replace(
-	/^\s*([\.\d]+)\s*/,
-	(_, _n)=>(n=+_n,''));
-      //alert(`NUM: ${n} ${typeof n} s=${s}`);
-      return n;
-    }
-
-    channel = 0;
-    while (s) {
-      let c = s[0];
-      s = s.substring(1).trim();
-      if (0) document.body.insertAdjacentHTML(
-	'beforeEnd', `SEQ: ch=${channel} '${c}' "${s}"\n<br>`);
-      switch (c) {
-	// skip
-      case '\n':
-      case ' ': break;
-	// envelopes
-      case 'q': env('square'); break;
-      case 't': env('triangle'); break;
-      case 'w': env('saw'); break;
-	// volume
-      case 'm': sounds.mute(); break;
-      case 'v': sounds.volume(
-	channel, +vmul.value * num()); break;
-	// frequency
-      case 'f': freq(num()); break;
-	// stop
-      case 's': stop(num()); break;
-      case ((c >= '0' && c <= '9')?c:false): // LOL
-	channel = +c; break;
-      default: throw `sounds: unrecongized char '${c}' in "${orig}"`;
-      }
-    }
-    channel = 0;
-    return  true;
-  }
-
-  sounds.named = {
-    ping: '1f2612qv1s4',
-    bouncy_steel: '1f2613v1s6 1f2v1'
-  }
-  
-  function handping() {
-    sounds(3);
-  // 1-9 channels
-    // SqUARE, tTRIANGLE, SAw (sine default)
-    // vnum  (volume)
-    // ssecs (stop exponential)
-      
-    // 1f2612qv1s4
-    channel = 1;
-    freq(2612);
-    //env('square');
-    sounds.volume(channel, 1);
-    stop(4);
-    
-    // 2f3V1S6
-    channel = 2;
-    freq(3);
-    //env('square');
-    env('saw')
-    sounds.volume(channel, 1);
-    stop(6);
-  }
-  </script>
-
-</body>
 </html>
