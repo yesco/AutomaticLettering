@@ -10,22 +10,21 @@ function sounds(x) {
     let o = sounds.o = [];
     let g = sounds.g = [];
     // https://mdn.github.io/webaudio-examples/audio-param/
-      function set(ref, sched, v, t) {
-	switch(sched) {
-	case '@': ref.setValueAtTime(v, t); break;
-	case '-': ref.linearRampToValueAtTime(v, t); break;
-	default:
-	case '~': ref.exponentialRampToValueAtTime(v, t); break;
-	}
+    function set(ref, sched, v, t) {
+      let at = sounds.ctx.currentTime + t;
+      switch(sched) {
+      case '@': ref.setValueAtTime(v, at); break;
+      case '-': ref.linearRampToValueAtTime(v, at); break;
+      default:
+      case '~': ref.exponentialRampToValueAtTime(v, at); break;
       }
+    }
 
     sounds.volume = (c, v, t, sched)=>{
-      v = v || 0.00001; // 0 not allowed!
+      v = v || 0.001; // 0 not allowed!
       t = t || 0.04; // 0 is clickety
-      t = 0.4;
       sched = sched || '~';
-      let at = sounds.ctx.currentTime + t;
-      set(g[c].gain, sched, v, at);
+      set(g[c].gain, sched, v, t);
     }
     sounds.mute = function(t, sched) {
       for(let i=0; i<channels; i++) {
@@ -35,6 +34,11 @@ function sounds(x) {
       }
     }
 
+    sounds.freq = function(c, f, t, sched) {
+      set(o[c].frequency,
+	  sched, Math.floor(f), t);
+    }
+    
     for(let i=0; i<channels; i++) {
       let o = sounds.o[i] = ctx.createOscillator();
       let g = sounds.g[i] = ctx.createGain();
@@ -71,23 +75,8 @@ function stop(s) {
 
   } catch(e) { alert("silence:", e); }
 }
-function freq(f) {
-  if (f) {
-    let ff = sounds.o[channel].frequency;
-    ff.exponentialRampToValueAtTime(
-      f, sounds.ctx.currentTime + 5);
-  }
-  if (f) sounds.o[channel].frequency.value =
-    Math.floor(f) || 0;
-}
 function env(e) {
   if (e) sounds.o[channel].type = e || "sine";
-}
-function play() {
-  freq();
-  try {
-    //sounds.o[channel].start(0);
-  } catch(e) { alert("note:" + e); }
 }
 function ch(c) {
   function bg(c, col) {
@@ -174,10 +163,25 @@ function sequencer(s) {
   // volume
   //   vnum  (0--1.0, volume)
   //   m (mute all == v0)
-  // scheduling
+  // scheduling (obs absolute, set on coming)
   //   ~secs.ms (EXP change to t)
   //   @secs.ms (ABRUPT change AT t)
   //   -secs.ms (LINEAR change to t)
+  //   +secs.ms (relaive, ADD time to t))
+  //   +   (no number, add same as last)
+  //   [~@-]0 resets (for use w other channel)
+  // scheduling for (only) notes (automatic!)
+  //   /num (length of note, advance T w +/num)
+  //   /1  (full note, +)
+  //   /2  (half note, +/2
+  //   /4 
+  //   /8 
+  //   /16 
+  //   /32 
+  //   /0.5 (double! :-o )
+  //
+  // TODO: change times to MS!!!!
+  //   +0.200 /1 A4 /4 A1 A1 - daaa ta ta
   // octave
   //   ooct (0--8, set octave, default 4)
   // note
@@ -192,6 +196,16 @@ function sequencer(s) {
   //   - No sound unless set volume!
   //   - if no number given -> 0
   //   - 'C6HAGFED' - octave shorthand
+  //
+  // Length: http://neilhawes.com/sstheory/theory12.htm
+  // 
+
+  // TODO: beats! 2/4 3/4 ???
+  // - http://neilhawes.com/sstheory/theory10.htm
+  //   2/4 = Oom pah
+  //   3/4 = Oom pah pah
+  //   4/4 = Oom Pah pah pah
+  //   | move to next bar (move time forard to "next" +
   //
   // TODO: make more envelopes
   // - https://blog.chrislowis.co.uk/2013/06/17/synthesis-web-audio-api-envelopes.html
@@ -220,11 +234,18 @@ function sequencer(s) {
     s = s.substring(1).trim();
     return c;
   }
-
+  // step the current note time forward
+  // controlled by + and /
+  function step() {
+    T = (T || 0) + add/frac;
+  }
   // init
-  let sched = '';
+  let sched = '@';
   let T = 0;
   let oct = 4; // yeah
+  let add = 0.300;
+  let frac = 1;
+  let vol = 0.5;
   channel = 0;
   
   // chars are removed from s as we advance
@@ -243,16 +264,26 @@ function sequencer(s) {
       // volume
     case 'm': sounds.mute(); break;
     case 'v': sounds.volume(
-      channel, +vmul.value * num(), T, sched); break;
+      channel, vol = +vmul.value * num(), T, sched); break;
       // frequency
-    case 'f': freq(num(), T, sched); break;
+    case 'f': sounds.freq(
+      channel, num(), T, sched); break;
       // schedule
     case '~':
     case '@':
     case '-':
       T=num(); sched=c; break;
-
-      // COND-style! LOL
+    case '+': {
+      let n = num();
+      if (n)
+	add = n
+      else
+	T = (T || 0) + add;
+      break; }
+    case '/': {
+      let n = num()
+      frac = n ? n : 1;
+      break; }
       // channel
     case (c.match(/\d/)          ?c:false):
       channel = +c; break;
@@ -260,19 +291,31 @@ function sequencer(s) {
     case 'o': oct = num(); break;
     case 'n': {
       let note = NOTES[num()] + oct;
-      freq(NOTE2FREQ[note], f, sched);
+      sounds.freq(
+	channel, NOTE2FREQ[note], f, sched);
       break; }
     case (c.match(/[HBAGFEDC]/)  ?c:false): {
       let note = c;
       if (next('#')) note += '#';
       // allow shorthand! C6HAGFED
       oct = num() || oct; 
+      note += oct;
       // play it Sam!
-      freq(NOTE2FREQ[note], T, sched);
+      sounds.freq(
+	channel, NOTE2FREQ[note], T, sched);
+      step();
+      break; }
+      // pause, silent note
+    case 'p': {
+      //step();
+      sounds.volume(channel, 0.00001, T, '@');
+      step();
+      sounds.volume(channel, vol, T, '@');
       break; }
     default:
       sounds.mute();
       throw `sounds: unrecongized char '${c}' in "${orig}"`;
+      
     }
   }
   channel = 0;
@@ -280,9 +323,33 @@ function sequencer(s) {
 }
 
 sounds.named = {
+  crystal: '1f440v1\nf441v1\n3f666v1',
+  complicated: '1f440v1\n2f449v1\n3f441v1',
+  wowo: '1f440v1\n2f441v1',
   ping1: '1f2612qv1~4v0',
   ping2: '1f2616qv1~4v0 2f3v1~6v0',
-  bouncy_steel: '1f2613v1~6v0 1f2v1'
+  bouncy_steel: '1f2613v1~6v0 1f2v1',
+  space: '1f30~1f7740v1@1v0',
+  drop: '1f5740-0.7f300\nv1@0.7v0',
+  shot: '1f3000~0.1f80\nv1@0.1v0',
+  whissle: '1f2000~0.1f4000\nv1@0.1v0',
+  TwoTones1: 'v0.5 +0.2 @0 f440++f523+v0',
+  TwoTones2: 'v0.5 +0.2 A4/2C4 v0',
+  SwedishPhones: `
+v1 +0.3
+f425++++++++
+f425+pf425+pf425+pf425+pf425+pf425+p
+v0
+++++
+
+v1
+f950+f1400+f1800+pp
+f950+f1400+f1800+pp
+f950+f1400+f1800+pp
+f950+f1400+f1800+pp
+f950+f1400+f1800+pp
+v0
+`,
 }
 
 function handping() {
@@ -290,14 +357,14 @@ function handping() {
 
   // 1f2612qv1~4v0
   channel = 1;
-  freq(2612);
+  sounds.freq(channel, 2612);
   //env('square');
   sounds.volume(channel, 1);
   stop(4);
   
   // 2f3V1S6
   channel = 2;
-  freq(3);
+  sounds.freq(channel, 3);
   //env('square');
   env('saw')
   sounds.volume(channel, 1);

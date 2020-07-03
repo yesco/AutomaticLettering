@@ -107,11 +107,14 @@ ${args.map((x,i)=>`${i} ${typeof x}: ${x}\n`).join('')}
 <br>
 <div>
   Sequencer
-  <button onclick='sounds(seq.value)'>run</button> (or CTRL-ENTER)<br>
-  <textarea id=seq size=60 style='font-weight:bold; font-size:2rem;'>1f2612qv1~4v0
+  <button onclick='sounds(seq.value)'>run</button>
+  (or CTRL-ENTER)
+  <button onclick='sounds.mute();'>MUTE</button>
+<br>
+  <textarea id=seq rows=20 cols=50 style='font-weight:bold; font-size:1rem;'>1f2612qv1~4v0
 2f3v1~6v0</textarea>
 </div>
-  
+g  
 <script>
   seq.onkeypress = function(k) {
     if (k.ctrlKey && k.keyCode == 13) {

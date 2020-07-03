@@ -1985,6 +1985,19 @@ already,then skip
   
   /* (ASCII A) which is (in decimal) 46600. Try the following program which POKES new values into these locations and then PRINTS an A. The A should appear as an italic A because we have now redefined the way Orie draws an A. Try switching to HIRES mode and use CHAR to place an A on the screen to prove that the characters have been copied down correctly.*/
   
+  // jsk: Just got an IDEA!
+  // 1. whenever poked in letter 'X'
+  //    (chardef area)
+  //    - record it
+  // 2. when "done" (subjective)
+  //    - creata an svg put in
+  //      SPRITE[hex(chardef)] = svg
+  //      CHAR2SPRITE['X'] = hex(chardef)
+  // 3. in screen replace every 'X'
+  //
+  // gif: will work
+  // svg symbol: can they be redefined?
+
   example_CHARDEF = `
 10 FOR A=0 TO 7 
 20 READ B 
