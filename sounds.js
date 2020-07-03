@@ -48,8 +48,12 @@ function sounds(x) {
       g.connect(ctx.destination);
       o.start(0);
     }
-    //sounds.mute();
+
+    sounds.play = function(name) {
+      sounds(sounds.named[name]);
+    }
   }
+
   if (typeof x === 'string') {
     try {
       sequencer(x);
@@ -150,9 +154,10 @@ let NOTE2FREQ = {}, NOTES = []; {
 	.join('<br>'));
 }
 
+// call sequencer with string
+// optinonal a display function showing left
 function sequencer(s) {
-  let orig = s;
-
+  // DOC:
   // channel
   //   0-9 (or none for default)
   // envelopes
@@ -197,10 +202,21 @@ function sequencer(s) {
   //   - if no number given -> 0
   //   - 'C6HAGFED' - octave shorthand
   //
-  // Length: http://neilhawes.com/sstheory/theory12.htm
-  // 
-
-  // TODO: beats! 2/4 3/4 ???
+  //
+  // === NOT IMPLEMENTED - BELOW HERE ===
+  //
+  // Repeats: (NOT IMPLEMENTED)
+  //   (...)*2 repeats 2 times, no nesting
+  //   |: ... :| same
+  //
+  // Macros
+  //   [name] - play section (before def)
+  //   [:name sequence:] - named section (neeed to be at end)
+  //
+  // Notes
+  // - Length: http://neilhawes.com/sstheory/theory12.htm
+  //
+  // Beats
   // - http://neilhawes.com/sstheory/theory10.htm
   //   2/4 = Oom pah
   //   3/4 = Oom pah pah
@@ -209,6 +225,13 @@ function sequencer(s) {
   //
   // TODO: make more envelopes
   // - https://blog.chrislowis.co.uk/2013/06/17/synthesis-web-audio-api-envelopes.html
+  // look at
+  // - https://en.m.wikipedia.org/wiki/ABC_notation
+  //
+  // ... For the rest - read the SOURCE Luke!
+  // ENDDOC
+  let orig = s;
+
 
   // TODO: if (z === 'undefined') {
   ///g.gain.cancelScheduledValue(
@@ -239,13 +262,27 @@ function sequencer(s) {
   function step() {
     T = (T || 0) + add/frac;
   }
+  
+  // remove comments (unnamed macros!)
+  s = s.replace(/\[:\s+[\s\S\n]*?\s*:\]/g, ' ');
+
+  // extract macros
+  let defs = {};
+  s = s.replace(
+    /\[:(\w+)([\s\S]*?)\s*:\]/g,
+    (_, name, def)=>{
+      defs[name] = def;
+      return ''});
+
   // init
   let sched = '@';
   let T = 0;
-  let oct = 4; // yeah
   let add = 0.300;
   let frac = 1;
   let vol = 0.5;
+  let freq = 440;
+  let oct = 4;
+  
   channel = 0;
   
   // chars are removed from s as we advance
@@ -267,12 +304,17 @@ function sequencer(s) {
       channel, vol = +vmul.value * num(), T, sched); break;
       // frequency
     case 'f': sounds.freq(
-      channel, num(), T, sched); break;
+      channel, freq = num(), T, sched); break;
       // schedule
     case '~':
     case '@':
-    case '-':
-      T=num(); sched=c; break;
+    case '-': {
+      //alert(s);
+      let t = num();
+      T = (t === 0) ? 0 : T + t;
+      //alert(T);
+      sched=c;
+      break; }
     case '+': {
       let n = num();
       if (n)
@@ -312,6 +354,22 @@ function sequencer(s) {
       step();
       sounds.volume(channel, vol, T, '@');
       break; }
+    case '[': {
+      let name;
+      s = s.replace(
+	/^(\w+)\]/g,
+	(_,n)=>{name=n; return ''});
+      if (!name) return alert('SEQ: no name in play name: [' + s);
+      let d = defs[name];
+      if (!d) return alert('SEQ: No play named: ' + name);
+      // push on queue
+      s = d + '  ' + s;
+      break; }
+    case '|': {
+      break; }
+    case '*': {
+      break; }
+
     default:
       sounds.mute();
       throw `sounds: unrecongized char '${c}' in "${orig}"`;
@@ -350,6 +408,57 @@ f950+f1400+f1800+pp
 f950+f1400+f1800+pp
 v0
 `,
+  borst: 'v1 f425~0.6f20000 v1-1v0',
+  borst2: 'v1 f425~0.6f20000 2f2000~1f200 v1-1v0',
+  tjiong: '1e @0 v1 ~0f7777+f1000 -1v0\n2q @0 v1 ~0f7000+f100 ~1v0',
+  echo: `
+1e
+[: first control frequencies and timing :]
+@0 ~0.1 v1 [y][y]
+[: then in PARALLEL volume falling :]
+@0 ~v1+++ +++v0
+
+[:y [x][x][x] :]
+[:x f400 + f1000 :]
+
+v0
+`,
+  echoUnderseas: `
+1e
+[: first control frequencies and timing :]
+@0 ~0.1 v0.4 [y][y]
+[: then in PARALLEL volume falling :]
+@0 ~v1+++ +++v0
+
+[:y [x][x][x] :]
+[:x f2000 + f1000 :]
+
+v0
+`,
+  echoInSpace: `
+1e
+[: first control frequencies and timing :]
+@0 ~0.1 v0.4 [y][y]
+[: then in PARALLEL volume falling :]
+@0 ~v1+++ +++v0
+
+[:y [x][x][x] :]
+[:x f4000 + f9000 :]
+`,
+  small_clock_stroke: `
+1 @0 [a]
+2 @0 v0.1 f300v1~1v0
+
+[:a v1A4v1~1v0p :]
+`,
+  hit_something_tinny_on_heavy: `
+
+1 @0 [a]
+2 @0 v0.1 f30v1~0.7v0
+
+[:a v1A4v1~1v0p :]
+`;
+  
 }
 
 function handping() {
