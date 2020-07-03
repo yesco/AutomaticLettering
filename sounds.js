@@ -22,6 +22,7 @@ function sounds(x) {
     sounds.volume = (c, v, t, sched)=>{
       v = v || 0.00001; // 0 not allowed!
       t = t || 0.04; // 0 is clickety
+      t = 0.4;
       sched = sched || '~';
       let at = sounds.ctx.currentTime + t;
       set(g[c].gain, sched, v, at);
@@ -38,7 +39,8 @@ function sounds(x) {
       let o = sounds.o[i] = ctx.createOscillator();
       let g = sounds.g[i] = ctx.createGain();
       o.connect(g);
-      sounds.volume(i, 0.3);
+      o.type = 'sine';
+      g.gain.value = 0;
       g.connect(ctx.destination);
       o.start(0);
     }
