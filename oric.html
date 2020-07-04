@@ -1899,7 +1899,7 @@ already,then skip
       // DOC: Not and expression
       // negate all bits (0 <=> -1)
       // Related: AND OR NOT TRUE FALSE
-      return ~a;
+      return -(a+1);
     }
   }
 
@@ -1950,7 +1950,151 @@ already,then skip
   
   // So if the first byte of the screen (#BB80), contains the value 65 (ASCII code for the upper case A letter), we know that this block of 6x8 pixels will be filled with graphical information stored at the address #B400+(8*65).
 
+/* special addresses:
+some may be considere "simulated"
+
+--- KEYS
+$17 Set to 1 if CTRL C pressed, otherwise 0. 
+$35-$84 Input buffer. (79 bytes) 
+$208 Key address if pressed — #38 if no key pressed. 
+$209 Key status, 
+ #38 - Default, 
+ #A2 - CONTROL, 
+ #A4 - Left SHIFT, 
+ #A5 - FUNCTION (Atmos only), 
+ #A7 - Right SHIFT. 
+$20A Saved key column for repeat. 
+$20C Bit 7 is set if CAPS is on otherwise clear. 
+$20D 
+$20E Repeat counter for keyboard. 
+$20F 
+$210 Temporary store of row of key being tested for repeat. 
+$211 Temporary store of keyboard row during strobe routine. 
+
+--- TEXT
+$12,$13 Address of text cursor. 
+$2E CTRL O flag. 0 if output to screen enabled.$30 Cursor position for Basic printout. 
+$31 Screen line width. 
+$32 8 - multiple line width. 
+$21F 0 - LORES, 1 - HIRES. 
+$23B-$23D Jump to GET KEY routine (V1.1). 
+$23E-$240 Jump to SEND BYTE TO PRINTER (V1.1). 
+$241-$243 Jump to PRINT TO STATUS LINE (V1.l). 
+$24E Keyboard initial repeat deiay (V1.l). 
+$24F Keyboard successive repeat delay (V1.1). 
+$250 
+$251 Cursor enabie in CTRL routines (Vl.l).
+$256 Printer width (Vl.l). 
+$257 Screen width (Vl.l). 
+$258 Printer cursor position (V1.1). 
+$259 Screen cursor position (V1.1). 
+$265 Current cursor state indicator, 0 - off, 1 — on. 
+$266,$267 
+$268 Cursor row number, (status line is row 0).
+$269 Cursor column position. 
+$26A Flag byte. 
+ Bit Flag function when bit is set to 1. 
+ 0 Cursor on. 
+ 1 Printout to screen enabled. 
+ 2 Unused. 
+ 3 Disable keyciick. 
+ 4 Previous printed character was ESC 
+ 5 Protect columns 0 and 1 of screen. 
+ 6 Double height characters. 
+ 7 Unused. 
+$26B Paper colour (+16). 
+$26C Ink colour. 
+$26D,$26E Start address of screen memory. 
+$26F Number of text lines available on screen (V1.0). 
+$270 Cursor on/off flag. 
+$271 Cursor invert flag. 
+$272,$273 Keyboard timer. 
+$274,$275 Cursor timer. 
+$278,$279 Address of second line on screen (V1.1). 
+$27A,$27B Address of first line on screen (V1.1). 
+$27C,$27D Number of characters normally used in screen scrolling, 
+26 x 40 – 1,040 or #410 (V1.1). 
+$27E Number of rows of text available (V1.1). 
+$2C0 Screen status, 0=GRAB, 2=TEXT and 3=HIRES.
+
+--- HIRES
+$10,$11 Address of hires cursor. 
+$A6,$A7 Himem. 
+$212 Holds FB code in hires commands. 
+$213 Pattern data for hires screen. 
+$214 Temporary copy of pattern byte for drawing lines. 
+$215 Holds position of pixel in byte corresponding to position of 
+cursor on hires screen. 
+$216,$217 Temporary store of hires X and Y cursor positions. 
+$218 Temporary store for content of $215. 
+$219 Hires cursor — X coordinate. 
+$21A Hires cursor — Y coordinate. 
+$21F 0 - LORES, 1 - HIRES. 
+$2C0 Screen status, 0=GRAB, 2=TEXT and 3=HIRES.$2C1,$2C2 Char set start address in HIRES mode (V1.1). 
+$2C3 Cursor movement in hires, 0 = Absolute, 1 = 
+$2DF Latest key from keyboard. Bit 7 set if valid. 
+$2E0 Non zero if error in Sound / Graphics routines. 
+$2F1 Bit 7 set to 1 if printer enabled. 
+$2F2 Bit 7 is EDIT flag, set to 1 when on. 
+$2F4 TRACE flag, set if bit 7 is set. 
+
+--- PROGRAM
+$A8,$A9 Current line number, top byte is #FF if in command mode. 
+$AA,$AB Previous line number. 
+$AC,$AD Last line start address. 
+$AE,$AF Temporary copy of line number. 
+      
+$B4,$B5 Last variable name accessed. 
+$B6,$B7 Address of last variable value accessed
+$E9,$EA Position pointer in program. 
+$252 ELSE pending flag, 1 - on, 0-off (Vl.l). 
+$253-$255 
+$2F5,$2F6 Indirect jump for '!' routine. 
+$2FB-$2FD Jump to '&' routine. 
+
+
+--- HARDWARE
+$220 0 - 48K Oric, 1 - 16K Oric. 
+$228-$22A Jump to IRQ routine (V1.0). 
+$22B-$22D Jump to NMI routine (V1.0). 
+$244-$246 Jump to IRQ routine (Vl.l). 
+$247-$249 Jump to NMI routine (Vl.l). 
+$24A—$24C RTI instruction which can be intercepted by a jump (Vl.l). 
+$230 RTI instruction (V1.0). 
+
+$21—$23 Jump location for USR command. 
+
+--- INTERNAL
+      
+$18,$19 Tokenising pointer. 
+$1A—$1C Jump location to print 'Ready'. 
+
+$C3—$C5 Jump location to evaluate numeric functions. $C5 also used as a 
+temporary store of the rounding byte for mathematical operations. 
+
+$E2—$F2 Routine to step through program to find next non space char. See 
+$EC9C of disassembly. 
+
+$20B Not used but gets written over by routine that sets $208 - $20A. 
+
+$238-$23A Jump to PRINT CHARACTER on screen (V1.1).
+$24D Tape speed, 0 - fast, 1 - slow (Vl.l). 
+
+$261,$262 Indirect jump for CTRL character routine.
+$263,$264 Temporary storage. 
+$276,$277 Spare counter — also used by WAIT (and printer in V1.0). 
+*/
+
+  example_TIMER =`
+9 REM *** PRINTS THE CURRENT TIMER IN HECTOSECONDS
+10 LET D=DEEK(630)
+20 PRINT D
+30 STOP
+`;
+
   HELP.related.push('PEEK POKE DEEK DOKE SCRN'); {
+    // LOCAL VARS USED FOR PEEK/DEEK etc 
+
     const SCREEN = 0x0BB80;
     const SCREEN_LEN = SCREEN_ROWS * SCREEN_COLS;
     //const SCREEN_LEN = 1120;
@@ -2004,6 +2148,10 @@ already,then skip
     }
 
     function DEEK(a, v) {
+      if (a === 0x276) // timer hs (10ms)
+	return 0x10000 - (INT(
+	  Date.now() / 10) % 0x10000);
+      
       return 256*PEEK(a+1) + PEEK(a);
     }
 
@@ -2283,7 +2431,7 @@ channel combination
     }
   }
 
-  let example_PLAY = `
+  example_PLAY = `
 l REM ***PLAY***
 5 CLS
 10 CLS:PRINT:PRJNT
@@ -2299,7 +2447,7 @@ l REM ***PLAY***
 
   // on Xiaomi A4 note+ it plays 3s
   // original oric about 6s
-  let example_CHROMANG = `
+  example_CHROMANG = `
 10 REM CHROMATIC (WITHOUT FOR)
 20 LET I=0
 25 PLAY 1,0,0,0
@@ -2313,7 +2461,7 @@ l REM ***PLAY***
 100 PLAY 0,0,0,0
   `;
   
-  let example_CHROMATIC = `
+  example_CHROMATIC = `
 l REM *** CHROMATIC SCALE *** 
 5 CLS 
 10 PAPER 5 
@@ -2326,7 +2474,7 @@ l REM *** CHROMATIC SCALE ***
 75 END 
 `;
 
-  let example_KEYBOARD =`
+  example_KEYBOARD =`
 10 REM *** KEYBOARD ***
 11 PRINT "0 1 2 .. - = /"
 20 GET A$
@@ -2710,13 +2858,14 @@ errorObj : ${errorObj}
     let s = e.shiftKey, ch = e.code;
     let kc = e.keyCode;
 
-    if (c && k || kc==13 || kc==8)
+    if ((c && k !== 'control') || kc==13
+	|| kc==8 || (37<=kc && kc<=40))
       clickSound(true);
 
     // editing
     if (kc==13) editEnter();
     if (kc==8) editBackspace();
-    if (37 <= kc && kc <= 40) editArrow(kc);
+    if (37<=kc && kc<=40) editArrow(kc);
 
     // my extensions
     if (c && k=='r') window.location.reload();
