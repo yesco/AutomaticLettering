@@ -167,6 +167,12 @@
     error('?ILLEGAL QUANTITY ERROR');
   }
 
+  // when calling some interactive funcs
+  // like key$ and get, input
+  function direct_error() {
+    error('?ILLEGAL DIRECT ERROR');
+  }
+
   function type_error() {
     error('?TYPE MISMATCH ERROR');
   }
@@ -244,6 +250,9 @@ span, div { font-family: 'oric-atmos', monospace; }
 </style>
   
 <script src='misc.js'>
+</script>
+
+<script src='sounds.js'>
 </script>
 
 </head>
@@ -391,6 +400,7 @@ INFO:<br><span id='info'></span>
     stop('noprompt');
     CLS();
     
+    
     // init
     vars = {};
     stack = [];
@@ -406,6 +416,11 @@ INFO:<br><span id='info'></span>
     
     row = 1;
     col = 2;
+    
+    // at start only one channel enabled!
+    PLAY['con1'] = 1;
+    PLAY['con2'] = 0;
+    PLAY['con3'] = 0;
     
     // stats
     putc.count = 0;
@@ -2231,7 +2246,27 @@ channel combination
     // 5 |\|~  ~~~~ ... 
     // 6 /|    /|/| ... "saw"
     // 7 /     ~~~~ ... "slow-start"
-  } 
+    
+    // TODO: noise! channels > 
+    // channels noise envelope duration
+
+    // PLAY 0,... ' all off
+    if (!channels)
+      return sounds('0v0 1v0 2v0 3v0');
+
+    let c = 1;
+    for (let b=1; b<8; b*=2) {
+      let e = channels & b;
+      PLAY['con'+c] = e;
+
+      // If enabled start saved stuff
+      if (e) 
+	sounds(PLAY['c'+c] || '');
+      else
+	sounds(`${c} v0`);
+      i++;
+    }
+  }
 
   let example_PLAY = `
 l REM ***PLAY***
@@ -2278,7 +2313,7 @@ l REM *** CHROMATIC SCALE ***
   
   function MUSIC(c, o, n, v) {
     // DOC:Make music using:
-    // CHANNEL 0--3
+    // CHANNEL 1--3
     // OCTAVE 0--7
     // NOTE 1--12 see below
     // VOLUME 0--15
@@ -2291,6 +2326,16 @@ l REM *** CHROMATIC SCALE ***
     // | C | D | E | F | G | A | H |
     // \---------------------------/
     // _ 1   3   5   6   8  10  12
+    tPos(c, c < 1 || c > 3);
+    tPos(o, o > 6);
+    tPos(o, n < 1 || n > 12);
+    tPos(v, v > 15);
+    v = INT(100 * v / 15) / 100;
+    // we need to save it for PLAY
+    let seq = PLAY['c'+c] =
+	`${c} o${o} n${n} v${v}`
+    // only play if channel enabled with PLAY
+    if (PLAY['con'+c]) sounds(seq);
   }
 
   example_WAVES = `
@@ -2305,17 +2350,37 @@ l80 REM*** WAUES ***
 250 GOT0 205
 `;
   
-  function SOUND(chan, pitch, vol) {
+  function SOUND(c, p, v) {
     // DOC: Make pitch (X/freq) and noise
     // CHAN:1--3 + 4 (noise!)
     // PITCH: 0--65536 X/freq
-    // 
+    tPos(c, c > 7);
+    tPos(p, p < 65536);
+    tPos(v, v > 15);
+    if (c > 3)
+      implemented_error("SOUND: doesn't support noise yet!");
+    v = INT(100 * v / 15) / 100;
+    const MAGIC = 30800;
+    let f = INT(MAGIC / p);
+
+    // we need to save it for PLAY
+    let seq = PLAY['c'+c] =
+	`${chan} v${vol} f${f}`;
+    // only play if channel enabled with PLAY
+    if (PLAY['con'+c]) sounds(seq);
   }
 
   HELP.related.push('PING ZAP EXPLODE SHOOT SOUND');
 
-  function ZAP() {}
-  function PING() {}
+  function ZAP() {
+    sounds('[oric_zap]');
+    // TODO: wait as long as it takess to
+    // play like he original..
+  }
+  function PING() {
+    sounds('[oric_ping]');
+    // thisone doessn't block
+  }
   function SHOOT() {} // "snare-drum"
   function EXPLODE() {}
 
@@ -2358,7 +2423,19 @@ errorObj : ${errorObj}
   // clear initial error
   dom('error', '');
   
+  function clickSound(special) {
+    editChar.n = ((editChar.n || 0) + 1)%20;
+    let named = special ?
+	'[oric_okey]' : '[oric_key]';
+    if (click) {
+      sounds('' + (editChar.n+3) + named);
+      // compatible keysound, turn off vol of 1
+      sounds('1v0');
+    }
+  }
+
   function editChar(ch) {
+    clickSound();
     cursorHide();
     let c = String.fromCharCode(ch);
     // ignore keyboard setting
@@ -2596,10 +2673,14 @@ errorObj : ${errorObj}
   }
   
   dom('exp').addEventListener('keydown', function(e) {
+    
     let c = e.ctrlKey, a = e.altKey;
     let k = e.key.toLowerCase();
     let s = e.shiftKey, ch = e.code;
     let kc = e.keyCode;
+
+    if (c && k || kc==13 || kc==8)
+      clickSound(true);
 
     // editing
     if (kc==13) editEnter();

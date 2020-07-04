@@ -4,7 +4,7 @@
 
 function sounds(x) {
   if (!sounds.ctx) {
-    let channels = (typeof x === 'integer') ? x : 10;
+    let channels = sounds.channels || (typeof x === 'integer') ? x : 30;
     sounds.channels = channels;
     let ctx = sounds.ctx = new AudioContext();
     let o = sounds.o = [];
@@ -21,7 +21,7 @@ function sounds(x) {
     }
 
     sounds.volume = (c, v, t, sched)=>{
-      v = v || 0.001; // 0 not allowed!
+      v = v || 0.00001; // 0 not allowed!
       t = t || 0.04; // 0 is clickety
       sched = sched || '~';
       set(g[c].gain, sched, v, t);
@@ -60,8 +60,10 @@ function sounds(x) {
     } catch(e) {
       sounds.mute();
       alert("SEQ:" + e);
+      return false;
     }
   }
+  return true;
 }
 
 // init
@@ -147,7 +149,7 @@ let NOTE2FREQ = {}, NOTES = []; {
 
   // debug: insert all frequencies at end
   if (0)
-    document.body.insertAdjacentHTML(
+    DOCUMENT.body.insertAdjacentHTML(
       'beforeend',
       Object.keys(NOTE2FREQ).map(
 	(n)=>`${n} = ${NOTE2FREQ[n]}\n`)
@@ -232,12 +234,15 @@ function sequencer(s) {
   // ENDDOC
   let orig = s;
 
-
   // TODO: if (z === 'undefined') {
   ///g.gain.cancelScheduledValue(
   //sounds.ctx.currentTime);
   //}
   
+  function vfactor() {
+    return (typeof vmul === 'undefined')?
+      1 : +vmul.value;
+  }
   // num() extacts+returns immediate number
   // or gives undefined if none
   function num() {
@@ -248,7 +253,6 @@ function sequencer(s) {
     //alert(`NUM: ${n} ${typeof n} s=${s}`);
     return n;
   }
-
   // next() gives next char
   // next('#') if next if not '#'->undefined
   function next(optC) {
@@ -274,6 +278,12 @@ function sequencer(s) {
       defs[name] = def;
       return ''});
 
+  // use local first, then library or loaded
+  function finddef(name) {
+    return def = defs[name] ||
+      sounds.named[name];
+  }
+  
   // init
   let sched = '@';
   let T = 0;
@@ -301,7 +311,7 @@ function sequencer(s) {
       // volume
     case 'm': sounds.mute(); break;
     case 'v': sounds.volume(
-      channel, vol = +vmul.value * num(), T, sched); break;
+      channel, vol = +vfactor() * num(), T, sched); break;
       // frequency
     case 'f': sounds.freq(
       channel, freq = num(), T, sched); break;
@@ -328,13 +338,14 @@ function sequencer(s) {
       break; }
       // channel
     case (c.match(/\d/)          ?c:false):
+      // TODO: create local ones!!!
       channel = +c; break;
       // octave/note
     case 'o': oct = num(); break;
     case 'n': {
       let note = NOTES[num()] + oct;
       sounds.freq(
-	channel, NOTE2FREQ[note], f, sched);
+	channel, NOTE2FREQ[note], T, sched);
       break; }
     case (c.match(/[HBAGFEDC]/)  ?c:false): {
       let note = c;
@@ -354,21 +365,22 @@ function sequencer(s) {
       step();
       sounds.volume(channel, vol, T, '@');
       break; }
+      // named macro invocaton
     case '[': {
       let name;
       s = s.replace(
 	/^(\w+)\]/g,
 	(_,n)=>{name=n; return ''});
       if (!name) return alert('SEQ: no name in play name: [' + s);
-      let d = defs[name];
+      let d = finddef(name);
       if (!d) return alert('SEQ: No play named: ' + name);
-      // push on queue
+      // push body on queue
       s = d + '  ' + s;
       break; }
     case '|': {
       break; }
-    case '*': {
-      break; }
+    //case '*': {
+    //break; }
 
     default:
       sounds.mute();
@@ -384,8 +396,12 @@ sounds.named = {
   crystal: '1f440v1\nf441v1\n3f666v1',
   complicated: '1f440v1\n2f449v1\n3f441v1',
   wowo: '1f440v1\n2f441v1',
-  ping1: '1f2612qv1~4v0',
-  ping2: '1f2616qv1~4v0 2f3v1~6v0',
+  ping_echo: '8f2616qv1~4v0 9f3v1~6v0',
+
+  oric_ping: '1f2612qv1~4v0',
+  oric_zap: '7v1 qf4000-0.2v1f51 v0',
+  oric_key: '@0 v1 qf5500~0.23f19\n@0 v1      ~0.07v0',
+  oric_okey: '@0 v1 qf5500~0.23f2\n@0 v1      ~0.07v0',
   bouncy_steel: '1f2613v1~6v0 1f2v1',
   space: '1f30~1f7740v1@1v0',
   drop: '1f5740-0.7f300\nv1@0.7v0',
@@ -457,7 +473,7 @@ v0
 2 @0 v0.1 f30v1~0.7v0
 
 [:a v1A4v1~1v0p :]
-`;
+`,
   
 }
 
