@@ -149,7 +149,7 @@ let NOTE2FREQ = {}, NOTES = []; {
 
   // debug: insert all frequencies at end
   if (0)
-    DOCUMENT.body.insertAdjacentHTML(
+    document.body.insertAdjacentHTML(
       'beforeend',
       Object.keys(NOTE2FREQ).map(
 	(n)=>`${n} = ${NOTE2FREQ[n]}\n`)
