@@ -170,14 +170,14 @@ function sequencer(s) {
   // volume
   //   vnum  (0--1.0, volume)
   //   m (mute all == v0)
-  // scheduling (obs absolute, set on coming)
-  //   ~secs.ms (EXP change to t)
-  //   @secs.ms (ABRUPT change AT t)
-  //   -secs.ms (LINEAR change to t)
-  //   +secs.ms (relaive, ADD time to t))
+  // scheduling (obs values are relative)
+  //   ~secs.ms (EXP change in t)
+  //   @secs.ms (ABRUPT change in t)
+  //   -secs.ms (LINEAR change in t)
+  //   +secs.ms (ADD adds t, store it)
   //   +   (no number, add same as last)
-  //   [~@-]0 resets (for use w other channel)
-  // scheduling for (only) notes (automatic!)
+  //   [~@-]0 set ABSOLUTE time to 0
+  // scheduling for notes
   //   /num (length of note, advance T w +/num)
   //   /1  (full note, +)
   //   /2  (half note, +/2
@@ -185,17 +185,38 @@ function sequencer(s) {
   //   /8 
   //   /16 
   //   /32 
-  //   /0.5 (double! :-o )
+  //   /0.5 (double note! :-o )
+  //  change beats per minute
+  //   /2=120 (120 beats/m for /2-note)
   //
-  // TODO: change times to MS!!!!
   //   +0.200 /1 A4 /4 A1 A1 - daaa ta ta
+  // 
+  //   (TODO: change times to MS!!!!)
   // octave
   //   ooct (0--8, set octave, default 4)
   // note
   //   nnote (1--12, C--H)
+  // rest
+  //   p (for pause, ADD silent time)
+  //   _ (traditional)
   // music
-  //   [HAGFEDC]#?oct (note)
-  //   C#4
+  //   _ (pause, _. = 150%, _.. = 175%)
+  //   [HAGFEDC]#?oct (a note)
+  //   A4
+  //   A   (A in default oct)
+  //   C#3
+  //   A4HF == A4H4F4 (sets ooct)
+  //   
+  //     optional additions (no space)
+  //     + increase octave (once)
+  //     - decrease octave (once)
+  //     optinal to lengthen note by:
+  //     . +50%         
+  //     .. + 50% + 25%
+  //     ... + 50% + 25% +1/8th
+  // macros!
+  //   [name] - play section (from name)
+  //   [:name sequence:] name sequence
   //
   // ' ' space/newline allowed between cmds
   //
@@ -207,15 +228,34 @@ function sequencer(s) {
   //
   // === NOT IMPLEMENTED - BELOW HERE ===
   //
+  //   TODO: lowercase (abc notation)
+  //     TODO: write converter
+  //        http://abcnotation.com/blog/2010/01/31/how-to-understand-abc-the-basics/
+  //     only inside a bar
+  //     low-high: N, N n n'
+  //               N' == n  n, == N !
+  // Tune then notes
+  //   A=420 (change scale to use A=420!)
+  //
+  // Notes
+  //   ^ slurs! (crescent line above notes)
+  //   A4^A5
+  //    = no pause!
+  //     - http://neilhawes.com/sstheory/theory35.htm
+  //   syncopiation (shortening of notes)
+  //   - http://neilhawes.com/sstheory/theory37.htm
+  //   doremesolfa!
+  //   - http://neilhawes.com/sstheory/theory39.htm
+  //   - https://en.m.wikipedia.org/wiki/Solf%C3%A8ge
+  //
+  // Bars
+  //   &3/4 A4C4 | C4D3 |: HAG :| C4D3 ||
+  //
   // Repeats: (NOT IMPLEMENTED)
   //   (...)*2 repeats 2 times, no nesting
   //   |: ... :| same
   //
-  // Macros
-  //   [name] - play section (before def)
-  //   [:name sequence:] - named section (neeed to be at end)
-  //
-  // Notes
+
   // - Length: http://neilhawes.com/sstheory/theory12.htm
   //
   // Beats
@@ -229,6 +269,7 @@ function sequencer(s) {
   // - https://blog.chrislowis.co.uk/2013/06/17/synthesis-web-audio-api-envelopes.html
   // look at
   // - https://en.m.wikipedia.org/wiki/ABC_notation
+  // - http://abcnotation.com/
   //
   // ... For the rest - read the SOURCE Luke!
   // ENDDOC
@@ -250,7 +291,13 @@ function sequencer(s) {
     s = s.replace(
       /^\s*([\.\d]+)\s*/,
       (_, _n)=>(n=+_n,''));
-    //alert(`NUM: ${n} ${typeof n} s=${s}`);
+    return n;
+  }
+  function digit() {
+    let n;
+    s = s.replace(
+      /^(\d)\s*/,
+      (_, _n)=>(n=+_n,''));
     return n;
   }
   // next() gives next char
@@ -258,13 +305,14 @@ function sequencer(s) {
   function next(optC) {
     let c = s[0];
     if (optC && optC !== c) return;
+    // if match => eat it up!
     s = s.substring(1).trim();
-    return c;
+    return c; // basically 'true'
   }
   // step the current note time forward
   // controlled by + and /
-  function step() {
-    T = (T || 0) + add/frac;
+  function step(optMul) {
+    T = (T || 0) + (optMul || 1) * add/frac;
   }
   
   // remove comments (unnamed macros!)
@@ -284,6 +332,28 @@ function sequencer(s) {
       sounds.named[name];
   }
   
+  function playnote(note) {
+    // read dots - as multiplier for time
+    let mult = 1, pot = 1/2;
+    while(next('.')) {
+      mult += pot;
+      pot /= 2;
+    }
+    
+    if (note === '_') { // rest = silent note
+      sounds.volume(channel, 0.001, T, '@');
+      step(mult);
+      // TODO: a way to turn on sound later?
+      // the next sound should do it
+      // 'v1 f440+_f0+_f440+_ v0'
+      sounds.volume(channel, vol, T, '@');
+    } else {
+      sounds.freq(
+	channel, NOTE2FREQ[note], T, sched);
+      step(mult);
+    }
+  }
+
   // init
   let sched = '@';
   let T = 0;
@@ -300,29 +370,32 @@ function sequencer(s) {
     let c = next();
 
     switch (c) {
+
       // skip
     case '\n':
     case ' ': break;
+
       // envelopes
     case 'e': env('sine'); break;
     case 'q': env('square'); break;
     case 't': env('triangle'); break;
     case 'w': env('saw'); break;
+
       // volume
     case 'm': sounds.mute(); break;
     case 'v': sounds.volume(
       channel, vol = +vfactor() * num(), T, sched); break;
+
       // frequency
     case 'f': sounds.freq(
       channel, freq = num(), T, sched); break;
+
       // schedule
     case '~':
     case '@':
     case '-': {
-      //alert(s);
       let t = num();
       T = (t === 0) ? 0 : T + t;
-      //alert(T);
       sched=c;
       break; }
     case '+': {
@@ -336,35 +409,36 @@ function sequencer(s) {
       let n = num()
       frac = n ? n : 1;
       break; }
+    case '=': {
+      let bpm = num();
+      add = 60 / frac / bpm;
+      break; }  
+
       // channel
     case (c.match(/\d/)          ?c:false):
       // TODO: create local ones!!!
       channel = +c; break;
-      // octave/note
+
+      // octave / note
     case 'o': oct = num(); break;
-    case 'n': {
-      let note = NOTES[num()] + oct;
-      sounds.freq(
-	channel, NOTE2FREQ[note], T, sched);
-      break; }
+    case 'n': 
+      playnote(NOTES[num()] + oct); break;
     case (c.match(/[HBAGFEDC]/)  ?c:false): {
       let note = c;
       if (next('#')) note += '#';
       // allow shorthand! C6HAGFED
-      oct = num() || oct; 
-      note += oct;
-      // play it Sam!
-      sounds.freq(
-	channel, NOTE2FREQ[note], T, sched);
-      step();
+      if (next('-') || nex(','))
+	note += (oct - 1);
+      else if (next('+') || next("'"))
+	note += (oct + 1);
+      else
+	note += (oct = digit() || oct);
+      playnote(note);
       break; }
-      // pause, silent note
-    case 'p': {
-      //step();
-      sounds.volume(channel, 0.00001, T, '@');
-      step();
-      sounds.volume(channel, vol, T, '@');
-      break; }
+
+      // rest, pause, silent note
+    case '_': playnote('_'); break;
+
       // named macro invocaton
     case '[': {
       let name;
@@ -397,7 +471,17 @@ sounds.named = {
   complicated: '1f440v1\n2f449v1\n3f441v1',
   wowo: '1f440v1\n2f441v1',
   ping_echo: '8f2616qv1~4v0 9f3v1~6v0',
+  paris_gris: `v1 o5 /2=240
+[hag]
+[hag]
+A_A_ _
+D+_C+_
+[hag]
 
+v0
+  
+[:hag H_A_G__ :]
+`,
   oric_ping: '1f2612qv1~4v0',
   oric_zap: '7v1 qf4000-0.2v1f51 v0',
   oric_key: '@0 v1 qf5500~0.23f19\n@0 v1      ~0.07v0',
@@ -412,16 +496,16 @@ sounds.named = {
   SwedishPhones: `
 v1 +0.3
 f425++++++++
-f425+pf425+pf425+pf425+pf425+pf425+p
+f425+_f425+_f425+_f425+_f425+_f425+_
 v0
 ++++
 
 v1
-f950+f1400+f1800+pp
-f950+f1400+f1800+pp
-f950+f1400+f1800+pp
-f950+f1400+f1800+pp
-f950+f1400+f1800+pp
+f950+f1400+f1800+__
+f950+f1400+f1800+__
+f950+f1400+f1800+__
+f950+f1400+f1800+__
+f950+f1400+f1800+__
 v0
 `,
   borst: 'v1 f425~0.6f20000 v1-1v0',

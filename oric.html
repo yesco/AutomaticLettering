@@ -390,9 +390,18 @@ INFO:<br><span id='info'></span>
       scoff = 0, // screen off if > 0 (count!)
       trace = false, // debug tracing CTRL-P
       tron = false, // TRON/TROFF
-      forceUpdate = false,
       row = 1,
       col = 2;
+
+  // --- slow down!
+  // TODO: set if too much screen updates?
+  // hack to make it slower
+  // an oric does about 3000stms/s
+  // for n==2 CHROMA is about 3s
+  // for n==13 PRINT1-1000 16 s
+  // TODO: instead, make MUSIC slower?
+  let forceUpdate = false,
+      forceUpdateLimit = 1024*1024;
 
   const ESC = 27;
 
@@ -412,7 +421,8 @@ INFO:<br><span id='info'></span>
     column = false
     trace = false;
     tron = false;
-    forceUpdate = false,
+    forceUpdate = false;
+    forceUpdateLimit = 1024*1024;
     
     row = 1;
     col = 2;
@@ -1308,12 +1318,16 @@ This command works exactly the same as a PRINT statement except that it is used 
       cont.intervalcount++;
       let start = Date.now();
       let millis;
+      let n = 0;
+      forceUpdate = false;
       do {
 	nextline();
 	if (line && trace) print(lineno + ' ' + line)
 	if (tron) princ('[ '+lineno+']');
 	if (!run(line)) stop();
 	millis = Date.now() - start;
+
+	forceUpdate = (n++ > forceUpdateLimit);
       } while (!forceUpdate && millis  < TIMESLICE);
       cont.millis += millis;
     }, 1);
@@ -1417,25 +1431,26 @@ This command works exactly the same as a PRINT statement except that it is used 
   // IF "A" THEN ?1 ELSE ?2 => 1
   // IF ("A") THEN ?1 ELSE ?2 => 1
   
+  let traceif = 0;
   function IF(e) {
-    print("IF.hello");
+    if (traceif) print("IF.hello");
     let line = this;
     while (line.match(/(IF|THEN|ELSE)/)) {
-      print('IF: ' + line);
+      if (traceif) print('IF: ' + line);
       line = line.trim();
 
       // we're (maybe) in the THEN
       // - skip the first statement after ELSE
       // continue with the rest!
       if (line.match(/^ELSE/)) {
-	print('ELSE: ' + line);
+	if (traceif) print('ELSE: ' + line);
 	// remove anything before ':'
 	//   (':' inside "string" ok)
 	line = line.replace(
 	  /^[^:"]*("[^"]*"[^:"]*)\s*/,
 	  '');
 
-	print('ELSE.replace: ' + line);
+	if (traceif) print('ELSE.replace: ' + line);
 
 	// if just a single statement no ':'
 	if (line.length && line[0] != ':')
@@ -1471,10 +1486,10 @@ This command works exactly the same as a PRINT statement except that it is used 
 	  return '';
 	});
 
-      print('------------');
-      print('IF.left: >' + line);
-      print('IF.exp: ' + exp);
-      print('IF.expr: ' + expr);
+      if (traceif) print('------------');
+      if (traceif) print('IF.left: >' + line);
+      if (traceif) print('IF.exp: ' + exp);
+      if (traceif) print('IF.expr: ' + expr);
 
       // did we get it?
       if (exp === undefined || expr === undefined)
@@ -1482,12 +1497,12 @@ This command works exactly the same as a PRINT statement except that it is used 
 
       // not true => ELSE
       if (!expr) {
-	print('IF.false ' + expr);
+	if (traceif) print('IF.false ' + expr);
 	// TOOD: this cheats: "foo ELSE ..."
 	let t = line.indexOf('THEN');
 	let e = line.indexOf('ELSE');
 
-	print('IF.false t=' + t + ' e=' + e);
+	if (traceif) print('IF.false t=' + t + ' e=' + e);
 
 	// no ELSE - we're done!
 	if (e < 0) return;
@@ -2282,6 +2297,22 @@ l REM ***PLAY***
 90 GET A$: GOT0 5
 `;
 
+  // on Xiaomi A4 note+ it plays 3s
+  // original oric about 6s
+  let example_CHROMANG = `
+10 REM CHROMATIC (WITHOUT FOR)
+20 LET I=0
+25 PLAY 1,0,0,0
+30 LET O=INT(I/12)
+35 IF O-6 THEN 40 ELSE GOTO 100
+40 LET N=INT(I-O*12)+1
+45 MUSIC 1,O,N,2
+50 PRINT O, N
+60 LET I=I+1
+70 GOTO 30
+100 PLAY 0,0,0,0
+  `;
+  
   let example_CHROMATIC = `
 l REM *** CHROMATIC SCALE *** 
 5 CLS 
