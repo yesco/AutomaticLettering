@@ -483,7 +483,7 @@ v0
 [:hag H_A_G__ :]
 `,
   oric_ping: '1f2612qv1~4v0',
-  oric_zap: '7v1 qf4000-0.2v1f51 v0',
+  oric_zap: '7v1 qf4000-0.2v1f360 v0',
   oric_key: '@0 v1 qf5500~0.23f19\n@0 v1      ~0.07v0',
   oric_okey: '@0 v1 qf5500~0.23f2\n@0 v1      ~0.07v0',
   bouncy_steel: '1f2613v1~6v0 1f2v1',
