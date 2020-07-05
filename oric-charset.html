@@ -66,32 +66,57 @@
 
   </s> 
 
-<div id='screen' style='font-weight:bold; font-size:24px; font-family:courier; width:100%; overflow:show; zoom:10; '>
-ABC:
-  <div class='row'>
-    <span class='char'><svg viewBox="0 0 6 8" xmlns="http://www.w3.org/2000/svg" height='20px'><use x="0" y='0' href='#char-65'/></svg></span>
-  </div>
+<div id='screen' style='font-size:28px; font-family:courier; width:100%; overflow:show;'>
 </div>
 
-<hr>
-<div style='font-weight:bold; font-size:24px; font-family:courier; overflow:show; background:pink; '><div class='row'>
-  A
-</div></div>
-
+xyz<div id='xxx' style='font-weight:bold; font-size:24px; font-family:courier; width:100%; overflow:show; zoom:10; '>
+ABC:
+  <div class='row'>
+    <span class='char'><svg viewBox="0 0 6 8" xmlns="http://www.w3.org/2000/svg" height='20px'><use x="0" y='0' href='#char-65'/></svg>
+    </span>
+  </div>
+</div>
+zyx
 
 <div id='A'>A</div>
 
 <style>
+@font-face {
+	font-family: 'oric-atmos';
+	src: url('oric-atmos.ttf'); 
+	src: 
+		local('oric-atmos'),
+		local('oric-atmos'),
+		url('oric-atmos.ttf') 
+		format('truetype');
+}
+span, div { font-family: 'oric-atmos', monospace; }
   .row {
       white-space: nowrap;
-      zoom: 1.6;
+      zoom: 1.4;
+      padding: 0;
+      margin:0;;
+      overflow: visible;
   }
   .char {
+      font-size: 40px;
       width: 6px
       max-width: 6px;
       height: 8px;
-      max-height: 8px;
+      max-height: 88px;
       overflow: visible;
+      padding: 0;
+      margin:0;;
+      background: green;
+  }
+  .oric {
+      position: relative;
+      top: -2.7px;
+      left: 2px;
+      max-height: 5px;
+      background: pink;
+      line-height: 5px;
+      overflow: hidden;
   }
 </style>
 
@@ -103,8 +128,11 @@ ABC:
 	for(let c=0; c<cols; c++) {
 	  let uid =
 	      r==0||c==0||r+c==0||r==27||c==39?
-	      '#shape3' : '#shape2';
-	  hr += `<span class='char' id='r${r}c${c}'><svg viewBox="0 0 6 8" xmlns="http://www.w3.org/2000/svg" height='20px'><use x="0" y='0' href='${uid}'/></svg></span>`;
+	      '#shape3' : '#char-32';
+	  if (uid == '#char-32')
+	    hr += `<span class='char' id='r${r}c${c}'></span>`;
+	  else 
+	    hr += `<span class='char' id='r${r}c${c}'><svg viewBox="0 0 6 8" xmlns="http://www.w3.org/2000/svg" height='20px'><use x="0" y='0' href='${uid}'/></svg></span>`;
 	}
 	h += `<div class='row'>${hr}</div>`;
       }
@@ -131,7 +159,7 @@ ABC:
         s3.id = s3.id==orig?'#shape':orig;
     }, 2000)
     
-    let n = 0;      
+      let n = 0, cc = 0;
     setInterval(()=>{
       if (0) {
 	let x = Math.floor(Math.random()*6);
@@ -141,21 +169,42 @@ ABC:
       } else if (1) {
 	let x = n % 10; x = (x<6)?x:11-x;
 	let y = n % 14; y = (y<8)?y:15-y;
+/*
 	s3.innerHTML = `
 <rect x='0' y='${y}' width='8' height='1' />
 <rect x='${x}' y='0' width='1' height='8' />
 `;
-	for (let i=0; i<0; i++) {
-	  let r = 4+Math.floor(Math.random()*20);
-	  let c = 4+Math.floor(Math.random()*32);
-	  let ch = 33+Math.floor(Math.random()*64);
+*/
+	for (let i=0; i<5; i++) {
+	  let r, c, ch;
+	  if (0) { 
+	    r = 4+Math.floor(Math.random()*20);
+	    c = 4+Math.floor(Math.random()*32);
+	    ch = 32+Math.floor(Math.random()*96);
+	  } else {
+	    r = Math.floor(cc / 40) % 28;
+	    c = cc % 40;
+	    ch = 32 + cc % 96;
+	    cc++;
+	  }
 	
-	  dom(`r${r}c${c}`).textContent = String.fromCharCode(ch);
+	  if (r%2 && Math.random()>0.5 && ch!==32 && ch<125) {
+	    dom(`r${r}c${c}`).innerHTML =
+	      `<span class='oric'>${String.fromCharCode(ch)}</span>`;
+	  } else if(0) {
+	    dom(`r${r}c${c}`).textContent = String.fromCharCode(ch);
+	  } else if (1)  {
+	    if (0 && ch==32)
+	      dom(`r${r}c${c}`).textContent = '';
+	    else
+	      dom(`r${r}c${c}`).innerHTML = `<svg viewBox="0 0 6 8" xmlns="http://www.w3.org/2000/svg" height='20px'><use x="0" y='0' href='#char-${ch}'/></svg>`;
+	  }  else if (1) {
+	    dom(`r${r}c${c}`).innerHTML = String.fromCharCode(ch);
+	  }
 	}
-	
-        n++;
+	n++;
       }
-      }, 1) 
+      }, 0) 
     } 
   </script>
 
@@ -213,9 +262,9 @@ if (0) {
   for(let i=0; i<ORIC_FONT.length; i++) {
     font.push(ORIC_FONT[i].toString(16).padStart(2,'0'));
   }
-  font = font.join('');
-  document.body.append('\n\n\n');
-  document.body.append(JSON.stringify(font));
+  //font = font.join('');
+  //document.body.append('\n\n\n');
+  //document.body.append(JSON.stringify(font));
 
   ORIC_FONT_HEX =
   `00000000000000000808080808000800141414000000000014143e143e141400081e281c0a3c08003032040810260600102828102a241a00080808000000000008102020201008000804020202040800082a1c081c2a08000008083e0808000000000000000808100000003e00000000000000000004000000020408102000001c22262a32221c000818080808081c001c22020408103e003e02040c02221c00040c14243e0404003e203c0202221c000c10203c22221c003e020408101010001c22221c22221c001c22221e0204180000000800000800000000080000080810040810201008040000003e003e00000010080402040810001c220408080008001c222a2e2c201e00081422223e2222003c22223c22223c001c22202020221c003c22222222223c003e20203c20203e003e20203c202020001e20202026221e002222223e222222001c08080808081c000202020202221c0022242830282422002020202020203e0022362a2a222222002222322a262222001c22222222221c003c22223c202020001c2222222a241a003c22223c282422001c22201c02221c003e080808080808002222222222221c0022222222221408002222222a2a362200222214081422220022221408080808003e02040810203e001e10101010101e0000201008040200003c04040404043c0008142a08080808000e1010103c103e000c122d29292d120c00001c021e221e0020203c2222223c0000001e2020201e0002021e2222221e0000001c223e201e000c12103c1010100000001c22221e021c20203c22222222000800180808081c0004000c040404241820202224382422001808080808081c000000362a2a2a220000003c222222220000001c2222221c0000003c22223c202000001e22221e020200002e302020200000001e201c023c0010103c1010120c000000222222261a000000222222140800000022222a2a3600000022140814220000002222221e021c00003e0408103e000e18183018180e000808080808080808380c0c060c0c38002a152a152a152a153f3f3f3f3f3f3f3f`;
@@ -223,7 +272,7 @@ if (0) {
   ORIC_FONT = new Uint8Array(ORIC_FONT_HEX.length/2);
   
   function ORIC_init_font() {
-    for(let i=0; i<ORIC_FONT.length/2; i++) {
+    for(let i=0; i<ORIC_FONT.length; i++) {
       ORIC_FONT[i] = parseInt(ORIC_FONT_HEX.substr(i*2, 2), 16);
     }
   }
@@ -257,22 +306,35 @@ if (0) {
     for(let i=0; i<8; i++) {
       h += bits2svg(ORIC_FONT[a+i], i);
     }
-    return `<symbol id='char-${c}'>${svg(h)}</symbol>`;
+    return `<symbol id='char-${c}'>${h}</symbol>`;
   }
 
   function svg(h) {
     return `<svg id='bar' viewBox="0 0 6 8" xmlns="http://www.w3.org/2000/svg">${h}</svg>`;
   }
   
+  function ORIC_font_peek(o) {
+    return ORIC_FONT[o];
+  }
+  function ORIC_font_poke(o, v) {
+    ORIC_FONT[o] = v;
+    // and do an update of the svg symbol!
+    let c = Math.floor(o / 8);
+    dom(`char-${c}`).innerHTML = char2svg(c);
+    // magically this updates on the screen!
+  }
+  
   try{
 
   {
     let A = dom('A');
+    let h = [];
     for(let c=32; c<128; c++) {
-      A.insertAdjacentHTML(
-	'beforeEnd',
-	`<span class='char' >${char2svg(c)}</span>`);
+      h.push(char2svg(c));
     }
+    A.insertAdjacentHTML(
+      'beforeEnd',
+      svg(h.join('')));
   }
 
   }catch(e){alert('char2svg: ' + e);}
