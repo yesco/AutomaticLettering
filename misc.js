@@ -22,36 +22,41 @@ function quoteHTML(h) {
 }
 
 function flattenstrings(o, optDelim) {
+  let self = o;
   try {
     return xflattenstrings(o, optDelim);
   } catch(e) {
     alert(e);
   }
-}
 
-function xflattenstrings(o, optDelim, seen, deep) {
-  optDelim = optDelim || '';
-  deep == deep || 0;
-  if (!seen) seen = new WeakSet();
+  function xflattenstrings(o, optDelim, seen, deep) {
+    optDelim = optDelim || ' ';
+    deep == deep || 0;
+    if (!seen) {
+      seen = new WeakSet();
+    } else {
+      //if (o === self) return '#TOP#';
+    }
 
-  if (o === window) return '#WINDOW#';
-  if (o === document) return '#DOCUMENT#';
-  if (o === document.body) return '#BODY#';
-  if (typeof(o) !== 'object') return '' + o;
-  if (o === null || o === undefined) return '';
+    if (o === window) return '#WINDOW#';
+    if (o === document) return '#DOCUMENT#';
+    if (o === document.body) return '#BODY#';
+    if (typeof(o) !== 'object') return '' + o;
+    if (o === null || o === undefined) return '';
 
-  // TODO: clearer refs?
-  if (seen.has(o)) return '#CIRCULAR#';
-  seen.add(o);
+    // TODO: clearer refs?
+    if (seen.has(o)) return '#CIRCULAR#';
+    seen.add(o);
 
-  if (Array.isArray(o)) {
-    let l = o.map(
-      x=>xflattenstrings(x, optDelim, seen, deep+1));
-    return l.join(optDelim);
+    if (Array.isArray(o)) {
+      let l = o.map(
+	x=>xflattenstrings(x, optDelim, seen, deep+1));
+      return l.join(optDelim);
+    }
+    return Object.keys(o).map(
+      k=>`<b>${k}</b>:${xflattenstrings(o[k], optDelim, seen, deep+1)}<br/>`
+    ).join(optDelim);
   }
-  return Object.keys(o).map(
-    k=>`<b>${k}</b>:${xflattenstrings(o[k], optDelim, seen, deep+1)}<br/>`
-  ).join(optDelim);
 }
 
 // TODO: need to handle circular refs
@@ -599,3 +604,4 @@ function from(what, ...args) {
 // repeat(10).then()
 // each(collection/iterator/generator).then()
 // on(dom, 'click').then()
+t

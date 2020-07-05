@@ -208,14 +208,17 @@ span, div { font-family: 'oric-atmos', monospace; }
 /*span elements inside the container div*/
 
   span {
+      //position: absolute;
       display: inline-block;
       /*height: 1px; /* haha you can try! */
   }
   
   .char {
+      position: relative;
       width: 0.30rem;
       border: 0px;
       padding-right: 0.25rem;
+      max-height: 12px;
   }
 
   /* TODO: investigate!
@@ -262,9 +265,13 @@ span, div { font-family: 'oric-atmos', monospace; }
   <img width='20%' src='oric-logo-black-export.svg'/>
   <div style='float:right; top:0; width:80%; text-align:center; font-decoration:bold; text-justify:inter-word; font-size:3rem;'>W E B - B A S I C
 <sup><a tabindex='-1' target='oricman' style='text-decoration:none; font-size:1.5rem; padding:0.3rem; padding-bottom:0.1rem; color:black; background:white;' href='http://www.defence-force.org/computing/oric/library/lib_manual_oric/files/manual_atmos.pdf'>PDF</a></sup>
-<div style='font-size:1rem;'>&copy;jsk@yesco.org</div>
+<div style='font-size:1rem;'>&copy;jsk@yesco.or
+g</div>
   </div>
 <span style='transform-origin:left; transform:scale(1.8, 1);'><b>&nbsp;&nbsp;B A S I C</b></span>
+</div>
+
+<div id='bits'>
 </div>
 
 <!-- seemingly useless span, but need for getting correct width of 'screen'-->
@@ -610,9 +617,14 @@ So far the subject of writing
   //   ch > 31   ASCII
   //   ch >127   ASCII inverted!
   //   ch > 255  Unicode ...
-  function screen(row, col, ch) {
+  function screen(row, col, ch, html) {
     let dc = domc(`cr${row}c${col}`);
-    // read screen?
+
+    // TODO: speedup for read/scroll
+    // screen.arr[row, col]
+    // other idea: redraw from scratch!
+    
+    // --- READ screen?
     if (ch === undefined) {
       screen.readcount++;
       if (typeof dc.screenchar == 'number')
@@ -623,11 +635,20 @@ So far the subject of writing
     screen.writecount++;
     dc.screenchar = ch;
 
-    // write
+    // hack for testing!
+    if (html) {
+      dc.innerHTML = html;
+      dc.screenchar = ch;
+      return
+    }
+    
+
+    // no write?
     if (scoff) return scoff++;
     
+    // --- WRITE!
+    
     let da = domc(`ar${row}c${col}`);
-
     let t;
 
     // interpret char/attribute
@@ -692,12 +713,14 @@ So far the subject of writing
   screen.writecount = 0;
 
   function INK(color) {
+    INK.color = color;
     // skip status line
     for(let row=1; row<SCREEN_ROWS; row++) {
       screen(row, 1, color);
     }
   }
   function PAPER(color) {
+    PAPER.color = color;
     // skip status line
     for(let row=1; row<SCREEN_ROWS; row++) {
       screen(row, 0, 16+color);
@@ -2575,6 +2598,88 @@ l80 REM*** WAUES ***
   CLS();
 
   run('boot');
+
+/*
+var svgns = "http://www.w3.org/2000/svg";
+for (var x = 0; x < 5000; x += 50) {
+    for (var y = 0; y < 3000; y += 50) {
+        var rect = document.createElementNS(svgns, 'rect');
+        rect.setAttributeNS(null, 'x', x);
+        rect.setAttributeNS(null, 'y', y);
+        rect.setAttributeNS(null, 'height', '50');
+        rect.setAttributeNS(null, 'width', '50');
+        rect.setAttributeNS(null, 'fill', '#'+Math.round(0xffffff * Math.random()).toString(16));
+        document.getElementById('svgOne').appendChild(rect);
+    }
+}
+
+  */
+  screen(
+    1,5,'A', charA=`
+<div style='top:1.55px; position:absolute; max-width:10px; max-height:142px; overflow:visible; zoom:1;'>
+<svg viewBox="0 0 6 8" xmlns="http://www.w3.org/2000/svg" style='background:white'
+xmax-width:10px; xmax-height:10px;'
+width='10px' height='12px'>
+  <use xlink:href='#A'>
+</svg>
+<div>
+`);
+  screen(1,2,'A', charA);
+  screen(2,2,'A', charA); screen(2,3,'A', charA)
+  screen(3,2,'A', charA);
+  
+  // js: create rect
+  // - https://stackoverflow.com/questions/32985564/how-to-style-manipulate-contents-of-svg-use-element
+  
+  dom('bits', svgchar=`
+<svg viewBox="0 0 6 8" xmlns="http://www.w3.org/2000/svg" style='background:white' width='20px' height='30px'>>
+
+  <symbol id="101010">
+    <rect x="0" width="1" height="1" />
+    <!rect x="1" width="1" height="1" />
+    <rect x="2" width="1" height="1" />
+    <!rect x="3" width="1" height="1" />
+    <rect x="4" width="1" height="1" />
+    <!rect x="5" width="1" height="1" />
+  </symbol>
+  <symbol id="100001">
+    <rect x="0" width="1" height="1" />
+    <!rect x="1" width="1" height="1" />
+    <!rect x="2" width="1" height="1" />
+    <!rect x="3" width="1" height="1" />
+    <!rect x="4" width="1" height="1" />
+    <rect x="5" width="1" height="1" />
+  </symbol>
+
+  <symbol id='A'>
+    <rect y="0" x="0" width="1" height="1" />
+    <rect y="1" x="1" width="1" height="1" />
+    <rect y="2" x="2" width="1" height="1" />
+    <rect y="3" x="3" width="1" height="1" />
+    <rect y="4" x="4" width="1" height="1" />
+    <rect y="5" x="5" width="1" height="1" />
+    <rect y="6" x="3" width="1" height="1" />
+    <rect y="7" x="1" width="1" height="1" />
+  </symbol>
+
+  <symbol id='B'>
+  <use xlink:href="#101010" x="0" y="0" />
+  <use xlink:href="#101010" x="1" y="1" />
+  <use xlink:href="#101010" x="0" y="2" />
+  <use xlink:href="#101010" x="0" y="3" />
+  <use xlink:href="#101010" x="1" y="4" />
+  <use xlink:href="#101010" x="0" y="5" />
+  <use xlink:href="#100001" x="0" y="6" />
+  <use xlink:href="#101010" x="1" y="7" />
+  </symbol>
+ 
+  <use id='fishfish' xlink:href='#A' x="0" y="0" />
+</svg>
+</div>
+`, 'h');
+`<div style='position:absolute;max-heigth:1.2em; max-width:1em; z-index:1; background:pink; font-size:330px;'>
+<div>
+`;
 
   if (0)  window.onerror = function(message, url, line, col, errorObj) {
     dom('error', `WINDOW.ERROR:
