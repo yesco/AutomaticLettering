@@ -1,0 +1,307 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN">
+<!-- from https://iss.sandacite.com/tools/oric-font-viewer.html# -->
+
+<html lang="en">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+<title>Oric Fonter</title>
+
+<style>
+html,body,h1,h2,h3,h4,h5,h6,table,div,p {
+  font-family: "Tahoma", sans-serif;
+  color: #000;
+}
+body {
+  background-color: #dcdcdc;
+}
+#myCanvas {
+/*   background-color: #c0c0c0; */
+  border: 2px solid #000;
+  padding: 0px;
+}
+#myDropZone {
+  border: 2px dashed #bbb;
+  -moz-border-radius: 5px;
+  -webkit-border-radius: 5px;
+  border-radius: 5px;
+  padding: 25px;
+  text-align: center;
+}
+#myDropZoneTite {
+  padding: 12px;
+  text-align: center;
+  font-size: 24px;
+  font-weight: bold;
+  color: #bbb;
+}
+#myListDiv {
+  text-align: left;
+}
+#myList {
+  font-size: 16px;
+  color: #000;
+}
+</style>
+
+<script type="text/javascript">
+var gDefaultFonts = [
+[0,0,0,0,0,0,0,0,8,8,8,8,8,0,8,0,20,20,20,0,0,0,0,0,20,20,62,20,62,20,20,0,
+8,30,40,28,10,60,8,0,48,50,4,8,16,38,6,0,16,40,40,16,42,36,26,0,8,8,8,0,0,0,0,0,
+8,16,32,32,32,16,8,0,8,4,2,2,2,4,8,0,8,42,28,8,28,42,8,0,0,8,8,62,8,8,0,0,
+0,0,0,0,0,8,8,16,0,0,0,62,0,0,0,0,0,0,0,0,0,4,0,0,0,2,4,8,16,32,0,0,
+28,34,38,42,50,34,28,0,8,24,8,8,8,8,28,0,28,34,2,4,8,16,62,0,62,2,4,12,2,34,28,0,
+4,12,20,36,62,4,4,0,62,32,60,2,2,34,28,0,12,16,32,60,34,34,28,0,62,2,4,8,16,16,16,0,
+28,34,34,28,34,34,28,0,28,34,34,30,2,4,24,0,0,0,8,0,0,8,0,0,0,0,8,0,0,8,8,16,
+4,8,16,32,16,8,4,0,0,0,62,0,62,0,0,0,16,8,4,2,4,8,16,0,28,34,4,8,8,0,8,0,
+28,34,42,46,44,32,30,0,8,20,34,34,62,34,34,0,60,34,34,60,34,34,60,0,28,34,32,32,32,34,28,0,
+60,34,34,34,34,34,60,0,62,32,32,60,32,32,62,0,62,32,32,60,32,32,32,0,30,32,32,32,38,34,30,0,
+34,34,34,62,34,34,34,0,28,8,8,8,8,8,28,0,2,2,2,2,2,34,28,0,34,36,40,48,40,36,34,0,
+32,32,32,32,32,32,62,0,34,54,42,42,34,34,34,0,34,34,50,42,38,34,34,0,28,34,34,34,34,34,28,0,
+60,34,34,60,32,32,32,0,28,34,34,34,42,36,26,0,60,34,34,60,40,36,34,0,28,34,32,28,2,34,28,0,
+62,8,8,8,8,8,8,0,34,34,34,34,34,34,28,0,34,34,34,34,34,20,8,0,34,34,34,42,42,54,34,0,
+34,34,20,8,20,34,34,0,34,34,20,8,8,8,8,0,62,2,4,8,16,32,62,0,30,16,16,16,16,16,30,0,
+0,32,16,8,4,2,0,0,60,4,4,4,4,4,60,0,8,20,42,8,8,8,8,0,14,16,16,16,60,16,62,0,
+12,18,45,41,41,45,18,12,0,0,28,2,30,34,30,0,32,32,60,34,34,34,60,0,0,0,30,32,32,32,30,0,
+2,2,30,34,34,34,30,0,0,0,28,34,62,32,30,0,12,18,16,60,16,16,16,0,0,0,28,34,34,30,2,28,
+32,32,60,34,34,34,34,0,8,0,24,8,8,8,28,0,4,0,12,4,4,4,36,24,32,32,34,36,56,36,34,0,
+24,8,8,8,8,8,28,0,0,0,54,42,42,42,34,0,0,0,60,34,34,34,34,0,0,0,28,34,34,34,28,0,
+0,0,60,34,34,60,32,32,0,0,30,34,34,30,2,2,0,0,46,48,32,32,32,0,0,0,30,32,28,2,60,0,
+16,16,60,16,16,18,12,0,0,0,34,34,34,38,26,0,0,0,34,34,34,20,8,0,0,0,34,34,42,42,54,0,
+0,0,34,20,8,20,34,0,0,0,34,34,34,30,2,28,0,0,62,4,8,16,62,0,14,24,24,48,24,24,14,0,
+8,8,8,8,8,8,8,8,56,12,12,6,12,12,56,0,42,21,42,21,42,21,42,21,63,63,63,63,63,63,63,63],
+[0,0,0,0,0,0,0,0,8,8,8,8,8,0,8,0,20,20,20,0,0,0,0,0,20,20,62,20,62,20,20,0,
+8,30,40,28,10,60,8,0,48,50,4,8,16,38,6,0,16,40,40,16,42,36,26,0,8,8,8,0,0,0,0,0,
+8,16,32,32,32,16,8,0,8,4,2,2,2,4,8,0,8,42,28,8,28,42,8,0,0,8,8,62,8,8,0,0,
+0,0,0,0,0,8,8,16,0,0,0,62,0,0,0,0,0,0,0,0,0,4,0,0,0,2,4,8,16,32,0,0,
+28,34,38,42,50,34,28,0,8,24,8,8,8,8,28,0,28,34,2,4,8,16,62,0,62,2,4,12,2,34,28,0,
+4,12,20,36,62,4,4,0,62,32,60,2,2,34,28,0,12,16,32,60,34,34,28,0,62,2,4,8,16,16,16,0,
+28,34,34,28,34,34,28,0,28,34,34,30,2,4,24,0,0,0,8,0,0,8,0,0,0,0,8,0,0,8,8,16,
+4,8,16,32,16,8,4,0,0,0,62,0,62,0,0,0,16,8,4,2,4,8,16,0,28,34,4,8,8,0,8,0,
+28,34,42,46,44,32,30,0,8,20,34,34,62,34,34,0,60,34,34,60,34,34,60,0,28,34,32,32,32,34,28,0,
+60,34,34,34,34,34,60,0,62,32,32,60,32,32,62,0,62,32,32,60,32,32,32,0,30,32,32,32,38,34,30,0,
+34,34,34,62,34,34,34,0,28,8,8,8,8,8,28,0,2,2,2,2,2,34,28,0,34,36,40,48,40,36,34,0,
+32,32,32,32,32,32,62,0,34,54,42,42,34,34,34,0,34,34,50,42,38,34,34,0,28,34,34,34,34,34,28,0,
+60,34,34,60,32,32,32,0,28,34,34,34,42,36,26,0,60,34,34,60,40,36,34,0,28,34,32,28,2,34,28,0,
+62,8,8,8,8,8,8,0,34,34,34,34,34,34,28,0,34,34,34,34,34,20,8,0,34,34,34,42,42,54,34,0,
+34,34,20,8,20,34,34,0,34,34,20,8,8,8,8,0,62,2,4,8,16,32,62,0,30,16,16,16,16,16,30,0,
+0,32,16,8,4,2,0,0,60,4,4,4,4,4,60,0,8,20,42,8,8,8,8,0,42,40,20,42,20,10,42,0,
+36,42,42,58,42,42,36,0,8,20,34,34,62,34,34,0,60,32,32,60,34,34,60,0,36,36,36,36,36,36,62,2,
+12,20,20,20,20,20,62,34,62,32,32,60,32,32,62,0,8,28,42,42,42,28,8,0,62,32,32,32,32,32,32,0,
+34,34,20,8,20,34,34,0,34,34,38,42,50,34,34,0,42,34,38,42,50,34,34,0,34,36,40,48,40,36,34,0,
+14,18,18,18,18,18,34,0,34,54,42,42,34,34,34,0,34,34,34,62,34,34,34,0,28,34,34,34,34,34,28,0,
+62,34,34,34,34,34,34,0,30,34,34,30,10,18,34,0,60,34,34,60,32,32,32,0,28,34,32,32,32,34,28,0,
+62,8,8,8,8,8,8,0,34,34,34,30,2,2,60,0,42,42,42,28,42,42,42,0,60,34,34,60,34,34,60,0,
+32,32,32,60,34,34,60,0,48,16,16,28,18,18,28,0,60,2,2,28,2,2,60,0,42,42,42,42,42,42,62,0,
+28,34,2,14,2,34,28,0,42,42,42,42,42,42,62,2,34,34,34,30,2,2,2,0,1,1,1,1,1,1,1,1]];
+
+var gFiles, gFont;
+var cols = 16, rows = 6;
+var charWidth = 6, charHeight = 8;
+var dotWidth = 8, dotHeight = 8;
+
+function unpack(str) {
+  var bytes = [];
+  for(var i = 0; i < str.length; i++) {
+    var char = str.charCodeAt(i);
+    bytes.push(char & 0xFF);
+  }
+  return bytes;
+};
+
+function pack(bytes) {
+  var str = "";
+  for(var i = 0; i < bytes.length; i++) {
+    str += String.fromCharCode(bytes[i]);
+  }
+  return str;
+}
+
+function canvasWidth(){
+  return dotWidth*charWidth*cols+cols-1;
+};
+
+function canvasHeight(){
+  return dotHeight*charHeight*rows+rows-1;
+};
+
+function grid(){
+  var canvas = document.getElementById('myCanvas');
+  canvas.width = canvasWidth();
+  canvas.height = canvasHeight();
+  var ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.save();
+  ctx.translate(0.0, 0.0);
+  ctx.scale(1.0, 1.0);
+  ctx.lineWidth = 1.0;
+  ctx.strokeStyle = "#ffffff";
+  for(var x=1;x<cols;x++) {
+    ctx.moveTo(x*(charWidth*dotWidth+1),0);
+    ctx.lineTo(x*(charWidth*dotWidth+1),canvas.height-1);
+    ctx.stroke();
+  }
+  for(var y=1;y<rows;y++){
+    ctx.moveTo(0,y*(charHeight*dotHeight+1));
+    ctx.lineTo(canvas.width-1,y*(charHeight*dotHeight+1));
+    ctx.stroke();
+  }
+  ctx.restore();
+};
+
+function drawChar(i, chr) {
+  if(96<=i) return;
+  var irem = function(a,b){return(a%b);};
+  var idiv = function(a,b){return((a-irem(a,b))/b);};
+  var canvas = document.getElementById('myCanvas');
+  var ctx = canvas.getContext('2d');
+  ctx.fillStyle = "#000000";
+  var x = irem(i,cols); x = x*charWidth*dotWidth+x;
+  var y = idiv(i,cols); y = y*charHeight*dotHeight+y;
+  for(var i=0; i<charHeight && i<chr.length; i++){
+    var b = chr[i];
+    for(var j=0,mask=0x20; j<charWidth; j++,mask>>=1){
+      if(b&mask) ctx.fillRect(x+j*dotWidth, y+i*dotHeight, dotWidth, dotHeight);
+    }
+  }
+};
+
+function drawFont(f) {
+  grid();
+  //console.log(f);
+  gFont = [];
+  // jsk
+  var start = Date.now();
+  for(var i=0; f && i<f.length/charHeight; i++)
+  {
+    var chr = [];
+    for(var j=0; j<charHeight; j++){
+      gFont.push(f[i*charHeight+j]);
+      chr.push(f[i*charHeight+j]);
+    }
+    drawChar(i,chr);
+  }
+  // jsk
+  alert('Time drawFont.ms: ' + (Date.now()-start));
+}
+
+function parseTap(arr,offs){
+  var tap;
+  offs = offs || 0;
+  if(arr && (offs+1+1+9+1) < arr.length){
+    if(arr[offs]==0x16) return parseTap(arr,offs+1);
+    if(arr[offs]==0x24){
+      offs++;
+      var e = arr[offs+4]*256+arr[offs+5];
+      var b = arr[offs+6]*256+arr[offs+7];
+      var size = e-b;
+      var tapName = [];
+      offs += 9; while(offs<arr.length && arr[offs]!=0x00) tapName.push(arr[offs++]);
+      offs++;
+      tap = { b:b, e:e, size:size, name:pack(tapName), bytes:[] };
+      for(var n=0; offs<arr.length && n<tap.size; n++, offs++) tap.bytes.push(arr[offs]);
+      tap.size = tap.bytes.length;
+    }
+  }
+  return tap;
+};
+
+function parseFontArray(arr) {
+  var font, i, c;
+  grid();
+  switch(arr.length){
+    case 768:
+      font = arr;
+      break;
+    case 1024:
+      font = []; for(i=256; i<1024; i++) font.push(arr[i]);
+      break;
+    default:
+      var tap = parseTap(arr);
+      if(tap){
+        console.log(tap.name || 'NONAME');
+        switch(tap.size){
+          case 768: case 1024:
+            parseFontArray(tap.bytes);
+            break;
+          default:
+            if(tap.b==0xb400||tap.b==0xb800||tap.b==0x9800||tap.b==0x9c00){
+              for(var i=256, font=[]; i<tap.size; i++) font.push(tap.bytes[i]);
+            }
+            else if(tap.b==0xb500||tap.b==0xb900||tap.b==0x9900||tap.b==0x9d00){
+              for(var i=0, font=[]; i<tap.size; i++) font.push(tap.bytes[i]);
+            }
+            break;
+        }
+      }
+      break;
+  }
+  if(font) drawFont(font);
+};
+
+function parseFontFile(f) {
+  parseFontArray(unpack(f));
+}
+
+function loadFontFile(i) {
+  var fileReader = new FileReader();
+  fileReader.onloadend = function(evt) {
+    if (evt.target.readyState == FileReader.DONE)
+      parseFontFile(evt.target.result);
+  };
+  fileReader.readAsBinaryString(gFiles[i]);
+};
+
+function initElements(){
+  grid();
+  function handleFileSelect(evt) {
+    evt.stopPropagation();
+    evt.preventDefault();
+    grid();
+    var checkValid = function (f) {return f && 14 < f.size && f.size < 2048;};
+    var files = gFiles = evt.dataTransfer.files;
+    var output = [];
+    for (var i = 0, f; f = files[i]; i++) {
+      if(checkValid(f)) {
+        output.push('<li><strong><a href="#" onclick="loadFontFile(',i,');">', escape(f.name), '</a>',
+                    '</strong> - ', f.size, ' bytes</li>');
+      }
+    }
+    document.getElementById('myList').innerHTML = '<ul>' + output.join('') + '</ul>';
+  }
+  function handleDragOver(evt) {
+    evt.stopPropagation();
+    evt.preventDefault();
+    evt.dataTransfer.dropEffect = 'copy';
+  }
+  var dropZone = document.getElementById('myDropZone');
+  dropZone.addEventListener('dragover', handleDragOver, false);
+  dropZone.addEventListener('drop', handleFileSelect, false);
+  dropZone.addEventListener('click', function(evt){}, false);
+
+  var output = [];
+  output.push('<li><strong><a href="#" onclick="drawFont(gDefaultFonts[0]);">normal-Oric</a></strong></li>');
+  output.push('<li><strong><a href="#" onclick="drawFont(gDefaultFonts[1]);">normal-8D</a></strong></li>');
+  document.getElementById('myList').innerHTML = '<ul>' + output.join('') + '</ul>';
+
+  document.onmousedown =
+  document.ondblclick = function(evt){
+    // console.log(evt);
+    evt.stopPropagation();
+    evt.preventDefault();
+    return false;
+  };
+};
+</script>
+</head>
+
+<body>
+<h2>Oric Fonter</h2>
+<div id="myDropZone">
+  <div id="myDivCanvas"><canvas id="myCanvas"></canvas></div>
+  <p id="myDropZoneTite">Drop font file(s) here</p>
+  <div id="myListDiv"><pre><output id="myList"></output></pre></div>
+</div>
+<script>initElements()</script>
+<h6 align="right">copyright &copy; 2020, raxiss</h6>
+</body>
+</html>
