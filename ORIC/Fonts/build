@@ -1,0 +1,2 @@
+gcc u8.c bdf.c bdf2ttf.c -o bdf2ttf
+gcc bdf.c bdfedit.c u8.c oio.c unidat.c -o bdfedit

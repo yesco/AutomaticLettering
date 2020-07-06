@@ -7,13 +7,10 @@
 #include "time.h"
 #include "ctype.h"
 #include "byteswap.h"
-//#include "u8.h"
-//#include "bdf.h"
+#include "u8.h"
+#include "bdf.h"
 #include "oio.h"
 
-// jsk: there was no makefile or compile command, just do this!
-#include "bdf.c"
-#include "u8.c"
 
 #define ei else if
 int xdgval(int c){
@@ -101,7 +98,7 @@ void makepathmap(struct bdfglyph*g);
 //temporary storage;
 char line[300];
 char pathmap[17*19];
-struct point {char x,y,start;} pathlist[17*19*2];
+struct point {signed char x,y,start;} pathlist[17*19*2];
 int pathend;
 
 int bdfpthchk(struct bdfglyph g,int x,int y);

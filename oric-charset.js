@@ -87,5 +87,48 @@ function ORIC_append_symbols() {
 function ORIC_use_char(c) {
   if (typeof c === 'string')
     c = c.charCodeAt(0);
+
   return `<svg viewBox="0 0 6 8" xmlns="http://www.w3.org/2000/svg" height='20px'><use x="0" y='0' href='#char-${c}'/></svg>`;
+}
+
+function ORIC_char_BDF(c) {
+  if (typeof c === 'string')
+    c = c.charCodeAt(0);
+    
+  let hex = ORIC_FONT_HEX.substr( (c-32)*2*8, 2*8).toUpperCase();
+  // TODO: STARTCHAR importace?
+  return (
+`STARTCHAR A
+ENCODING ${c}
+SWIDTH 562 0
+DWIDTH 9 0
+BBX 8 8 0 0
+BITMAP
+${hex.match(/(..)/g, '$1').join('\n')}
+ENDCHAR`);
+}
+
+function ORIC_generate_BDF() {
+  let start = 32, afterlast = 128
+  let chars = afterlast - start;
+  console.log(
+`STARTFONT 2.1
+FONT neoletters
+SIZE 8 75 75
+FONTBOUNDINGBOX 18 16 0 -4
+STARTPROPERTIES 3
+PIXEL_SIZE 16
+FONT_ASCENT 8
+FONT_DESCENT 4
+ENDPROPERTIES
+CHARS ${chars}`);
+  for(let c=start; c<afterlast; c++) {
+    let bdf = ORIC_char_BDF(c);
+    console.log(bdf);
+  }
+}
+
+// from nodejs: generate
+if (typeof require !== 'undefined') {
+    ORIC_generate_BDF();
 }
