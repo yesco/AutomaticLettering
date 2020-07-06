@@ -93,18 +93,19 @@ function ORIC_use_char(c) {
 
 let rand = 0; //Math.floor(Math.random()*16);
 
-function ORIC_char_BDF(c) {
+function ORIC_char_BDF(c, optHex, w=6, h=8) {
   if (typeof c === 'string')
     c = c.charCodeAt(0);
     
-  let hex = ORIC_FONT_HEX.substr( (c-32)*2*8, 2*8).toUpperCase();
+  let hex = optHex ||
+      ORIC_FONT_HEX.substr( (c-32)*2*8, 2*8).toUpperCase();
   // TODO: STARTCHAR importace?
   return (
-`STARTCHAR A
+`STARTCHAR
 ENCODING ${c+rand}
 SWIDTH 200 0
 DWIDTH 8 0
-BBX 6 8 0 0
+BBX ${w} ${h} 0 0
 BITMAP
 ${hex.match(/(..)/g, '$1').join('\n')}
 ENDCHAR`);
@@ -112,7 +113,33 @@ ENDCHAR`);
 
 function ORIC_generate_BDF() {
   let start = 32, afterlast = 128
-  let chars = afterlast - start;
+
+  let out = [];
+  // dump the ORIC FONT
+  for(let c=start; c<afterlast; c++) {
+    out.push(ORIC_char_BDF(c));
+  }
+
+  out.push(
+    ORIC_char_BDF(128, '0000000000000000', 6, 8));
+  out.push(
+    ORIC_char_BDF(128 + 32, '0000000000000000', 6, 8));
+  // TODO: ALT-font... 32-127?
+  // (actually easier to use another ttf!)
+
+  // generate 6x1 pixel cells!
+  let poffset = 128+64; // TODO: check unicode?
+  for(let m=0; m<64; m++) {
+    out.push(
+      ORIC_char_BDF(
+	poffset + m,
+	m.toString(16).padStart(2, '0').toUpperCase().repeat(1),
+	6, 1));
+  }
+
+  // TODO: add good hexmaps that people
+  // often redefine? | + corners etc
+
   console.log(
 `STARTFONT 2.1
 FONT neoletters
@@ -124,12 +151,22 @@ PIXEL_SIZE 16
 FONT_ASCENT 8
 FONT_DESCENT 4
 ENDPROPERTIES
-CHARS ${chars}`);
-  for(let c=start; c<afterlast; c++) {
-    let bdf = ORIC_char_BDF(c);
-    console.log(bdf);
-  }
+CHARS ${out.length}`);
+
+  out.forEach(bdf=>console.log(bdf));
+
   console.log(`ENDFONT`);;
+}
+
+// https://stackoverflow.com/questions/9005580/how-to-check-if-the-font-has-a-symbol
+// This function could be used to see
+// if there is a predef font (by name?)
+// as a defined hexcode? At least:
+// we should know!
+//
+// => charcode or undefined
+function ORIC_font_has(hex) {
+  throw 'Not implemented yet!';
 }
 
 // from nodejs: generate

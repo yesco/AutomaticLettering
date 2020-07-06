@@ -97,7 +97,7 @@ zyx
 
 span, div { font-family: 'ORIC-ATMOS', monospace; }
 
-.line {
+.text, .hires {
     //position: relative;
     //top: 4px;
     font-size: 1em;
@@ -106,6 +106,14 @@ span, div { font-family: 'ORIC-ATMOS', monospace; }
     line-height:9.1px;
     margin: 0;
     padding: 0;
+}
+
+.hires {
+    /* pixel cell... */
+    //height:1px;
+    //max-height:3px;
+    line-height: 1px;
+    //overflow:hidden;
 }
 
 .xxrow {
@@ -155,7 +163,21 @@ span, div { font-family: 'ORIC-ATMOS', monospace; }
 </style>
 
   <script>
-    function TEXT(rows, cols) {
+    LINES = 28; hires = 0;
+    function TEXT(rows=28, cols=40) {
+      LINES = rows;
+      initscreen(rows, cols, 'text');
+      hires = 0;
+    }
+    function HIRES(rows=200, cols=40) {
+      LINES = rows;
+      initscreen(rows, cols, 'hires');
+      hires = 1;
+      // TODO: how to do the 3 text rows?
+      // rows + 3 ;)
+    }
+      
+    function initscreen(rows, cols, klass) {
       //let coff = 32;
       let coff = 32;
       let h = '';
@@ -175,27 +197,34 @@ span, div { font-family: 'ORIC-ATMOS', monospace; }
 	    uid = c;
 	  }
 
+	  //TODO: not needed?
+	  let k = '.char';
+	  
 	  // display uid if set, or c
 	  if (!uid) {
 	    if (0 && ch == 32) {
-	      hr += `<span class='char' id='r${r}c${c}'></span>`;
+	      hr += `<span class='${k}' id='r${r}c${c}'></span>`;
 	    } else {
-	      hr += `<span class='char' id='r${r}c${c}'>${String.fromCharCode(ch)}</span>`;
+	      hr += `<span class='${k}' id='r${r}c${c}'>${String.fromCharCode(ch)}</span>`;
 	    }
 	  } else if (uid == '#char-32') {
-	    hr += `<span class='char' id='r${r}c${c}'></span>`;
+	    hr += `<span class='${k}' id='r${r}c${c}'></span>`;
 	  } else  {
-	    hr += `<span class='char' id='r${r}c${c}'>${ORIC_use_char(c)}</svg></span>`;
+	    hr += `<span class='${klass}' id='r${r}c${c}'>${ORIC_use_char(c)}</svg></span>`;
 	  }
 	}
-	h += `<div class='line'>${hr}</div>`;
+	h += `<div class='${klass}'>${hr}</div>`;
 	//h += `<div class='line'>${hr} - ${coff+r}</div>`;
       }
       dom('screen').innerHTML = h;
     }
-    try{
-      TEXT(28, 40);
-    }catch(e){alert(e);}
+
+    hires = 0;
+    if (hires) {
+      HIRES();
+    } else {
+      TEXT();
+    }
 
     let h;
     let u = document.getElementById('carp');
@@ -216,7 +245,7 @@ span, div { font-family: 'ORIC-ATMOS', monospace; }
         s3.id = s3.id==orig?'#shape':orig;
     }, 2000)
     
-    let n = 0, cc = 0;
+    let n = 0, cc = 0, oo = 7;
     if (1) setInterval(()=>{
       if (0) {
 	let x = Math.floor(Math.random()*6);
@@ -232,18 +261,24 @@ span, div { font-family: 'ORIC-ATMOS', monospace; }
 <rect x='${x}' y='0' width='1' height='8' />
 `;
 */
-	for (let i=0; i<1; i++) {
+	oo += 1;;
+	for (let i=0; i<40*200; i++) {
 	  let r, c, ch;
 	  if (0) { 
 	    r = 4+Math.floor(Math.random()*20);
 	    c = 4+Math.floor(Math.random()*32);
 	    ch = 32+Math.floor(Math.random()*96);
 	  } else {
-	    r = Math.floor(cc / 40) % 28;
+	    r = Math.floor(cc / 40) % LINES;
 	    c = cc % 40;
-	    ch = 32 + cc % 96;
+	    if (hires)
+	      ch = 128+64+ ((cc+oo) % 64);
+	    else
+	      ch = 32 + cc % 96;
 	    cc++;
 	  }
+
+	  if (ch == 32) ch+=128;
 	
 	  // conclusions (top is fastests)
 	  // - >10 faster than you can see
