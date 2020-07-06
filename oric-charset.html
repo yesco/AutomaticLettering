@@ -89,62 +89,69 @@ zyx
 <div id='A'>A</div>
 
 <style>
-/* Font is crap!
-   letters 32,334,39,40,44,46,49,50,59,60,62,73,95,96,105,106,108,124,126,127 are not fixed width! */
+/* My font! (jsk) */
 @font-face {
-	font-family: 'oric-atmos';
-	src: url('oric-atmos.ttf'); 
-	src: 
-		local('oric-atmos'),
-		local('oric-atmos'),
-		url('oric-atmos.ttf') 
-		format('truetype');
+    font-family: 'ORIC-ATMOS';
+    src: url('oric-atmos-jsk.ttf');
 }
-span, div { font-family: 'oric-atmos', monospace; }
-  .row {
-      white-space: nowrap;
-      zoom: 1.4;
-      padding: 0;
-      margin:0;;
-      overflow: visible;
-  }
-  .char {
-      font-size: 40px; /* what is pixels? lol */
 
-      width: 7px
-      max-width: 7px;
-      height: 8px;
-      max-height: 6px;
+span, div { font-family: 'ORIC-ATMOS', monospace; }
 
-      overflow: visible;
+.line {
+    //position: relative;
+    //top: 4px;
+    font-size: 1em;
+    background: yellow;
+    letter-spacing: -9.3px;
+    line-height:9.1px;
+    margin: 0;
+    padding: 0;
+}
 
-      padding: 0;
-      margin:0;
+.xxrow {
+    white-space: nowrap;
+    zoom: 1.4;
+    padding: 0;
+    margin:0;;
+    overflow: visible;
+}
+.xxchar {
+    font-size: 40px; /* what is pixels? lol */
 
-      color: green;
-      fill: green;
+    width: 7px
+	       max-width: 7px;
+    height: 8px;
+    max-height: 6px;
 
-      //background: green; /* for debug */
-  }
-  .oric { /* this is the oric-atmos.ttf crap font */
-      /* shift it up and right a bit */
-      position: relative;
-      top: -2.7px;
-      //left: 2px;
+    overflow: visible;
 
-      padding: 0;
-      margin:0;;
+    padding: 0;
+    margin:0;
 
-      /* the actual value don't seem to matter
+    color: green;
+    fill: green;
+
+    //background: green; /* for debug */
+}
+.oric { /* this is the oric-atmos.ttf crap font */
+    /* shift it up and right a bit */
+    position: relative;
+    top: -2.7px;
+    //left: 2px;
+
+    padding: 0;
+    margin:0;;
+
+    /* the actual value don't seem to matter
 	 below a threshold, keep them small! */
-      height: 5px;
-      max-height: 5px;
+    height: 5px;
+    max-height: 5px;
 
-      line-height: 5px;
-      overflow: hidden;
+    line-height: 5px;
+    overflow: hidden;
 
-      // color: red; /* for debug */
-  }
+    // color: red; /* for debug */
+}
 </style>
 
   <script>
@@ -161,7 +168,7 @@ span, div { font-family: 'oric-atmos', monospace; }
 	  if (1) {
 	    // debug spacing
 	    ch = c < 38 ? coff + r : 33;
-	    uid = '#char-' + ch;
+	    //uid = '#char-' + ch;
 	  } else if (1) {
 	    // framed by sprite
 	    c = r==0||c==0||r+c==0||r==27||c==39? 65 : 32;
@@ -181,7 +188,8 @@ span, div { font-family: 'oric-atmos', monospace; }
 	    hr += `<span class='char' id='r${r}c${c}'>${ORIC_use_char(c)}</svg></span>`;
 	  }
 	}
-	h += `<div class='row'>${hr} - ${coff+r}</div>`;
+	h += `<div class='line'>${hr}</div>`;
+	//h += `<div class='line'>${hr} - ${coff+r}</div>`;
       }
       dom('screen').innerHTML = h;
     }
@@ -224,7 +232,7 @@ span, div { font-family: 'oric-atmos', monospace; }
 <rect x='${x}' y='0' width='1' height='8' />
 `;
 */
-	for (let i=0; i<40*28; i++) {
+	for (let i=0; i<1; i++) {
 	  let r, c, ch;
 	  if (0) { 
 	    r = 4+Math.floor(Math.random()*20);
@@ -250,7 +258,7 @@ span, div { font-family: 'oric-atmos', monospace; }
 	  if (0 || 0  && r%2 && Math.random()>0.5 && ch!==32 && ch<125) {
 	    dom(`r${r}c${c}`).innerHTML =
 	      `<span class='oric'>${String.fromCharCode(ch)}</span>`;
-	  } else if(0) {
+	  } else if(1) {
 	    dom(`r${r}c${c}`).textContent = String.fromCharCode(ch);
 	  } else if (1)  {
 	    if (0 && ch==32)
