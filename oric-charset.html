@@ -99,24 +99,41 @@ span, div { font-family: 'oric-atmos', monospace; }
       overflow: visible;
   }
   .char {
-      font-size: 40px;
-      width: 6px
-      max-width: 6px;
+      font-size: 40px; /* what is pixels? lol */
+
+      width: 7px
+      max-width: 7px;
       height: 8px;
-      max-height: 88px;
+      max-height: 6px;
+
       overflow: visible;
+
       padding: 0;
-      margin:0;;
-      background: green;
+      margin:0;
+
+      color: green;
+      fill: green;
+
+      //background: green; /* for debug */
   }
-  .oric {
+  .oric { /* this is the oric-atmos.ttf crap font */
+      /* shift it up and right a bit */
       position: relative;
       top: -2.7px;
-      left: 2px;
+      //left: 2px;
+
+      padding: 0;
+      margin:0;;
+
+      /* the actual value don't seem to matter
+	 below a threshold, keep them small! */
+      height: 5px;
       max-height: 5px;
-      background: pink;
+
       line-height: 5px;
       overflow: hidden;
+
+      // color: red; /* for debug */
   }
 </style>
 
@@ -292,7 +309,7 @@ if (0) {
     while(sixbits) {
       if (sixbits & 1) {
 	// TODO: optimize adjacent bits
-	h += `<rect x='${6-i}' y='${y}' width='1' height='1' />`;
+	h += `<rect x='${5-i}' y='${y}' width='1' height='1' />`;
       }
       sixbits = sixbits >> 1;
       i++;
