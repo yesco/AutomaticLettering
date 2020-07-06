@@ -27,7 +27,7 @@ body, p, span, div {
     font-family: 'ORIC-ATMOS', nonospace;
 }
 tt {
-    font-family: 'consola';
+    font-family: courier;
 }
 .char {
     display: inline-block;
@@ -35,23 +35,54 @@ tt {
     margin: 0;
     padding: 0;
 }
+
+#xcharset {
+    font-size: 1em;
+    background: pink;
+    letter-spacing: -8.2px;
+    line-height:12px;
+}
+
+.line {
+    //position: relative;
+    //top: 4px;
+    font-size: 1em;
+    background: yellow;
+    letter-spacing: -8.2px;
+    line-height:8px;
+    margin: 0;
+    padding: 0;
+}
+
 </style>
 
 </head>    
 <body>
 
-<span id='charset' style='font-size:32px'>
-</span>
+<div class='line' id='charset' contenteditable='true'>
+</div>
 <script>
   {
-    let h = '';
+    let h = '', x = '';
     for(let i=32; i<128;i++) {
       let c = String.fromCharCode(i);
       h += `<tt>${c}</tt>`;
       h += c;
-      if (i % 32 == 31) h += '<br>';
+      x += c;
+      if (i % 32 == 31) {
+	h += '<br>';
+	x += '<br>';
+      }
     }
-    dom('charset', h, 'h');
+    let y = `<br><div class='line'>
+&#126;y&#126;&#127;</div><div class='line'>
+&#127;A&#127;&#126;</div><div class='line'>
+&#127;&#126;&#127;&#126;</div><div class='line'>
+&#126;&#127;&#126;&#127;</div><div class='line'>
+&#126;&#127;&#126;&#127;</div><div class='line'>
+</div>
+`;
+    dom('charset', h+'<br>'+x + y, 'h');
   }
 </script>
   

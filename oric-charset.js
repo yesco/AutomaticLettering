@@ -91,6 +91,8 @@ function ORIC_use_char(c) {
   return `<svg viewBox="0 0 6 8" xmlns="http://www.w3.org/2000/svg" height='20px'><use x="0" y='0' href='#char-${c}'/></svg>`;
 }
 
+let rand = 0; //Math.floor(Math.random()*16);
+
 function ORIC_char_BDF(c) {
   if (typeof c === 'string')
     c = c.charCodeAt(0);
@@ -99,10 +101,10 @@ function ORIC_char_BDF(c) {
   // TODO: STARTCHAR importace?
   return (
 `STARTCHAR A
-ENCODING ${c}
-SWIDTH 562 0
-DWIDTH 9 0
-BBX 8 8 0 0
+ENCODING ${c+rand}
+SWIDTH 200 0
+DWIDTH 8 0
+BBX 6 8 0 0
 BITMAP
 ${hex.match(/(..)/g, '$1').join('\n')}
 ENDCHAR`);
@@ -114,8 +116,9 @@ function ORIC_generate_BDF() {
   console.log(
 `STARTFONT 2.1
 FONT neoletters
-SIZE 8 75 75
-FONTBOUNDINGBOX 18 16 0 -4
+SIZE 16 150 150
+COMMENT x 16 0 -8 ... 16 fixed can't do smaller
+FONTBOUNDINGBOX 6 16 0 -4
 STARTPROPERTIES 3
 PIXEL_SIZE 16
 FONT_ASCENT 8
