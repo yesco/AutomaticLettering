@@ -126,6 +126,7 @@ CHARS ${chars}`);
     let bdf = ORIC_char_BDF(c);
     console.log(bdf);
   }
+  console.log(`ENDFONT`);
 }
 
 // from nodejs: generate
