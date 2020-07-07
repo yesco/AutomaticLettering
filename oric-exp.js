@@ -7,7 +7,9 @@
 // returns next parse pos
 // meaning first exp is TILL (< pos)
 
-function parseExp(line) {
+// keywordz is a concat string:
+// ',FOO,BAR,FIE,FUM,'
+function parseExp(line, keywordz) {
   let i = 0, c = '';
 
   let res = [], rev = [], tok = [];
@@ -262,7 +264,7 @@ if (typeof required !== undefined) {
 
 }
 
-function tokenizer(line) {
+function tokenizer(line, keywordz='') {
   let i = -1, c = '', t = '';
   function spc() {
     while (c == ' ' && skip());
@@ -284,8 +286,8 @@ function tokenizer(line) {
   function emit(typ) {
     if (t) {
       console.log('EMIT '+typ.padEnd(8, ' ')+'  - '+t);
-      t = '';
       ret.push([typ, t]);
+      t = '';
       return true;
     }
   }
@@ -325,19 +327,22 @@ function tokenizer(line) {
     } else if (digit()) {
       while(digit());
       return emit('number');
-    } else if (letter()) {
-      while(letter() || digit());
-      r(/[\%\$]/);
-      return emit('variable');
     } else if (op()) {
       return emit('op');
+    } else if (letter()) {
+      do {
+	if (keywordz.includes(`,${t},`))
+	  return emit('keyword');
+      } while(letter() || digit());
+      r(/[\%\$]/);
+      return emit('name');
     } else {
       step();
       return emit('');
     }
   }
   
-  console.log('-------------LINE:', line);
+  console.log('--TOKENS-------LINE:', line);
   skip();
   while(token());
   return ret;
@@ -348,5 +353,8 @@ console.log("---------------------------");
 console.log(tokenizer('   (   3    3+4 55 5 )   '));
 console.log(tokenizer(' 3A$B(55)" f o   ob  ar3+5 "9'));
 console.log(tokenizer(' 3A"fish'));
+console.log(tokenizer('PRINT 3', ',PRINT,'));
+console.log(tokenizer('PRINT 3+4', ',PRINT,'));
+
 
 

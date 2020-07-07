@@ -268,6 +268,9 @@ span, div { font-family: 'oric-atmos', monospace; }
 
 </style>
   
+<script src='oric-exp.js'>
+</script>
+
 <script src='misc.js'>
 </script>
 
@@ -292,7 +295,7 @@ g</div>
 
 <!-- seemingly useless span, but need for getting correct width of 'screen'-->
 <center><span id='foo'>
-<div id='screen' style='color:black; font-size: 1.5rem; overflow:hidden; xtext-align: left; white-space:nowrap;'>
+<div id='screen' style='color:white; background:black; font-size: 1.5rem; overflow:hidden; xtext-align: left; white-space:nowrap;'>
 </div>
 </span></center>
 
@@ -686,7 +689,6 @@ So far the subject of writing
       return
     }
     
-
     // no write?
     if (scoff) return scoff++;
     
@@ -748,10 +750,18 @@ So far the subject of writing
       // 28-31 Switch to HIRES mode (60 Hz)
     }
 
-    if (t == 32)
+    if (t == 32) {
       dc.innerHTML = '&nbsp;';
-    else if (t !== undefined)
+    } else if (t !== undefined) {
       dc.textContent = String.fromCharCode(t);
+    }
+
+    // get out if set colors
+    if (c < 32) return;
+    
+    // reset any attribute set previously
+    da.style.color='';
+    da.style.backgroundColor='';
   }
   screen.readcount = 0;
   screen.writecount = 0;
@@ -796,6 +806,7 @@ l0 FOR I=0 TO 7
     if (printer) return printer = undefined;
 
     let p = dom('printer');
+
     printer = function(c) {
       // TODO: print@, plot, (screen?
       if (typeof c === 'number') {
@@ -914,12 +925,14 @@ CODE CHARACTER Control Code
     // TODO: how to handle inverse?
     let ch = c & 0x7f;
     if (ch === ESC) return raw = true;
-      
+
     if (raw || ch >= 32) {
       screen(row, col, c);
       col++;
+      raw = false;
+      if (raw) alert('c===' + c);
+      c = ch = undefined;
     }
-    raw = false;
 
     if (ch == 10) { row++; col = 2; }
 
@@ -2785,7 +2798,8 @@ l80 REM*** WAUES ***
   TEXT();
   CLS();
 
-  run('boot');
+  boot(); //run('boot'); prints prommpt
+  prompt();
 
 /*
 var svgns = "http://www.w3.org/2000/svg";
@@ -2919,11 +2933,43 @@ errorObj : ${errorObj}
     }
     cursorShow();
   }
+
+  // reads from line variable
+  function nextExp(line) {
+    let r;
+    r = tokenizer(line, ORIC_TOKENZ);
+    if (trace) {
+      print('======== TOKENS =========');
+      print(JSON.stringify(r));
+    }
+    if (0)
+    while(line) {
+      //r = parseExp(line, ORIC_TOKENZ);
+      
+      if (trace) {
+	print();
+	princ('-------------TOKEN:');
+	print(JSON.stringify(r));
+	princ('x.RES ');
+	print(JSON.stringify(r.res));
+	princ('x.REV ');
+	print(JSON.stringify(r.rev));
+	princ('x.TOK ');
+	print(JSON.stringify(r.tok));
+      }
+      line = r[1];
+    }
+    return;
+  }
+
   // interprets and runs one line
   // returns true if ok
   // END return false
   function run(line) {
+    nextExp(line);
+    
     line = line.trim();
+
     // remove leading ':' (used for indent!)
     line = line.replace(/^[\s:]*/, '');
 
@@ -3045,6 +3091,38 @@ errorObj : ${errorObj}
     while(steps--)
       editArrow(c);
   }
+
+  function editExt(k, kc, a, s, c, e) {
+    try{
+    cursorHide();
+    //if (!k.match(/[0-9a-z]/)) return;
+    //alert(`editExt: '${k}' ${kc} ${a?'a':''} ${s?'s':''} ${c?'c':''}`);
+
+    switch(k) {
+    case 'h':
+    case '/': // unsifted ? lol
+    case '?': 
+      clearline(0);
+      PLOT(0,0,'COLOR:CTRL- ALT- 0 \21'+'1\0\22'+'2 \23'+'3\7\24'+'4 \25'+'5\0\26'+'6 \27'+'7\0');
+      break;
+
+
+
+      // fg: CTRL-# bg: ALT-#
+    case (k.match(/\d/)?k:false):
+      putc(ESC);
+      k = kc-48 + (a?16:0);
+      putc(k);
+      break;
+    }
+    //alert('EDITEXT: '+k + ' kc='+kc);
+    cursorShow();
+    } catch(err){alert(
+      'ERROR: ' + err +
+	`\neditExt: '${k}' ${kc} ${a?'a':''} ${s?'s':''} ${c?'c':''}`);}
+
+  }
+  
   function editArrow(ch) {
     cursorHide();
     switch(ch) {
@@ -3062,17 +3140,27 @@ errorObj : ${errorObj}
     cursorShow();
   }
 
+  function clearline(r) {
+    PLOT(
+      0,
+      typeof r==='number'?r:row,
+      SPC(40));
+  }
+
   function showStatus() {
-    try{
-    // make modeline black w white text
-    screen(0, 0, 0);
-    screen(0, 1, 7);
-    
     function update(col, status, msg) {
       if (col < 0) col += SCREEN_COLS;
       PLOT(col, 0,
 	   status ? msg : SPC(msg.length));
     }
+
+    // difficult to update if OFF!
+    // (lol we update even if off :-)
+    // (ctrl-o on ORIC stopps updates)
+    let saved = scoff; scoff = 0;
+    
+    clearline(0);
+    
     // CTRL-Q: toggle cursor
     update(-4, caps, 'CAPS');
 
@@ -3080,40 +3168,37 @@ errorObj : ${errorObj}
     update(-4 -2 -7, printer, 'PRINTER');
     
     // CTRL-S: toggle screen (centered)
-    {
-      // difficult to update if OFF!
-      let saved = scoff; scoff = 0;
-
-      update(Math.floor(SCREEN_COLS-10)/2,
+    update(Math.floor(SCREEN_COLS-10)/2,
 	     saved, 'SCREEN OFF');
-
-      scoff = saved;
-    }
 
     // TODO: column enable disable CTRL-J
     if (column) {
     } else {
     }
-    }catch(e){alert(e);}
+
+    // restore, no write to screen
+    scoff = saved;
   }
   
   dom('exp').addEventListener('keydown', function(e) {
-    
-    let c = e.ctrlKey, a = e.altKey;
+    let c=e.ctrlKey,a=e.altKey,s=e.shiftKey;
     let k = e.key.toLowerCase();
-    let s = e.shiftKey, ch = e.code;
+    let ch = e.code;
     let kc = e.keyCode;
 
-    if ((c && !a && k !== 'control') || kc==13
-	|| kc==8 || (37<=kc && kc<=40))
+    if ((c && !a && !s && k !== 'control')
+	|| kc==13 || kc==8
+	|| (37<=kc && kc<=40))
       clickSound(true);
 
     // editing
     if (kc==13) editEnter();
     if (kc==8) editBackspace();
     if (37<=kc && kc<=40) editArrow(kc);
-
+    
     // my extensions
+    if ((c || a) && k.length==1)
+      editExt(k, kc, a, s, c, e);
     if (c && k=='r') window.location.reload();
     if (c && a && k=='p') trace = !trace;
 
@@ -3532,6 +3617,9 @@ instruction
       delete OricKeywords.status[n];
     });
 
+  // TODO: move? maybe move symbols out to oric-exp?
+  var ORIC_TOKENZ = ',' +
+      Object.keys(OricKeywords.name2code).join(',') + ',';
 
 </script>
 

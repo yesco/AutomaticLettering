@@ -20,6 +20,8 @@
 
 ;; (add-hook 'after-save-hook #'AL-check)
 
+(add-hook 'after-change-major-mode-hook (lambda() (electric-indent-mode -1)))
+
 (setq c-basic-offset 2)
 (setq js-indent-level 2)
 (setq wrap-prefix "\t\t\-\\\\")
