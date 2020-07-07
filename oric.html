@@ -250,6 +250,22 @@ span, div { font-family: 'oric-atmos', monospace; }
       overflow-x: visible;
       /* overflow-y: hidden; /* doesn't work */
   }
+
+#printer {
+    color: blue;
+    padding-left: 2rem;
+    padding-right: 2rem;
+    background: beige;
+}
+/* TODO: doesn't work on "lines"
+#printer:nth-child(2n+0) {
+    background: beige;
+}
+#printer:nth-child(2n+1) {
+    color: lightskyblue;
+*/
+}
+
 </style>
   
 <script src='misc.js'>
@@ -352,6 +368,22 @@ g</div>
   }
 </script>
 
+<center><b style='color:beige;'>PRINTER (toggle on/off with CTRL-P)</b></center>
+<pre id='printer'></pre>
+<script>
+  {
+    let p = dom('printer');
+    // select printer output on click!
+    p.onclick = ()=>{
+      let sel = window.getSelection();
+      let range = document.createRange();
+      range.selectNodeContents(p);
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }
+  }
+</script>
+
 <br>
 ROW: <span id='row'></span>
 COL: <span id='col'></span>
@@ -395,6 +427,7 @@ INFO:<br><span id='info'></span>
       click = true,
       column = false,
       scoff = 0, // screen off if > 0 (count!)
+      printer = undefined,
       trace = false, // debug tracing CTRL-P
       tron = false, // TRON/TROFF
       row = 1,
@@ -423,9 +456,10 @@ INFO:<br><span id='info'></span>
     line = '';
     lineno = 0;
     lineToDo = [];
-    caps = true
-    click = true
-    column = false
+    caps = true;
+    click = true;
+    column = false;
+    printer = undefined;
     trace = false;
     tron = false;
     forceUpdate = false;
@@ -572,16 +606,26 @@ So far the subject of writing
     return d;
   }
   
-  function PLOT(x, y, sORn) {
-    // DOC: X,Y puts a string or raw attribute
-    if (typeof sORn === 'string') {
-      let r = row, c = col;
-      row = y; col = x;
-      prin(sORn);
-      row = r; col = c;
-    } else {
-      screen(y, x, sORn);
+  function PLOT(x, y, s) {
+    // DOC: X,Y raw-write VALUE to screen
+    // If number, use it as charcode.
+    if (printer)
+      printer(`[ PLOT(${x},${y},"`);
+
+    if (typeof s === 'number')
+      s = String.fromCharCode(s);
+    
+    if (printer) printer(s);
+
+    for(let i=0; i<s.length; i++) {
+      screen(y, x, c);
+      if (++x >= 40) {
+	x = 0; y++;
+      }
     }
+        
+    // not totally "rigth" but it looks better
+    if (printer) printer('" ]\n');
   }
       
   function SCRN(x, y) {
@@ -748,6 +792,36 @@ l0 FOR I=0 TO 7
 `;
   }
 
+  function printerToggle() {
+    if (printer) return printer = undefined;
+
+    let p = dom('printer');
+    printer = function(c) {
+      // TODO: print@, plot, (screen?
+      if (typeof c === 'number') {
+	if (c >= 32 || c === 10)
+	  c = String.fromCharCode(c);
+	else if (c === 4) c = '[ TOGGLE DOUBLE LINE ]';
+	else if (c === 6) c = '[ TOGGLE KEYCLICK ]';
+	else if (c === 7) c = '[ BELL ]';
+	else if (c === 8) c = '[ BACKSPACE ]';
+	else if (c === 9) c = '[ RIGHT ]';
+	else if (c === 12) c = '\n[ CLEAR SCREEN ]\n';
+	else if (c === 13) c = '[ CR ]';
+	else if (c === 14) c = '[ CLEAR LINE ]';
+	else if (c === 15) c = '[ DISABLE SCREEN ]';
+	else if (c === 17) c = '[ TOGGLE CURSOR ]';
+	else if (c === 19) c = '[ TOGGLE SCREEN ]';
+	else if (c === 20) c = '[ TOGGLE CAPS ]';
+	else if (c === 27) c = '[ ESC ]';
+	else
+	  c = '[ CHAR: #' + c.toString(16) + ' (' + c + ') ]';
+      }
+      p.append(c);
+    }
+    return true;
+  }
+  
   // TODO: ORIC used to have blinking cursor
   // also has 'cursor' varaible controlled by
   let cursor = true;
@@ -763,6 +837,7 @@ l0 FOR I=0 TO 7
 
     if (!cursor) cursorHide();
     // don't show cursor here as this run as soon as key presseed leaving traces
+    return cursor;
   }
 
   // cursorHide(),cursorShow() - don't call as it's managed by the system functions call cursorToggle() for your intent
@@ -789,10 +864,51 @@ l0 FOR I=0 TO 7
     d.style.color = 'white';
   }
   
+/*
+Codes0-31 
+CODE CHARACTER Control Code 
+0 Null 
+1 Copy CTRL-A 
+2 
+3 Break	 CTRL-C 
+4 Double line printing CTRL-D (TODO: jsk)
+5 
+6 Keyclick CTRL-F 
+7 Bell (PING) CTRL-G  (TODO: jsk)
+8 Backspace (Cursor left) CTRL-H  (TODO: jsk)
+9 Cursor right CTRL-I  (TODO: jsk)
+10 Line feed (Cursor down) CTRL-J  (TODO: jsk)
+11 Cursor up CTRL-K  (TODO: jsk)
+12 Clear screen CTRL-L  (TODO: jsk)
+13 RETURN CTRL-M (beginning of line) (TODO: jsk)
+14 Clear line CTRL-N  (TODO: jsk)
+15 Disable screen CTRL-0  (TODO: jsk)
+16 
+17 Cursor CTRL-Q  (TODO: jsk)
+18 
+19 Screen CTRL-S  (TODO: jsk)
+20 Caps (upper case) CTRL-T  (TODO: jsk)
+21 
+22 
+23 
+24 Cancel line CTRL-X 
+25 
+26 
+27 ESC (Escape) (TODO: jsk)
+28 
+29 
+30 
+31 
+32 Space
+*/
   function putc(c) {
     if (typeof(c) !== 'number')
       alert('putc: only take nubmers: ' +  c);
     putc.count++;
+
+    // TODO: if scoff should we printer?
+    if (printer) printer(c);
+    
     if (scoff) return scoff++;
     
     // TODO: how to handle inverse?
@@ -1084,7 +1200,7 @@ l0 FOR I=0 TO 7
   // TODO: print ctrl-codes perform action!
   function PRINT() {
     let line = this;
-    line = line.replace(/^PRINT\s*/, '');
+    line = line.replace(/^L*PRINT\s*/, '');
     line = line.trim();
 
     let exp = '', mode = 'normal', par = '';
@@ -1189,6 +1305,57 @@ This command works exactly the same as a PRINT statement except that it is used 
 
   Related keywords: CHR$, LLIST, PRINT
   */
+  function LLIST() {
+    // DOC: List program to printer
+
+    // save state
+    let psave = printer, ssave = scoff;
+
+    // turn on printer, and screeen off!
+    if (!printer) printerToggle();
+    scoff = 1;
+
+    // essense of LIST
+    {
+      line = '';
+      lineno = -1;
+      print();
+      nextline();
+      while (line) {
+	princ(lineno);
+	print(line);
+	nextline();
+      }
+      print();
+      lineno = 0;
+      line = '';
+    }
+
+    // restore
+    printer = psave;
+    scoff = ssave;
+  }
+
+  // TODO: same complicated parsing as PRINT...
+  function LPRINT(...args) {
+    // DOC: Prints to the printer
+    // TODO: doen't handle TAB()
+
+    // save state
+    let psave = printer, ssave = scoff;
+
+    // turn on printer, and screeen off!
+    if (!printer) printerToggle();
+    scoff = 1;
+
+    // cheat
+    // TODO: keep track of col?
+    PRINT.apply(this, args);
+
+    // restore
+    printer = psave;
+    scoff = ssave;
+  }
 
 
   // TODO: Basic Lines max 80 chars bell at 79?
@@ -2140,7 +2307,12 @@ $276,$277 Spare counter — also used by WAIT (and printer in V1.0).
     const HIRES_ALTS_LEN = 1024;    
     
     function PEEK(a, v) { // LOL
+      tPos(a);
       print(`PEEK ${a} ${v} ${HEX$(a)}`);
+
+      if (a === 0x276) return DEEK(0x276) % 256;
+      if (a === 0x277) return INT(DEEK(0x276) / 256);
+
       // DOC: Read memory byte at ADDR
       // Simulator: only screen memory value!
       if (SCREEN.hires)
@@ -2167,20 +2339,34 @@ $276,$277 Spare counter — also used by WAIT (and printer in V1.0).
       error('?PEEK/POKE not defined for this address');
     }
     function POKE(a, v) {
+      tPos(a); tPos(v, v < 256);
+
+      if (a === 0x276) return deek276 = (deek276 & 0xff00) + v;
+      if (a === 0x276) return deek276 = (deek276 & 0x00ff) + v*256;
       // DOC: Set memory ADDR byte to VAL
       // Simulator: only screen access!
       PEEK(a, v); // LOL
     }
 
+    let deek276 = 0;
     function DEEK(a, v) {
-      if (a === 0x276) // timer hs (10ms)
-	return 0x10000 - (INT(
-	  Date.now() / 10) % 0x10000);
+      tPos(a);
+      // timer hs (10ms)
+      if (a === 0x276) {
+	// reset?
+	if (typeof v === 'number')
+	  doke276 = v;
+	return 0x10000 - INT(
+	  Date.now()/10 - deek276)
+	  % 0x10000;
+      }
       
       return 256*PEEK(a+1) + PEEK(a);
     }
 
     function DOKE(a, v) {
+      tPos(a); tPos(v, v < 655356);
+      if (a === 0x276) return DEEK(a, v);
       POKE(a, v % 256);
       POKE(a+1, INT(v / 256));
     }
@@ -2616,6 +2802,9 @@ for (var x = 0; x < 5000; x += 50) {
 }
 
   */
+
+  // TODO: remove svg experiments!
+  if (0) {
   screen(
     1,5,'A', charA=`
 <div style='top:1.55px; position:absolute; max-width:10px; max-height:142px; overflow:visible; zoom:1;'>
@@ -2629,60 +2818,10 @@ width='10px' height='12px'>
   screen(1,2,'A', charA);
   screen(2,2,'A', charA); screen(2,3,'A', charA)
   screen(3,2,'A', charA);
-  
+  }  
   // js: create rect
   // - https://stackoverflow.com/questions/32985564/how-to-style-manipulate-contents-of-svg-use-element
   
-  dom('bits', svgchar=`
-<svg viewBox="0 0 6 8" xmlns="http://www.w3.org/2000/svg" style='background:white' width='20px' height='30px'>>
-
-  <symbol id="101010">
-    <rect x="0" width="1" height="1" />
-    <!rect x="1" width="1" height="1" />
-    <rect x="2" width="1" height="1" />
-    <!rect x="3" width="1" height="1" />
-    <rect x="4" width="1" height="1" />
-    <!rect x="5" width="1" height="1" />
-  </symbol>
-  <symbol id="100001">
-    <rect x="0" width="1" height="1" />
-    <!rect x="1" width="1" height="1" />
-    <!rect x="2" width="1" height="1" />
-    <!rect x="3" width="1" height="1" />
-    <!rect x="4" width="1" height="1" />
-    <rect x="5" width="1" height="1" />
-  </symbol>
-
-  <symbol id='A'>
-    <rect y="0" x="0" width="1" height="1" />
-    <rect y="1" x="1" width="1" height="1" />
-    <rect y="2" x="2" width="1" height="1" />
-    <rect y="3" x="3" width="1" height="1" />
-    <rect y="4" x="4" width="1" height="1" />
-    <rect y="5" x="5" width="1" height="1" />
-    <rect y="6" x="3" width="1" height="1" />
-    <rect y="7" x="1" width="1" height="1" />
-  </symbol>
-
-  <symbol id='B'>
-  <use xlink:href="#101010" x="0" y="0" />
-  <use xlink:href="#101010" x="1" y="1" />
-  <use xlink:href="#101010" x="0" y="2" />
-  <use xlink:href="#101010" x="0" y="3" />
-  <use xlink:href="#101010" x="1" y="4" />
-  <use xlink:href="#101010" x="0" y="5" />
-  <use xlink:href="#100001" x="0" y="6" />
-  <use xlink:href="#101010" x="1" y="7" />
-  </symbol>
- 
-  <use id='fishfish' xlink:href='#A' x="0" y="0" />
-</svg>
-</div>
-`, 'h');
-`<div style='position:absolute;max-heigth:1.2em; max-width:1em; z-index:1; background:pink; font-size:330px;'>
-<div>
-`;
-
   if (0)  window.onerror = function(message, url, line, col, errorObj) {
     dom('error', `WINDOW.ERROR:
 message  : ${message}
@@ -2928,33 +3067,31 @@ errorObj : ${errorObj}
     screen(0, 0, 0);
     screen(0, 1, 7);
     
-    // save --- restore
+    function update(col, status, msg) {
+      if (col < 0) col = SCREEN_COLS + col;
+      PLOT(col, 0,
+	   status ? msg : SPC(msg.length));
+    }
+    // CTRL-Q: toggle cursor
+    update(-4, caps, 'CAPS');
+
+    // CTRL-P: toggle printer
+    update(-4 -1 -7, printer, 'PRINTER');
+    
+    // CTRL-S: toggle screen (centered)
     {
-      let r = row, c = col;
+      // difficult to update if OFF!
+      let saved = scoff; scoff = 0;
 
-      // CTRL-Q: toggle cursor
-      row = 0; col = SCREEN_COLS-4;
-      princ(caps?'CAPS':'    ');
+      update(Math.floor(SCREEN_COLS-10)/2,
+	     saved, 'SCREEN OFF');
 
-      // CTRL-S: toggle screen (centered)
-      row = 0;
-      col = Math.floor(SCREEN_COLS-10)/2;
-      {
-	// TODO: something goes wrong with
-	// screen when off?
-	
-	// difficult to update if OFF!
-	let saved = scoff; scoff = 0;
-	princ(saved?'SCREEN OFF':'          ');
-	scoff = saved;
-      }
-      // TODO: column enable disable CTRL-J
-      if (column) {
-      } else {
-      }
+      scoff = saved;
+    }
 
-      // --- and restore
-      row = r; col = c;
+    // TODO: column enable disable CTRL-J
+    if (column) {
+    } else {
     }
   }
   
@@ -3000,6 +3137,7 @@ errorObj : ${errorObj}
     if (k=='a') editCopy();
     if (k=='f') click = !click;
     if (k=='q') cursorToggle();
+    if (k=='p') showStatus(printerToggle());
     if (k=='t') showStatus(caps = !caps);
     if (k=='s') showStatus(scoff=scoff?0:1);
     if (k=='p') showStatus(printer != printer);
