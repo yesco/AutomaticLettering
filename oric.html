@@ -618,7 +618,7 @@ So far the subject of writing
     if (printer) printer(s);
 
     for(let i=0; i<s.length; i++) {
-      screen(y, x, c);
+      screen(y, x, s.charCodeAt(i));
       if (++x >= 40) {
 	x = 0; y++;
       }
@@ -3063,12 +3063,13 @@ errorObj : ${errorObj}
   }
 
   function showStatus() {
+    try{
     // make modeline black w white text
     screen(0, 0, 0);
     screen(0, 1, 7);
     
     function update(col, status, msg) {
-      if (col < 0) col = SCREEN_COLS + col;
+      if (col < 0) col += SCREEN_COLS;
       PLOT(col, 0,
 	   status ? msg : SPC(msg.length));
     }
@@ -3076,7 +3077,7 @@ errorObj : ${errorObj}
     update(-4, caps, 'CAPS');
 
     // CTRL-P: toggle printer
-    update(-4 -1 -7, printer, 'PRINTER');
+    update(-4 -2 -7, printer, 'PRINTER');
     
     // CTRL-S: toggle screen (centered)
     {
@@ -3093,6 +3094,7 @@ errorObj : ${errorObj}
     if (column) {
     } else {
     }
+    }catch(e){alert(e);}
   }
   
   dom('exp').addEventListener('keydown', function(e) {
@@ -3102,7 +3104,7 @@ errorObj : ${errorObj}
     let s = e.shiftKey, ch = e.code;
     let kc = e.keyCode;
 
-    if ((c && k !== 'control') || kc==13
+    if ((c && !a && k !== 'control') || kc==13
 	|| kc==8 || (37<=kc && kc<=40))
       clickSound(true);
 
@@ -3140,7 +3142,6 @@ errorObj : ${errorObj}
     if (k=='p') showStatus(printerToggle());
     if (k=='t') showStatus(caps = !caps);
     if (k=='s') showStatus(scoff=scoff?0:1);
-    if (k=='p') showStatus(printer != printer);
     if (k=='f') clickToggle();
     if (k=='d') doubleToggle();
     if (k=='g') bell();
