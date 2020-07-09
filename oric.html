@@ -234,28 +234,44 @@
 </script>
   
 <style>
-/*default version*/
+/* My font! (jsk) */
 @font-face {
-	font-family: 'oric-atmos';
-	src: url('oric-atmos.ttf'); 
-	src: 
-		local('oric-atmos'),
-		local('oric-atmos'),
-		url('oric-atmos.ttf') 
-		format('truetype');
+    font-family: 'ORIC-ATMOS';
+    src: url('oric-atmos-jsk.ttf');
 }
 @font-face {
-	font-family: 'neoletters';
-	src: url('neoletters.ttf'); 
-	src: 
-		local('neoletters'),
-		local('neoletters'),
-		url('neoletters.ttf') 
-		format('truetype');
+    font-family: 'ORIC-ATMOS-ALT';
+    src: url('oric-atmos-alt-jsk.ttf');
 }
+
+.text, .hires {
+    font-family: 'oric-atmos', monospace;
+    //position: relative;
+    //top: 4px;
+
+    font-size: 1em;
+    background: yellow;
+    //letter-spacing: -9.3px;
+    letter-spacing: -4.565px;
+    line-height:12.195px;
+    margin: 0;
+    padding: 0;
+}
+
+.hires {
+    /* change height to pixel cell... */
+    //height:1px;
+    //max-height:3px;
+    line-height: 1px;
+    //overflow:hidden;
+}
+
 /*container element*/
-span, div { font-family: 'oric-atmos', monospace; }
-/*span elements inside the container div*/
+span, div {
+    font-family: 'oric-atmos', monospace;
+}
+
+/* span elements inside the container div */
 
   span {
       //position: absolute;
@@ -325,6 +341,12 @@ span, div { font-family: 'oric-atmos', monospace; }
 
 .cursor {
     /* show attributes and cursor there */
+    position: relative;
+    /* this shifts the character, we want
+       to move the inversion "box"
+       top: -1px;
+       left: 2px;
+   */
     visibility: visible;
 
     animation: cursor_blinker 0.5s step-start infinite;
@@ -388,19 +410,17 @@ g
 <body style='background-color: black; color: white;'>
 <div style='width:100%'>
   <img width='20%' src='oric-logo-black-export.svg'/>
-  <div style='float:right; top:0; width:80%; text-align:center; font-decoration:bold; text-justify:inter-word; font-size:3rem;'>W E B - B A S I C
-<sup><a tabindex='-1' target='oricman' style='text-decoration:none; font-size:1.5rem; padding:0.3rem; padding-bottom:0.1rem; color:black; background:white;' href='http://www.defence-force.org/computing/oric/library/lib_manual_oric/files/manual_atmos.pdf'>PDF</a></sup>
-<div style='font-size:1rem;'>&copy;jsk@yesco.or
-g</div>
+  <div style='float:right; top:0; width:80%; text-align:center; font-decoration:bold; text-justify:inter-word; font-size:2rem; letter-spacing:3px; '>WEB - BASIC<sup><a tabindex='-1' target='oricman' style='text-decoration:none; font-size:1.1rem; padding:0.1rem; padding-bottom:-0.1rem; color:black; background:white; font-weight:bold; letter-spacing:0px;' href='http://www.defence-force.org/computing/oric/library/lib_manual_oric/files/manual_atmos.pdf'>PDF</a></sup>
+<div style='font-size:1rem;'>&copy;jsk@yesco.org</div>
   </div>
-<span style='transform-origin:left; transform:scale(1.8, 1);'><b>&nbsp;&nbsp;B A S I C</b></span>
+<span style='position:relative; left:3px; top:-7px; letter-spacing:6px; transform-origin:left; transform:scale(1.17, 1);'><b>BASIC</b></span>
 </div>
 
 <br>
 
 <!-- seemingly useless span, but need for getting correct width of 'screen'-->
 <center><span id='foo'>
-<div id='screen' style='color:white; background:black; font-size: 1.5rem; overflow:hidden; xtext-align: left; white-space:nowrap; '>
+<div id='screen' class='text' style='color:white; background:black; font-size: 1.5rem; overflow:hidden;  white-space:nowrap; '>
 </div>
 </span></center>
 
@@ -659,8 +679,9 @@ ORIC EXTENDED BASIC Vl.1
       // lol, let's create one extra as the last character is kind of hidden...
       for(let col=SCREEN_COLS; col>=0; col--) {
 	c = '&nbsp;';
+//	c = String.fromCharCode(128+32);
 	let id = `r${row}c${col}`;
-	r = `<span id='a${id}'><span id='c${id}' class='char'>${c}</span>${r}</span>`;
+	r = `<span id='a${id}'><span id='c${id}'>${c}</span>${r}</span>`;
       }
       dom('screen', r+'</br>', 'ah');
     }
@@ -1350,7 +1371,8 @@ CODE CHARACTER Control Code
 	if (Number.isNaN(r))
 	  type_error();
 	// 1. 7E38 -- 2.93E-39 OK!
-	if (r < 2.93E-39 || r > 1.7E38)
+	let a = ABS(r);
+	if (a && (a < 2.93E-39 || a > 1.7E38))
 	  overflow_error();
       }
      
