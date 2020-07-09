@@ -1043,6 +1043,7 @@ CODE CHARACTER Control Code
     if (row >= SCREEN_ROWS) {
       putc.scrollcount++;
       let start = Date.now();
+
       for(let r=2; r<SCREEN_ROWS; r++) {
 	for(let c=0; c<SCREEN_COLS; c++) {
 	  let old = screen(r-1, c);
@@ -1051,6 +1052,7 @@ CODE CHARACTER Control Code
 	    screen(r-1, c, nw);
 	}
       }
+
       // TODO: if not hidden column mode?
       row = 27;
       for(let c=2; c<SCREEN_COLS; c++) {
@@ -3218,12 +3220,21 @@ errorObj : ${errorObj}
       switch(k) {
       case 'v': alert("editExt: can't catch 'v"); break;
       
+	// ins char shift right after cursor
+      case 'i': 
+	if (c) {
+	  for(let i=SCREEN_COLS-1; i>col; i--)
+	    screen(row, i, screen(row, i-1));
+	  screen(row, col, 32);
+	}
+	break;
+
 	// DEL shift left after cursor
       case 'h':
 	if (c) {
 	  for(let i=col; i<SCREEN_COLS-1; i++)
 	    screen(row, i, screen(row, i+1));
-	  screen(row, SCREEN_COLS-1, '');
+	  screen(row, SCREEN_COLS-1, 32);
 	}
 	break;
       case '/': // unsifted ? lol
@@ -3306,11 +3317,12 @@ errorObj : ${errorObj}
     cursorShow();
   }
 
-  function clearline(r) {
+  function clearline(r, optCol) {
+    optCol = optCol || 0;
     PLOT(
-      0,
+      optCol,
       typeof r==='number'?r:row,
-      SPC(40));
+      SPC(40-optCol));
   }
 
   function showStatus() {
@@ -3346,23 +3358,78 @@ errorObj : ${errorObj}
     scoff = saved;
   }
   
+// TODO: merge with putc/scroll
+//scroll(2, SCREEN_ROWS);
+function scroll(srow, erow, noClr) {
+  try {
+    hscroll(srow, erow, noClr);
+  } catch(e) {alert('scroll: '+e);}
+}
+function hscroll(srow, erow, noClr) {
+  //alert(srow + ', ' + erow + ' dir='+dir);
+  let dir = srow > erow ? 1 : -1;
+  //srow += dir;
+  //erow += dir;
+  //alert(srow + ', ' + erow + ' dir='+dir);
+
+  console.log('srow='+srow+' erow='+erow+' dir='+dir);
+  // copy FROM row
+  for(let r=erow; r!=srow; r+= erow<srow?1:-1) {
+    console.log('r=', r);
+    // generalize for sideways scroll!
+    for(let c=0; c<SCREEN_COLS; c++) {
+      //console.log('r=', r, 'c=', c);
+      let old = screen(r, c);
+      let nw = screen(r+dir,c);
+      if (nw != old)
+	screen(r, c, nw);
+    }
+  }
+  // TODO: if not hidden column mode?
+  if (!noClr) {
+    for(let c=2; c<SCREEN_COLS; c++)
+      screen(srow, c, 32);
+  }
+}
+
   dom('exp').addEventListener('keydown', function(e) {
     let c=e.ctrlKey,a=e.altKey,s=e.shiftKey;
     let k = e.key.toLowerCase();
     let ch = e.code;
     let kc = e.keyCode;
 
+    console.log("KEY kc="+kc+" c="+c+" a="+a+" s="+s);
+
     if ((c && !a && !s && k !== 'control')
 	|| kc==13 || kc==8
 	|| (37<=kc && kc<=40))
       clickSound(true);
+
+    // magicall show attributes!
     if (c && a)
       dom('screen').classList.toggle('show-attr');
 
     // editing
-    if (kc==13) editEnter();
-    if (kc==8) editBackspace();
+    if (kc==13) {
+      console.log("ENTER c="+c);
+      if (c) {
+	scroll(row, SCREEN_ROWS-3, true);
+      } else {
+	editEnter();
+      }
+    }
+   			      
+    if (kc==8) {
+      if (c) { // delete line
+	scroll(SCREEN_ROWS-3, row);
+      } else {
+	editBackspace();
+      }
+    }
 
+    if (c && k=='n') clearline(row, 2);
+
+    // arrow, C-arrow
     let char = screen(row, col);
     if (37<=kc && kc<=40) {
       editArrow(kc);
@@ -3373,7 +3440,10 @@ errorObj : ${errorObj}
     // my extensions
     if ((c || a) && k.length==1)
       editExt(k, kc, a, s, c, e);
+    
+    // too easy boot? lol
     if (c && k=='r') window.location.reload();
+    // tracer
     if (c && a && k=='p') trace = !trace;
 
     // ALT-
