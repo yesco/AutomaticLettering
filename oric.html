@@ -274,16 +274,21 @@ span, div { font-family: 'oric-atmos', monospace; }
 }
 
 .cursor {
-    animation: cursor_blinker 0.5s step-start infinite;
+    /* show attributes and cursor there */
+    visibility: visible;
 
+    animation: cursor_blinker 0.5s step-start infinite;
+    background-color: black;
+    color: inherit;
     /* this is confusing, it only inverts background when set! */
 
-    background: black;
 }
 
 @keyframes cursor_blinker {
     50% {
 	filter: invert(100%);
+	background-color: inherit;
+	color: white;
     }
 }
 
@@ -345,7 +350,7 @@ g</div>
 
 <!-- seemingly useless span, but need for getting correct width of 'screen'-->
 <center><span id='foo'>
-<div id='screen' style='color:white; background:black; font-size: 1.5rem; overflow:hidden; xtext-align: left; white-space:nowrap; --vis-attr:hidden;'>
+<div id='screen' style='color:white; background:black; font-size: 1.5rem; overflow:hidden; xtext-align: left; white-space:nowrap; '>
 </div>
 </span></center>
 
@@ -760,11 +765,14 @@ So far the subject of writing
     // --- READ screen?
     if (ch === undefined) {
       screen.readcount++;
-      if (typeof dc.screenchar == 'number')
-	return dc.screenchar;
-      else
-	return dc.screenchar = dc.textContent.charCodeAt(0);
+      return dc.screenchar;
     }
+
+    // --- WRITE!
+    
+    // no write?
+    if (scoff) return scoff++;
+
     screen.writecount++;
     dc.screenchar = ch;
 
@@ -774,11 +782,6 @@ So far the subject of writing
       dc.screenchar = ch;
       return
     }
-    
-    // no write?
-    if (scoff) return scoff++;
-    
-    // --- WRITE!
     
     let da = domc(`ar${row}c${col}`);
     let t;
@@ -3203,61 +3206,87 @@ errorObj : ${errorObj}
     PLOT(2,0,`CHAR '${ch}' ${HEX$(c)} (${c}) ALT: \u0009${ch}\u0008 ${bits}`);
   }
 
+  // This is probably a crazy idea!
+  // adding full TELETEXT EDITING!
   function editExt(k, kc, a, s, c, e) {
     try{
-    cursorHide();
-    //if (!k.match(/[0-9a-z]/)) return;
+      cursorHide();
+      //if (!k.match(/[0-9a-z]/)) return;
       //alert(`editExt: '${k}' ${kc} ${a?'a':''} ${s?'s':''} ${c?'c':''}`);
 
-    switch(k) {
-    case 'v': alert("editExt: can't catch 'v"); break;
-      // uglies - block graphics
-    case 'u': uglies(x=>x+1); break;
-      // help
-    case 'h':
-    case '/': // unsifted ? lol
-    case '?': 
-      clearline(0);
-      PLOT(0,0,'COLOR:CTRL- ALT- 0 \21'+'1\0\22'+'2 \23'+'3\7\24'+'4 \25'+'5\0\26'+'6 \27'+'7\0');
-      break;
-
-      // fg: CTRL-# bg: ALT-#
-      // (and CTRL-ALT-# uglies)
-    case (k.match(/^\d$/)?k:false): {
-      // uglies - block graphics
-      // C-A-#   1 2
-      //         3 4
-      //         5 6
-      // 0 = 00 00 00
-      // 7 = 11 11 11
-      // 8 = 10 01 10
-      if (c && a) {
-	kc = kc - 48; // 0--9
-	uglies(x=>{
-	  switch(kc) {
-	  case 0: return 32+0;
-	  case 7: return 32+1+2+4+8+16+32;
-	  case 8: return x ^ (95-32);;
-	  case 9: return x ^ (1+4+16);
-	  case 6: return x + 32; // !
-	  default: return x ^ (1<<(kc-1));
-	  }
-	});
+      // TODO:
+      switch(k) {
+      case 'v': alert("editExt: can't catch 'v"); break;
+      
+	// DEL shift left after cursor
+      case 'h':
+	if (c) {
+	  for(let i=col; i<SCREEN_COLS-1; i++)
+	    screen(row, i, screen(row, i+1));
+	  screen(row, SCREEN_COLS-1, '');
+	}
 	break;
+      case '/': // unsifted ? lol
+      case '?': 
+	clearline(0);
+	PLOT(0,0,'COLOR:CTRL- ALT- 0 \21'+'1\0\22'+'2 \23'+'3\7\24'+'4 \25'+'5\0\26'+'6 \27'+'7\0');
+	break;
+      
+	// Yank! (paste line buffer)
+	// (ALT-Y stays, and move down)
+      case 'y': {
+	let sr=row, sc=col;
+	princ(line);
+	if (a) {
+	  row=sr+1; col=sc;
+	  if (row >= SCREEN_ROWS) row=0;
+	}
+	break; }
+
+	// any use?
+      case '8': break;
+      case '9': break;
+
+	// uglies - block graphics
+      case 'u': uglies(x=>x+1); break;
+
+	// fg: CTRL-# bg: ALT-#
+	// (and CTRL-ALT-# uglies)
+      case (k.match(/^\d$/)?k:false): {
+	// uglies - block graphics
+	// C-A-#   1 2
+	//         3 4
+	//         5 6
+	// 0 = 00 00 00
+	// 7 = 11 11 11
+	// 8 = 10 01 10
+	if (c && a) {
+	  kc = kc - 48; // 0--9
+	  uglies(x=>{
+	    switch(kc) {
+	    case 0: return 32+0;
+	    case 7: return 32+1+2+4+8+16+32;
+	    case 8: return x ^ (95-32);;
+	    case 9: return x ^ (1+4+16);
+	    case 6: return x + 32; // !
+	    default: return x ^ (1<<(kc-1));
+	    }
+	  });
+	  break;
+	}
+	// colors CTRL ->  0-- 7 (fg)
+	// colors ALT  -> 16--23 (bg)
+	putc(ESC);
+	k = kc-48 + (a?16:0);
+	putc(k);
+	break; }
       }
-      // colors CTRL ->  0-- 7 (fg)
-      // colors ALT  -> 16--23 (bg)
-      putc(ESC);
-      k = kc-48 + (a?16:0);
-      putc(k);
-      break; }
-    }
-    //alert('EDITEXT: '+k + ' kc='+kc);
-    cursorShow();
+      //alert('EDITEXT: '+k + ' kc='+kc);
+      cursorShow();
     } catch(err){throw err; alert(
       'ERROR: ' + err +
 	`\neditExt: '${k}' ${kc} ${a?'a':''} ${s?'s':''} ${c?'c':''}`);}
-
+    
   }
   
   function editArrow(ch) {
@@ -3333,8 +3362,14 @@ errorObj : ${errorObj}
     // editing
     if (kc==13) editEnter();
     if (kc==8) editBackspace();
-    if (37<=kc && kc<=40) editArrow(kc);
-    
+
+    let char = screen(row, col);
+    if (37<=kc && kc<=40) {
+      editArrow(kc);
+      // drag/trail char to new pos!
+      if (c) screen(row, col, char);
+    }
+
     // my extensions
     if ((c || a) && k.length==1)
       editExt(k, kc, a, s, c, e);
@@ -3352,9 +3387,9 @@ errorObj : ${errorObj}
     // CTRL-
     if (!c) return;
     
-    if (c && k=='h') editBackspace();
     if (c && k=='c') STOP();
     if (c && k=='x') editCancel();
+    if (c && k=='g') PING();
     if (c && k=='l') {
       cursorHide();
       CLS();
