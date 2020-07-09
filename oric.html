@@ -977,7 +977,7 @@ CODE CHARACTER Control Code
 4 Double line printing CTRL-D (TODO: jsk)
 5 
 6 Keyclick CTRL-F 
-7 Bell (PING) CTRL-G  (TODO: jsk)
+7 Bell (PING) CTRL-G (TODO: jsk)
 8 Backspace (Cursor left) CTRL-H  (TODO: jsk)
 9 Cursor right CTRL-I  (TODO: jsk)
 10 Line feed (Cursor down) CTRL-J  (TODO: jsk)
@@ -1233,27 +1233,26 @@ CODE CHARACTER Control Code
   }
 
   function princ(txt) {
-    return print(txt, 'nonewline');
-  }
-  function print(txt, nonewline) {
-    if (txt === undefined) return putc(10);
+    if (txt === undefined || txt === '')
+      return;
 
     // for numbers ORIC makes SURE it fits
     // without line breaks!
     if (typeof txt == 'number') {
       txt = ' ' + txt + ' ';
-      if (col + txt.length > SCREEN_COLS) // ?
+      if (col + txt.length > SCREEN_COLS)
 	putc(10);
     } else {
       txt = '' + txt;
     }
     
     for(let i=0; i<txt.length; i++) {
-      let c = txt.charCodeAt(i);
-      putc(c);
+      putc(txt.charCodeAt(i));
     }
-
-    if (!nonewline) putc(10);
+  }
+  function print(txt) {
+    princ(txt);
+    putc(10);
   }
 
   function TAB(pos) {
