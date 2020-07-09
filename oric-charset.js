@@ -112,14 +112,26 @@ ENDCHAR`);
 }
 
 function ORIC_generate_BDF(alt) {
-  let start = 32, afterlast = 128
-
   let out = [];
 
   // generate ALT blockfont
   if (alt) {
     for(let c=32; c<96; c++) {
-      out.push(ORIC_char_BDF(c));
+      let hex = '';
+      function add(l, r, times) {
+	let bits = (l?0x38:0) | (r?0x7:0);
+	hex += bits.toString(16).padStart(2, '0').repeat(times);
+	console.log(bits.toString(2).padStart(8,'0'));
+      }
+      //console.log('----------- ' + c);
+      add(c &  1, c &  2, 3);
+      add(c &  4, c &  8, 2);
+      add(c & 16, c & 64, 3);
+      //console.log('====== ' + hex);
+      let bdf = ORIC_char_BDF(c, hex);
+      //console.log(bdf);
+      //console.log();
+      out.push(bdf);
     }
   } else {
     // dump the ORIC FONT
@@ -128,29 +140,32 @@ function ORIC_generate_BDF(alt) {
     }
   }
 
+  // extra spaces
+  // (32 is not fixed width in browser!)
   out.push(
     ORIC_char_BDF(128, '0000000000000000', 6, 8));
   out.push(
     ORIC_char_BDF(128 + 32, '0000000000000000', 6, 8));
-  // TODO: ALT-font... 32-127?
-  // (actually easier to use another ttf!)
 
   // generate 6x1 pixel cells!
-  let poffset = 128+64; // TODO: check unicode?
-  for(let m=0; m<64; m++) {
-    out.push(
-      ORIC_char_BDF(
-	poffset + m,
-	m.toString(16).padStart(2, '0').toUpperCase().repeat(1),
-	6, 1));
+  if (!alt) {
+    let poffset = 128+64; // TODO: check unicode?
+    for(let m=0; m<64; m++) {
+      out.push(
+	ORIC_char_BDF(
+	  poffset + m,
+	  m.toString(16).padStart(2, '0').toUpperCase().repeat(1),
+	  6, 1));
+    }
   }
 
   // TODO: add good hexmaps that people
   // often redefine? | + corners etc
 
+  // prelude
   console.log(
 `STARTFONT 2.1
-FONT neoletters
+FONT ORIC-ATMOS${alt?'-ALT':''}
 SIZE 16 150 150
 COMMENT x 16 0 -8 ... 16 fixed can't do smaller
 FONTBOUNDINGBOX 6 16 0 -4
@@ -163,6 +178,7 @@ CHARS ${out.length}`);
 
   out.forEach(bdf=>console.log(bdf));
 
+  // postlude
   console.log(`ENDFONT`);;
 }
 
@@ -179,5 +195,5 @@ function ORIC_font_has(hex) {
 
 // from nodejs: generate
 if (typeof require !== 'undefined') {
-  ORIC_generate_BDF(argv[2] === 'alt');
+  ORIC_generate_BDF(process.argv[2] === 'alt');
 }

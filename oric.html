@@ -126,6 +126,18 @@
     throw msg;
   }
 
+  function subscript_error(info) {
+    error("?BAD SUBSCRIPT ERROR", info);
+  }
+
+  function until_error(info) {
+    error("?BAD UNTIL ERROR", info);
+  }
+
+  function disp_error(info) {
+    error("?DISP MISMATCH ERROR", info);
+  }
+
   // NEW?
   function save_error(info) {
     error("?CAN'T SAVE", info);
@@ -159,6 +171,14 @@
     error('?RETURN WITHOUT GOSUB ERROR');
   }
   
+  function next_error() {
+    error('?NEXT WITHOUT GOSUB ERROR');
+  }
+  
+  function data_error() {
+    error('?OUT OF DATA ERROR');
+  }
+  
   function cont_error() {
     error('?CAN\'T CONTINUE ERROR');
   }
@@ -167,12 +187,38 @@
     error('?ILLEGAL QUANTITY ERROR');
   }
 
+  // 1. 7E38 -- 2.93E-39 OK!
+  function overflow_error() {
+    error('?OVERFLOW ERROR');
+  }
+
+  function dim_error(info) {
+    error("?REDIM'D ARRAY ERROR", info);
+  }
+
   // when calling some interactive funcs
   // like key$ and get, input
   function direct_error() {
     error('?ILLEGAL DIRECT ERROR');
   }
 
+  function redo_error() {
+    // TODO: actually not error, just message
+    print('?REDO FROM START');
+  }
+
+  function string_error() {
+    error('?STRING TOO LONG ERROR');
+  }
+
+  function line_error() {
+    error("?UNDEF'D LINE ERROR");
+  }
+  
+  function line_error() {
+    error("?UNDEF'D FUNCTION");
+  }
+  
   function type_error() {
     error('?TYPE MISMATCH ERROR');
   }
@@ -180,7 +226,11 @@
   function div_error() {
     error('?DIVISION BY ZERO ERROR');
   }
-g  
+
+  function complex_error() {
+    error('?FORMULA TOO COMPLEX ERROR');
+  }
+
 </script>
   
 <style>
@@ -526,7 +576,15 @@ INFO:<br><span id='info'></span>
       trace = false, // debug tracing CTRL-P
       tron = false, // TRON/TROFF
       row = 1,
-      col = 2;
+      col = 2,
+
+      // 0=TEXT=LORES0, 1=LORES1, -1=HIRES
+      lores = 0,
+      curx = 0,
+      cury = 0;
+
+
+
 
   // --- slow down!
   // TODO: set if too much screen updates?
@@ -609,12 +667,95 @@ ORIC EXTENDED BASIC Vl.1
 
     domc.cache = {};
   }
-  TEXT.hires = false;
   
   // mode: 0 or 1
-  //function LORES(mode) {
-  //throw "LORES: Not implemented!";
-  //}
+  function LORES(mode) {
+    // DOC: Set text screen mode
+    // 0 - normal text mode
+    // 1 - alt character set moden
+    // New: N lines scroll text at bottom
+    // 3 - like 'HIRES' with 3 lines text
+    // N - same but with N lines
+    tPos(mode);
+    throw "LORES: Not implemented!";
+    lores = mode;
+  }
+
+  function hires() {
+    return lores < 0;
+  }
+
+  function HIRES(mode) {
+    // DOC: Set hiresolution grahics mode
+    // Three 3 lines at bottom is text
+    // New: N lines of text (0--3)
+    if (mode === undefined) mode = -3;
+    tPos(-mode, -mode < SCREEN_ROWS);
+    lores = mode;
+  }
+
+  HELP.related.push('HIRES CIRCLE CHAR CURMOV CURSET DRAW FILL PATTERN POINT  ');
+
+  function setbit(x, y, m) {
+    if (m == 3) return;
+
+    function updatebit(r, c, mask) {
+      r = INT(r); c = INT(c);
+      if (r < 0 || c < 0) return;
+      if (r < SCREEN_ROWS &&
+	  c < SCREEN_COLS) {
+
+	let ch = screen(r, c);
+	
+	switch(m) {
+	case 0: ch &= ~mask; break;
+	case 1: ch |= mask; break;
+	case 2: ch ^= mask; break;
+	}
+	    
+	screen(r, c, ch);
+      }
+    }
+
+    if (hires()) {
+      let mask = 1 << (x % 6);
+      updatebit(y, x/6, mask);
+    } else {
+      let bit = (x % 2) + 2*(y % 3);
+      let mask = bit<5 ? 1 << bit : 64;
+      updatebit(y/3, x/2, mask);
+    }
+  }
+
+  function CURSET(x, y, m) {
+    // Set graphics cursor X, Y
+    // MODE: 0 = clear bit  1 = set bit,
+    //       2 = xor        3 = ignore
+    // New: you can draw outside of screen!
+    curx = x;
+    cury = y;
+    setbit(x, y, m)
+  }
+
+  function CURMOV(dx, dy, m) {
+    // Set graphics cursor X, Y
+    // MODE: 0 = clear bit  1 = set bit,
+    //       2 = xor        3 = ignore
+    // New: you can draw outside of screen!
+    curx += dx;
+    cury += dy;
+    setbit(x, y, m);
+  }
+
+  function FILL(rows, cols, v) {
+    // Fills area of screen set by cursor
+    // ROWS: number of rows to fill
+    // COLS: number of cols to fill
+    // CELL: Cell value to use
+    fill(cury, curx,
+	 rows, INT(cols / 6),
+	 v);
+  }
 
   // Structurally it is very similar to the TEXT mode, with 40 bytes per line, with each byte representing 6 pixels for a total of 240 pixels in width.
   // The main difference is that each line is only one pixel tall instead of 8, so there are 200 of these.
@@ -629,11 +770,6 @@ ORIC EXTENDED BASIC Vl.1
   // This makes a total of 10210 bytes.
 
   // http://twilighte.oric.org/twinew/ula.htm
-  //function HIRES() {
-  //implemented_error('HIRES');
-  //throw "HIRES: Not implemented!";
-  // SCREEN.hires = true;
-  //}
   
 /*
 ince we can POKE any value we like to the screen we can use this to set up a 
@@ -703,11 +839,17 @@ So far the subject of writing
   }
   
   function PLOT(x, y, s) {
-    // DOC: X,Y raw-write VALUE to screen
-    // If number, use it as charcode.
+    // DOC: at X,Y raw-write VALUE to screen
+    // X: 0--39 (include 0--2 !)
+    // Y: 0--26 (not modeline)
+    // String of char code (0-255)
+
     if (printer)
       printer(`[ PLOT(${x},${y},"`);
 
+    iplot(x, y+1, s);
+  }
+  function iplot(x, y, s) {
     if (typeof s === 'number')
       s = String.fromCharCode(s);
     
@@ -726,7 +868,9 @@ So far the subject of writing
       
   function SCRN(x, y) {
     // DOC: Return char/attr at X, Y
-    return screen(y, x);
+    tPos(x, x < SCREEN_COLS);
+    tPos(y, y < SCREEN_ROWS-1);
+    return screen(y+1, x);
   }
   
   function POS() {
@@ -1009,6 +1153,7 @@ CODE CHARACTER Control Code
       alert('putc: only take nubmers: ' +  c);
     putc.count++;
 
+    // print double (at next line too)
     if (double && row+1 < SCREEN_ROWS)
       screen(row+1, col, c);
 
@@ -1019,13 +1164,26 @@ CODE CHARACTER Control Code
     
     // TODO: how to handle inverse?
     let ch = c & 0x7f;
+
+    // raw immediate mode
+    if (raw) {
+      // ESC A => \1
+      if (c < 128) {
+	c = ch & 0x1f;
+      } else {
+	// jsk; extension - allows INVERSE!
+	// ORIC: gives space :-(
+	c = ch;
+      }
+    } else if (c > 127) {
+      raw = true;
+      c = ch; // stripped high-bit
+    }
+
+    // raw next char mode
     if (ch === ESC) return raw = true;
 
     if (raw || ch >= 32) {
-      // in raw 'A' == \1 !!!
-      if (raw)
-	c = c & 0x1f;
-
       screen(row, col, c);
 
       col++;
@@ -1182,21 +1340,32 @@ CODE CHARACTER Control Code
       if (trace) print('-->: ' + r);
 
       // check illegal values
-      if (r === Number.NEGATIVE_INFINITY ||
-	  r === Number.POSITIVE_INFINITY)
-	div_error();
-      if (Number.isNaN(r))
-	type_error();
       if (r === undefined) // ???
 	type_error();
 
-      // TODO: overflow wraparound?
-      
+      if (typeof r === 'number') {
+	if (r === Number.NEGATIVE_INFINITY ||
+	    r === Number.POSITIVE_INFINITY)
+	  div_error();
+	if (Number.isNaN(r))
+	  type_error();
+	// 1. 7E38 -- 2.93E-39 OK!
+	if (r < 2.93E-39 || r > 1.7E38)
+	  overflow_error();
+      }
+     
+      if (typeof r === 'string') {
+	// TODO: relax?
+	if (r.length > 255)
+	  string_error();
+      }
+
       // should we allow extensions?
       if (typeof r === 'object')
 	type_error();
 
       return r;
+
     } catch(e) {
       console.log('?EVAL: ' + x);
       console.log('ERR=', e);
@@ -1211,19 +1380,22 @@ CODE CHARACTER Control Code
     return vars[n];
   }
   
+  // fill text/graphics cells
+  function fill(row, col, rows, cols, v) {
+    for(let r=0; r<rows; r++)
+      for(let c=0; c<cols; c++)
+	screen(row + r, col + c, v);
+  }
+
   // Also CTRL-L
   // TODO: manual says it'll clear screen
   // AND: set it to current INK/PAPER!!!?
   function CLS() {
     showStatus();
     let start = Date.now();
-    // TODO: does it scroll colors?
     // don't touch mode-line
-    for(let row=1; row<SCREEN_ROWS; row++) {
-      for(let col=2; col<SCREEN_COLS; col++) {
-	screen(row, col, 32);
-      }
-    }
+    fill(1, 2, SCREEN_ROWS-1, SCREEN_COLS-2, 32);
+
     row = 1; col = 2; raw = false;
     //dom('error', 'CLS time ' + (Date.now()-start));
   }
@@ -2432,7 +2604,7 @@ $276,$277 Spare counter — also used by WAIT (and printer in V1.0).
 
       // DOC: Read memory byte at ADDR
       // Simulator: only screen memory value!
-      if (SCREEN.hires)
+      if (hires())
 	error('?PEEK/POKE not defined for HIRES mode');
 	
       if (a >= SCREEN &&
@@ -2607,12 +2779,13 @@ $276,$277 Spare counter — also used by WAIT (and printer in V1.0).
   }
   
   // For the HIRES screen: 
-  // CSAVE"filename" ,A40960,E48000 ( 48K Orie)
-  // CSAVE"filename" ,A8192,EIS232 (16K Orie)
+  // CSAVE"filename",A40960,E48000 (48K)
+  // CSAVE"filename",A8192,EIS232 (16K)
+  //
   // For the TEXT and LORES screens: 
-  // CSAVE"filename" ,A48000,E49119 ( 48K Orie)
-  // CSA VE"filename" ,Al5232,El635 l (16K Oriek) 
-  // The start Address and End address will accept either decim
+  // CSAVE"filename",A48000,E49119 (48K)
+  // CSAVE"filename",Al5232,El635l (16K)
+  //
   function CSAVE(name, opt) {
     // DOC: Save program lines
     // foo - in localStorage
@@ -3215,7 +3388,7 @@ errorObj : ${errorObj}
       .match(/(..)/g)
       .join(' ');
     clearline(0);
-    PLOT(2,0,`CHAR '${ch}' ${HEX$(c)} (${c}) ALT: \u0009${ch}\u0008 ${bits}`);
+    iplot(2,0,`CHAR '${ch}' ${HEX$(c)} (${c}) ALT: \u0009${ch}\u0008 ${bits}`);
   }
 
   // This is probably a crazy idea!
@@ -3250,7 +3423,7 @@ errorObj : ${errorObj}
       case '/': // unsifted ? lol
       case '?': 
 	clearline(0);
-	PLOT(0,0,'COLOR:CTRL- ALT- 0 \21'+'1\0\22'+'2 \23'+'3\7\24'+'4 \25'+'5\0\26'+'6 \27'+'7\0');
+	iplot(0,0,'COLOR:CTRL- ALT- 0 \21'+'1\0\22'+'2 \23'+'3\7\24'+'4 \25'+'5\0\26'+'6 \27'+'7\0');
 	break;
       
 	// Yank! (paste line buffer)
@@ -3299,7 +3472,7 @@ errorObj : ${errorObj}
 	// colors ALT  -> 16--23 (bg)
 	editChar(ESC);
 	k = kc-48 + (a?16:0);
-	editChar(k);
+	editChar(k + 64); // ESC A = \1
 	break; }
       }
       //alert('EDITEXT: '+k + ' kc='+kc);
@@ -3329,7 +3502,7 @@ errorObj : ${errorObj}
 
   function clearline(r, optCol) {
     optCol = optCol || 0;
-    PLOT(
+    iplot(
       optCol,
       typeof r==='number'?r:row,
       SPC(40-optCol));
@@ -3338,7 +3511,7 @@ errorObj : ${errorObj}
   function showStatus() {
     function update(col, status, msg) {
       if (col < 0) col += SCREEN_COLS;
-      PLOT(col, 0,
+      iplot(col, 0,
 	   status ? msg : SPC(msg.length));
     }
 

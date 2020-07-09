@@ -1,5 +1,5 @@
 STARTFONT 2.1
-FONT neoletters
+FONT ORIC-ATMOS
 SIZE 16 150 150
 COMMENT x 16 0 -8 ... 16 fixed can't do smaller
 FONTBOUNDINGBOX 6 16 0 -4
