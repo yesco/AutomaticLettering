@@ -121,7 +121,7 @@ function ORIC_generate_BDF(alt) {
       function add(l, r, times) {
 	let bits = (l?0x38:0) | (r?0x7:0);
 	hex += bits.toString(16).padStart(2, '0').repeat(times);
-	console.log(bits.toString(2).padStart(8,'0'));
+	  //console.log(bits.toString(2).padStart(8,'0'));
       }
       //console.log('----------- ' + c);
       add(c &  1, c &  2, 3);

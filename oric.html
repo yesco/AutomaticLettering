@@ -240,17 +240,16 @@
     src: url('oric-atmos-jsk.ttf');
 }
 @font-face {
-    font-family: 'ORIC-ATMOS-ALT';
+    font-family: 'ORIC-ALT';
     src: url('oric-atmos-alt-jsk.ttf');
 }
 
 .text, .hires {
-    font-family: 'oric-atmos', monospace;
     //position: relative;
     //top: 4px;
 
     font-size: 1em;
-    background: yellow;
+    //background: yellow;
     //letter-spacing: -9.3px;
     letter-spacing: -4.565px;
     line-height:12.195px;
@@ -267,7 +266,7 @@
 }
 
 /*container element*/
-span, div {
+.text, .hires, .standard, .oric {
     font-family: 'oric-atmos', monospace;
 }
 
@@ -303,6 +302,11 @@ span, div {
      TODO: I couldn't find a way to translate
      the it and 'clip-y' seems 'overflow-y: hidden isn't working...
  */
+
+.alt {
+    font-family: 'ORIC-ALT', monospace;
+    background: 'yellow';
+}
 
 .double {
     width: 0.30rem;
@@ -410,7 +414,8 @@ g
 <body style='background-color: black; color: white;'>
 <div style='width:100%'>
   <img width='20%' src='oric-logo-black-export.svg'/>
-  <div style='float:right; top:0; width:80%; text-align:center; font-decoration:bold; text-justify:inter-word; font-size:2rem; letter-spacing:3px; '>WEB - BASIC<sup><a tabindex='-1' target='oricman' style='text-decoration:none; font-size:1.1rem; padding:0.1rem; padding-bottom:-0.1rem; color:black; background:white; font-weight:bold; letter-spacing:0px;' href='http://www.defence-force.org/computing/oric/library/lib_manual_oric/files/manual_atmos.pdf'>PDF</a></sup>
+  <div class='oric' style='float:right; top:0; width:80%; text-align:center; font-decoration:bold; text-justify:inter-word; font-size:2rem; letter-spacing:3px; '>WEB - BASIC
+<sup><a tabindex='-1' class='oric' target='oricman' style='text-decoration:none; font-size:1.1rem; padding:0.1rem; padding-bottom:-0.1rem; color:black; background:white; font-weight:bold; letter-spacing:0px;' href='http://www.defence-force.org/computing/oric/library/lib_manual_oric/files/manual_atmos.pdf'>PDF</a></sup>
 <div style='font-size:1rem;'>&copy;jsk@yesco.org</div>
   </div>
 <span style='position:relative; left:3px; top:-7px; letter-spacing:6px; transform-origin:left; transform:scale(1.17, 1);'><b>BASIC</b></span>
@@ -698,7 +703,12 @@ ORIC EXTENDED BASIC Vl.1
     // 3 - like 'HIRES' with 3 lines text
     // N - same but with N lines
     tPos(mode);
-    throw "LORES: Not implemented!";
+
+    let a = mode==0 ? 8 : 9;
+    fill(1, 0, SCREEN_ROWS-1,  a); // alt
+    fill(1, 1, SCREEN_ROWS-1, 16); // black
+
+    alert('done');
     lores = mode;
   }
 
@@ -989,14 +999,32 @@ So far the subject of writing
       // 13 Use Blinking Alternate Charset
       // 14 Use Double Size Blinking Standard Charset
       // 15 Use Double Size Blinking Alternate Char
+
       let alt = c & 1;
       let double = c & 2;
       let blink = c & 4;
-      // TODO: alt - complicated (edit font?)
-      // https://en.fontke.com/font/10042736/
-      // https://github.com/Zigazou/miedit
-      // https://github.com/Zigazou/miedit/tree/master/font
-      
+
+      da.class = '';
+      //da.classList.remove('alt');
+      //da.classList.remove('blink');
+      //da.classList.remove('double');
+
+      // TODO: consider attr12 !
+      if (alt) 
+	da.classList.add('alt');
+      else
+	da.classList.add('standard');
+
+      if (blink)
+	da.classList.add('blink');
+      else
+	da.classList.add('noblink');
+
+      if (double)
+	da.classList.add('double');
+      else
+	da.classList.add('normal');
+
     } else if (c < 24) { // 16-23 paper
       let bg = c & 0x07;
       if (bg > 127) bg = inverse(bg);
@@ -1007,9 +1035,11 @@ So far the subject of writing
     } else {
       // TODO: mode switching
       // idea: make screen garbled? lol
+      // or stretch!
+
       // Video control attributes
-      // 24-27 Switch to TEXT mode (60 Hz)
-      // 28-31 Switch to HIRES mode (60 Hz)
+      // 24-27 Switch to TEXT mode (60 Hz)?
+      // 28-31 Switch to HIRES mode (60 Hz)?
     }
 
     if (t == 32) {
