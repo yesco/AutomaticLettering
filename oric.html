@@ -237,19 +237,71 @@ span, div { font-family: 'oric-atmos', monospace; }
      TODO: I couldn't find a way to translate
      the it and 'clip-y' seems 'overflow-y: hidden isn't working...
  */
-  .double {
-      width: 0.30rem;
-      border: 0px;
-      padding-left: 0.25rem;
 
-      //max-height: 45px;
-      transform:
-	  scale(1, 2)
-	       /* translateY(15px); */
-      ;
-      overflow-x: visible;
-      /* overflow-y: hidden; /* doesn't work */
-  }
+.double {
+    width: 0.30rem;
+    border: 0px;
+    padding-left: 0.25rem;
+      
+    //max-height: 45px;
+    transform:
+	scale(1, 2)
+    /* translateY(15px); */
+    ;
+    overflow-x: visible;
+    /* overflow-y: hidden; /* doesn't work */
+  
+}
+    
+/* when displaying attributes...
+   add this to a parent class (#screen) */
+
+.show-attr {
+    --vis-attr: visible;
+}
+
+.attr {
+    visibility: var(--vis-attr, hidden);
+    font-weight: bold;
+    /* this shows white on white! */
+    filter: invert(20%);
+}
+
+/* INVERSE */
+/* TODO: not correct as it only blinks specified colors? */
+.inverse {
+    filter: invert(100%);
+}
+
+.cursor {
+    animation: cursor_blinker 0.5s step-start infinite;
+
+    /* this is confusing, it only inverts background when set! */
+
+    background: black;
+}
+
+@keyframes cursor_blinker {
+    50% {
+	filter: invert(100%);
+    }
+}
+
+/* BLINK
+g
+   https://stackoverflow.com/questions/16344354/how-to-make-blinking-flashing-text-with-css-3
+   The best way to get a pure "100% on, 100% off" blink, like the old <blink> is like this
+*/
+
+.blink {
+    animation: blinker 1s step-start infinite;
+}
+
+@keyframes blinker {
+    50% {
+	opacity: 0;
+    }
+}
 
 #printer {
     color: blue;
@@ -257,6 +309,7 @@ span, div { font-family: 'oric-atmos', monospace; }
     padding-right: 2rem;
     background: beige;
 }
+
 /* TODO: doesn't work on "lines"
 #printer:nth-child(2n+0) {
     background: beige;
@@ -264,8 +317,6 @@ span, div { font-family: 'oric-atmos', monospace; }
 #printer:nth-child(2n+1) {
     color: lightskyblue;
 */
-}
-
 </style>
   
 <script src='oric-exp.js'>
@@ -290,14 +341,49 @@ g</div>
 <span style='transform-origin:left; transform:scale(1.8, 1);'><b>&nbsp;&nbsp;B A S I C</b></span>
 </div>
 
-<div id='bits'>
-</div>
+<br>
 
 <!-- seemingly useless span, but need for getting correct width of 'screen'-->
 <center><span id='foo'>
-<div id='screen' style='color:white; background:black; font-size: 1.5rem; overflow:hidden; xtext-align: left; white-space:nowrap;'>
+<div id='screen' style='color:white; background:black; font-size: 1.5rem; overflow:hidden; xtext-align: left; white-space:nowrap; --vis-attr:hidden;'>
 </div>
 </span></center>
+
+<style>
+.oricl, .oricr {
+    background: red;
+    width: 30px;
+    height: 25px;
+    border: 2px solid black;
+    color: white;
+    font-size: 15px;
+    text-align: center;
+    margin: auto;
+    font-weight: bold;
+}
+.oricl {
+    float: left;
+}
+.oricr {
+    float: rigth;
+}
+</style>
+
+<div style='width:100%' hidden>
+  <span class='oricl'>CAPS</span>
+  <span class='oricr'>ENTER</span>
+
+  <div class='oricl'>SHIFT</div>
+  <div class='oricr'>^</div>
+
+  <div class='oricr'>CTRL</div>
+  <div class='oricr'>FUNC</div>
+  <div class='oricl'>&gt;</div>
+  <div class='oricl'>v</div>
+  <div class='oricl'>&lt;</div>
+</div>
+
+
 
 <script>
   window.onresize = function(){
@@ -700,6 +786,8 @@ So far the subject of writing
     // interpret char/attribute
     let c = ch & 0x7f;
 
+    dc.classList.remove('attr');
+
     if (ch > 255) { // unicode! lol
       if (ch == 127) {
 	// ATMOS font put it in unicode place!
@@ -718,7 +806,9 @@ So far the subject of writing
       let fg = c & 0x07;
       if (c > 127) fg = inverse(fg);
       da.style.color=color[fg];
-      t = 32; // blankk it out
+      //t = 32; // blankk it out
+      t = 48 + fg; // hidden
+      dc.classList.add('attr');
     } else if (c < 16) {
       // Character Set modifier
       // 8  Use Standard Charset
@@ -741,7 +831,9 @@ So far the subject of writing
       let bg = c & 0x07;
       if (bg > 127) bg = inverse(bg);
       da.style.backgroundColor=color[bg];
-      t = 32; // blankk it out
+      //t = 32; // blankk it out
+      t = 48 + bg; // hidden
+      dc.classList.add('attr');
     } else {
       // TODO: mode switching
       // idea: make screen garbled? lol
@@ -857,10 +949,8 @@ l0 FOR I=0 TO 7
     if (!cursorVisible) return;
     cursorVisible = false;
     let d = domc(`cr${row}c${col}`);
-    // TODO: implement real inverse
-    // here we don't know actual color!
-    d.style.backgroundColor = '';
-    d.style.color = '';
+    //d.classList.remove('inverser');
+    d.classList.remove('cursor');
   }
   function cursorShow() {
     // TODO: right place? lol
@@ -869,10 +959,7 @@ l0 FOR I=0 TO 7
     if (!cursor || cursorVisible) return;
     cursorVisible = true;
     let d = domc(`cr${row}c${col}`);
-    // TODO: implement real inverse
-    // here we don't know actual color!
-    d.style.backgroundColor = 'black';
-    d.style.color = 'white';
+    d.classList.add('cursor');
   }
   
 /*
@@ -1113,6 +1200,7 @@ CODE CHARACTER Control Code
   // TODO: manual says it'll clear screen
   // AND: set it to current INK/PAPER!!!?
   function CLS() {
+    showStatus();
     let start = Date.now();
     // TODO: does it scroll colors?
     // don't touch mode-line
@@ -2883,6 +2971,7 @@ errorObj : ${errorObj}
     else
       c = c.toLowerCase();
     line += c;
+    console.log(c.charCodeAt(0));
     putc(c.charCodeAt(0)); // lol
 
     cursorShow();
@@ -3081,6 +3170,10 @@ errorObj : ${errorObj}
 
   function editCopy() {
     let c = screen(row, col);
+    // escape read attributes
+    if ((c & 0x7f) < 32) {
+      editChar(27);
+    }
     editChar(c);
   }
 
@@ -3234,6 +3327,8 @@ errorObj : ${errorObj}
 	|| kc==13 || kc==8
 	|| (37<=kc && kc<=40))
       clickSound(true);
+    if (c && a)
+      dom('screen').classList.toggle('show-attr');
 
     // editing
     if (kc==13) editEnter();

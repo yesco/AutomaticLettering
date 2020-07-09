@@ -111,13 +111,21 @@ ${hex.match(/(..)/g, '$1').join('\n')}
 ENDCHAR`);
 }
 
-function ORIC_generate_BDF() {
+function ORIC_generate_BDF(alt) {
   let start = 32, afterlast = 128
 
   let out = [];
-  // dump the ORIC FONT
-  for(let c=start; c<afterlast; c++) {
-    out.push(ORIC_char_BDF(c));
+
+  // generate ALT blockfont
+  if (alt) {
+    for(let c=32; c<96; c++) {
+      out.push(ORIC_char_BDF(c));
+    }
+  } else {
+    // dump the ORIC FONT
+    for(let c=32; c<128; c++) {
+      out.push(ORIC_char_BDF(c));
+    }
   }
 
   out.push(
@@ -171,5 +179,5 @@ function ORIC_font_has(hex) {
 
 // from nodejs: generate
 if (typeof require !== 'undefined') {
-    ORIC_generate_BDF();
+  ORIC_generate_BDF(argv[2] === 'alt');
 }
