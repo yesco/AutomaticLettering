@@ -522,6 +522,7 @@ INFO:<br><span id='info'></span>
       column = false,
       scoff = 0, // screen off if > 0 (count!)
       printer = undefined,
+      double = false,
       trace = false, // debug tracing CTRL-P
       tron = false, // TRON/TROFF
       row = 1,
@@ -554,6 +555,7 @@ INFO:<br><span id='info'></span>
     click = true;
     column = false;
     printer = undefined;
+    double = false;
     trace = false;
     tron = false;
     forceUpdate = false;
@@ -1007,6 +1009,9 @@ CODE CHARACTER Control Code
       alert('putc: only take nubmers: ' +  c);
     putc.count++;
 
+    if (double && row+1 < SCREEN_ROWS)
+      screen(row+1, col, c);
+
     // TODO: if scoff should we printer?
     if (printer) printer(c);
     
@@ -1017,7 +1022,12 @@ CODE CHARACTER Control Code
     if (ch === ESC) return raw = true;
 
     if (raw || ch >= 32) {
+      // in raw 'A' == \1 !!!
+      if (raw)
+	c = c & 0x1f;
+
       screen(row, col, c);
+
       col++;
       raw = false;
       if (raw) alert('c===' + c);
@@ -1238,9 +1248,11 @@ CODE CHARACTER Control Code
       txt = '' + txt;
     }
     
-    // make sure we have text
-    for(let i=0; i<txt.length; i++)
-      putc(txt.charCodeAt(i));
+    for(let i=0; i<txt.length; i++) {
+      let c = txt.charCodeAt(i);
+      putc(c);
+    }
+
     if (!nonewline) putc(10);
   }
 
@@ -1901,8 +1913,8 @@ This command works exactly the same as a PRINT statement except that it is used 
       princ(' BREAK IN   '+lineno);
       CONT.lineno = lno;
       CONT.line = l;
+      prompt();
     }
-    prompt();
     cursorShow();
   }
   
@@ -2976,7 +2988,6 @@ errorObj : ${errorObj}
     else
       c = c.toLowerCase();
     line += c;
-    console.log(c.charCodeAt(0));
     putc(c.charCodeAt(0)); // lol
 
     cursorShow();
@@ -3287,9 +3298,9 @@ errorObj : ${errorObj}
 	}
 	// colors CTRL ->  0-- 7 (fg)
 	// colors ALT  -> 16--23 (bg)
-	putc(ESC);
+	editChar(ESC);
 	k = kc-48 + (a?16:0);
-	putc(k);
+	editChar(k);
 	break; }
       }
       //alert('EDITEXT: '+k + ' kc='+kc);
@@ -3428,6 +3439,10 @@ function hscroll(srow, erow, noClr) {
     }
 
     if (c && k=='n') clearline(row, 2);
+    if (c && k=='j') ; // down (rotate?)
+    if (c && k=='k') ; // up (rotate?)
+    if (c && k=='m') col = 2; // CR
+    //if (c && k=='u') ; // uglies
 
     // arrow, C-arrow
     let char = screen(row, col);
@@ -3471,8 +3486,8 @@ function hscroll(srow, erow, noClr) {
     if (k=='p') showStatus(printerToggle());
     if (k=='t') showStatus(caps = !caps);
     if (k=='s') showStatus(scoff=scoff?0:1);
+    if (k=='d') showStatus(double=!double);
     if (k=='f') clickToggle();
-    if (k=='d') doubleToggle();
     if (k=='g') bell();
 
     if (k=='j') showStatus(column = !column);
