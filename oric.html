@@ -317,7 +317,6 @@
 
 .alt {
     font-family: 'ORIC-ALT', monospace;
-    background: 'yellow';
 }
 
 .double {
@@ -431,7 +430,7 @@ g
 <sup><a tabindex='-1' class='oric' target='oricman' style='text-decoration:none; font-size:1.1rem; padding:0.1rem; padding-bottom:-0.1rem; color:black; background:white; font-weight:bold; letter-spacing:0px;' href='http://www.defence-force.org/computing/oric/library/lib_manual_oric/files/manual_atmos.pdf'>PDF</a></sup>
 <div style='font-size:1rem;'>&copy;jsk@yesco.org</div>
   </div>
-<span style='position:relative; left:3px; top:-7px; letter-spacing:6px; transform-origin:left; transform:scale(1.17, 1);'><b>BASIC</b></span>
+<span class='oric' style='position:relative; left:3px; top:-7px; letter-spacing:6px; transform-origin:left; transform:scale(1.17, 1);'><b>BASIC</b></span>
 </div>
 
 <br>
@@ -733,14 +732,8 @@ ORIC EXTENDED BASIC Vl.1
     // actually, LORES fills screen with
     // background == black
 
-    // TODO: debug, this give black on black
-    fill(1, 2, SCREEN_ROWS-1, SCREEN_COLS-2, 9);
-    // then first column is 9 for graphics
     let a = mode==0 ? 8 : 9;
-//    fill(1, 0, SCREEN_ROWS-1, 1,  a);
-
-    // TODO: ink white (maybe not needed?)
-    //fill(1, 1, SCREEN_ROWS-1, 1, 7);
+    fill(1, 0, SCREEN_ROWS-1, SCREEN_COLS, a);
 
     lores = mode;
   }
@@ -775,7 +768,7 @@ ORIC EXTENDED BASIC Vl.1
 
       if (!hires()) {
 	r++;  // skip status line
-	c+=2; // skip control columns
+	c++; // skip first control column
       }
 
       if (r < SCREEN_ROWS &&
@@ -848,8 +841,8 @@ ORIC EXTENDED BASIC Vl.1
     let iy = dy/steps;
     let x = curx, y = cury;
     for(let i=0; i<steps; i++) {
-      x += ix; y += iy;
       setbit(x, y, m);
+      x += ix; y += iy;
     }
     curx = curx + dx;
     cury = cury + dy;
@@ -1074,12 +1067,15 @@ So far the subject of writing
     // interpret char/attribute
     let c = ch & 0x7f;
 
-    //dc.classList.remove('attr');
+    // clear all
     da.style = '';
-    da.class = '';
-    dc.style = '';
-    dc.class = '';
+    da.className = '';
 
+    dc.style = '';
+    dc.className = '';
+    dc.textContent = '';
+
+    // process byte
     if (ch > 255) { // unicode! lol
       if (ch == 127) {
 	// ATMOS font put it in unicode place!
@@ -1094,7 +1090,7 @@ So far the subject of writing
       t = ch & 0x7f; 
     } else if (ch < 0) { // bits...
       t =  BRAILLE - ch; // so it get's "added"
-    } else if (c < 8) { // ink
+    } else if (c < 8) { // INK
       let fg = c & 0x07;
       if (c > 127) fg = inverse(fg);
       da.style.color=color[fg];
@@ -1117,15 +1113,15 @@ So far the subject of writing
       let blink = c & 4;
 
       da.class = '';
-      //da.classList.remove('alt');
-      //da.classList.remove('blink');
-      //da.classList.remove('double');
 
       // TODO: consider attr12 !
-      if (alt) 
+      if (alt) {
 	da.classList.add('alt');
-      else
+	t = 'A'.charCodeAt(0);
+      } else {
 	da.classList.add('standard');
+	t = 'T'.charCodeAt(0);
+      }
 
       if (blink)
 	da.classList.add('blink');
@@ -1137,13 +1133,19 @@ So far the subject of writing
       else
 	da.classList.add('normal');
 
+      // hidden
+      dc.classList.add('attr');
+
     } else if (c < 24) { // 16-23 paper
+
       let bg = c & 0x07;
       if (bg > 127) bg = inverse(bg);
       da.style.backgroundColor=color[bg];
-      //t = 32; // blankk it out
-      t = 48 + bg; // hidden
+
+      // hidden
+      t = 48 + bg;
       dc.classList.add('attr');
+
     } else {
       // TODO: mode switching
       // idea: make screen garbled? lol
@@ -1162,11 +1164,8 @@ So far the subject of writing
 
     // get out if set colors
     if (c < 32) return;
-    
-    // reset any attribute set previously
-    da.style.color='';
-    da.style.backgroundColor='';
   }
+
   screen.readcount = 0;
   screen.writecount = 0;
 
@@ -3650,6 +3649,37 @@ errorObj : ${errorObj}
   }
   
   // A graphical edit mode!
+  // ======================
+  // https://www.oric.org/software/lorigraph-1241.html
+  // TODO: Lorigraph was apparently one of
+  // the better drawing programs for ORIC
+  // Features:
+  // - pixel (' ', 1, 0)
+  // - line (l)
+  // - line-line-line (l arrow l arrow l))
+  // - star (back to origin) (l o arrow l o)
+  // - rectangle (m arrow r)
+  // - ROMB! (TODO:)
+  // - attributes (TODO:)
+  // - block (?) (TODO:)
+  // - swap (TODO:)
+  // - copy (TODO:)
+  // - mirror (TODO:)
+  // - chars (symbols, fonts)
+  // - text (oric) (TODO:)
+  // - erase (TODO:)
+  // - invert (TODO:) kind of a "fill"
+  // - rotation (TODO:)
+  // - flip (rot, mirror, unrot) (TODO:)
+  // - fill (I'm assuming 'paint') (TODO:)
+  // - print (TODO:)
+  // - save (TODO:)
+  // - load (TODO:)
+  // - pattern (TODO:)
+  // - paper
+  // - ink
+  // - write/erase (xor?)
+
   var gCommands = {
     ox: undefined,
     oy: undefined,
@@ -3665,8 +3695,8 @@ errorObj : ${errorObj}
       if (hires()) {
 	throw "gCommands: hires mode not implemented";
       } else {
-	curx = (SCREEN_COLS-2) * 2 / 2;
-	cury = (SCREEN_ROWS-1) * 3 / 2;
+	curx = INT((SCREEN_COLS-1) * 2 / 2);
+	cury = INT((SCREEN_ROWS-1) * 3 / 2);
 	this.mark();
       }
     },
@@ -3732,30 +3762,35 @@ errorObj : ${errorObj}
       this.other();
       CIRCLE(r, this.mode);
       this.other();
-      this.mark();
+      // save current pos
+      this.push();
       return INT(r);
     },
-    'r': function rectangle() {
+    'r': function rect() {
       let x = curx, y = cury;
+      this.other();
       DRAW(this.ox-x, 0, this.mode);
       DRAW(0, this.oy-y, this.mode);
       DRAW(x-this.ox, 0, this.mode);
       DRAW(0, y-this.oy, this.mode);
-      this.mark();
+      this.other();
     },
     'q': function quit() {
       if (hires()) {
-	throw 'GRAPHICS:quit not defined for hires yet!';
+	throw 'GEDIT: quit not defined for hires yet!';
       } else {
-	col = curx / 2;
-	row = cury / 3;
+	// move cursor to same cell!
+	col = INT(curx / 2);
+	row = INT(cury / 3);
       }
 
       // cleanup
       this.cross();
+      this.ocross();
       gedit = false;
 
-      return 'GRAPHICS OFF';
+      cursorShow();
+      return 'GEDIT BYE!';
     },
     // also works as init function
     cross: function cross() {
@@ -3768,15 +3803,29 @@ errorObj : ${errorObj}
 
       let x=curx;
       let y=cury;
-      let z=7;
+      let z=5;
 
-      CURMOV(z/2, 0, 3);
-      DRAW(-z, 0, 2);
-      CURMOV(z/2, z/2, 3);
-      DRAW(0, -z, 2);
+      CURSET(x, y, 3); DRAW(+z, 0, 2);
+      CURSET(x, y, 3); DRAW(-z, 0, 2);
+      CURSET(x, y, 3); DRAW( 0,+z, 2);
+      CURSET(x, y, 3); DRAW( 0,-z, 2);
 
       CURSET(x, y, 3);
     },
+    // show other "cross"
+    ocross: function ocross(x, y) {
+      let sx=curx;
+      let sy=cury;
+      let z=3;
+
+      CURSET(x, y, 3); DRAW(+z,+z, 2);
+      CURSET(x, y, 3); DRAW(-z,-z, 2);
+      CURSET(x, y, 3); DRAW(+z,-z, 2);
+      CURSET(x, y, 3); DRAW(-z,+z, 2);
+
+      CURSET(sx, sy, 3);
+    },
+
     arrowup: function(){cury-=this.step},
     arrowdown: function(){cury+=this.step},
     arrowleft: function(){curx-=this.step},
@@ -3801,9 +3850,13 @@ errorObj : ${errorObj}
       iplot(0, 0, txt);
     }
     
-    try  {
+    // draw x
     g.cross();
-} catch(e) {alert('cross: ' +e); }
+
+    // undraw o
+    if (typeof editG.ox !== 'undefined')
+      g.ocross(editG.ox, editG.oy);
+    editG.ox = undefined;
 
     if (s)
       g.step = 10;
@@ -3814,10 +3867,10 @@ errorObj : ${errorObj}
 
     // undo
     //if (c && g.last) g.last.call(g);
-    if (c) g.circle();
+    //if (c) g.circle();
 
     let f = g[k] || g.nofunc;
-    msg('GRAPHICS.' + f.name);
+    msg('GEDIT.' + f.name);
     let r;
     try  {
       r = f.call(g, k, kc, a, s, c, e);
@@ -3825,12 +3878,13 @@ errorObj : ${errorObj}
       r = '?ERROR: ' + e;
     }
     if (r)
-      msg('GRAPHICS.' + f.name + ': ' + r);
-    let p = `(${curx} ${cury})`;
+      msg('GEDIT.' + f.name + ': ' + r);
+
+    let p = '\3'+`${ABS(curx-g.ox)} ${ABS(cury-g.oy)}`+'\2'+`${curx} ${cury}`;
     iplot(40-p.length, 0, p);
    
     // save for undo
-    if (c) g.circle();
+    //if (c) g.circle();
     
     //if (c && g.last) {
     //g.last.call(g);
@@ -3838,6 +3892,13 @@ errorObj : ${errorObj}
     //g.last = f;
   //}
 
+    // draw o
+    editG.ox = g.ox;
+    editG.oy = g.oy;
+    if (typeof editG.ox !== 'undefined')
+      g.ocross(editG.ox, editG.oy);
+
+    // draw x
     g.cross();
   }
 
@@ -3868,6 +3929,7 @@ errorObj : ${errorObj}
 
   function showStatus() {
     function update(col, status, msg) {
+
       if (col < 0) col += SCREEN_COLS;
       iplot(col, 0,
 	   status ? msg : SPC(msg.length));
@@ -3881,7 +3943,7 @@ errorObj : ${errorObj}
     clearline(0);
     
     // gEdit mode
-    update(0, gedit, 'GRAPHICS MODE');
+    update(0, gedit, 'GEDIT');
 
     // CTRL-Q: toggle cursor
     update(-4, caps, 'CAPS');
@@ -3944,17 +4006,19 @@ function hscroll(srow, erow, noClr) {
 
     //console.log("KEY kc="+kc+" c="+c+" a="+a+" s="+s);
 
+    // magicall show attributes!
+    if (c && a)
+      dom('screen').classList.toggle('show-attr');
+
+    // if in gedit mode, don't do any more
     if (gedit && k.length!=1)
       return editG(k, kc, a, s, c, e);
 
+    // make ctrl click sound
     if ((c && !a && !s && k !== 'control')
 	|| kc==13 || kc==8
 	|| (37<=kc && kc<=40))
       clickSound(true);
-
-    // magicall show attributes!
-    if (c && a)
-      dom('screen').classList.toggle('show-attr');
 
     // editing
     if (kc==13) {
@@ -3992,7 +4056,7 @@ function hscroll(srow, erow, noClr) {
     if ((c || a) && k.length==1)
       editExt(k, kc, a, s, c, e);
 
-    // gedit mode
+    // gedit mode?
     if (a && !c && k=='g') {
       cursorHide();
       editG('cross');
