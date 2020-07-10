@@ -595,8 +595,6 @@ INFO:<br><span id='info'></span>
 	SCREEN_ROWS = 28, // ORIC: 28
 	
 	LastOne = 'foo';
-  
-  
 
   // Global ORIC ATMOS state
   let vars = {},
@@ -1273,6 +1271,33 @@ l0 FOR I=0 TO 7
     d.classList.add('cursor');
   }
   
+function scroll(srow, erow, noClr) {
+  //alert(srow + ', ' + erow + ' dir='+dir);
+  let dir = srow > erow ? 1 : -1;
+  //srow += dir;
+  //erow += dir;
+  //alert(srow + ', ' + erow + ' dir='+dir);
+
+  console.log('srow='+srow+' erow='+erow+' dir='+dir);
+  // copy FROM row
+  for(let r=erow; r!=srow; r+= erow<srow?1:-1) {
+    console.log('r=', r);
+    // generalize for sideways scroll!
+    for(let c=0; c<SCREEN_COLS; c++) {
+      //console.log('r=', r, 'c=', c);
+      let old = screen(r, c);
+      let nw = screen(r+dir,c);
+      if (nw != old)
+	screen(r, c, nw);
+    }
+  }
+  // TODO: if not hidden column mode?
+  if (!noClr) {
+    for(let c=2; c<SCREEN_COLS; c++)
+      screen(srow, c, 32);
+  }
+}
+
 /*
 Codes0-31 
 CODE CHARACTER Control Code 
@@ -1366,33 +1391,17 @@ CODE CHARACTER Control Code
       screen(row, col, 32);
     }
 
-    // TODO: should be SCREEN_COLS????
-    if (col >= SCREEN_COLS) { row++; col = 2; }
-
-    // scroll!
+    if (col >= SCREEN_COLS) {
+      row++;
+      col = 2;
+    }
+    
     if (row >= SCREEN_ROWS) {
-      putc.scrollcount++;
-      let start = Date.now();
-
-      for(let r=2; r<SCREEN_ROWS; r++) {
-	for(let c=0; c<SCREEN_COLS; c++) {
-	  let old = screen(r-1, c);
-	  let nw = screen(r,c);
-	  if (nw != old)
-	    screen(r-1, c, nw);
-	}
-      }
-
-      // TODO: if not hidden column mode?
-      row = 27;
-      for(let c=2; c<SCREEN_COLS; c++) {
-	screen(row, c, 32);
-      }
-      //screen(row, 0, paper);
-      //screen(row, 1, ink);
-      //dom('info', 'scroll time='+(Date.now()-start), 'lp');
+      scroll(SCREEN_ROWS-1, 1);
+      row = SCREEN_ROWS-1;
     }
   }
+
   putc.count = 0;
   putc.scrollcount = 0;
 
@@ -3964,40 +3973,6 @@ errorObj : ${errorObj}
     scoff = saved;
   }
   
-// TODO: merge with putc/scroll
-//scroll(2, SCREEN_ROWS);
-function scroll(srow, erow, noClr) {
-  try {
-    hscroll(srow, erow, noClr);
-  } catch(e) {alert('scroll: '+e);}
-}
-function hscroll(srow, erow, noClr) {
-  //alert(srow + ', ' + erow + ' dir='+dir);
-  let dir = srow > erow ? 1 : -1;
-  //srow += dir;
-  //erow += dir;
-  //alert(srow + ', ' + erow + ' dir='+dir);
-
-  console.log('srow='+srow+' erow='+erow+' dir='+dir);
-  // copy FROM row
-  for(let r=erow; r!=srow; r+= erow<srow?1:-1) {
-    console.log('r=', r);
-    // generalize for sideways scroll!
-    for(let c=0; c<SCREEN_COLS; c++) {
-      //console.log('r=', r, 'c=', c);
-      let old = screen(r, c);
-      let nw = screen(r+dir,c);
-      if (nw != old)
-	screen(r, c, nw);
-    }
-  }
-  // TODO: if not hidden column mode?
-  if (!noClr) {
-    for(let c=2; c<SCREEN_COLS; c++)
-      screen(srow, c, 32);
-  }
-}
-
   dom('exp').addEventListener('keydown', function(e) {
     let c=e.ctrlKey,a=e.altKey,s=e.shiftKey;
     let k = e.key.toLowerCase();
