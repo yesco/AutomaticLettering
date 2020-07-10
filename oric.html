@@ -346,7 +346,7 @@
     visibility: var(--vis-attr, hidden);
     font-weight: bold;
     /* this shows white on white! */
-    filter: invert(20%);
+    filter: invert(3g0%);
 }
 
 /* INVERSE */
@@ -716,24 +716,73 @@ ORIC EXTENDED BASIC Vl.1
   
   // mode: 0 or 1
   function LORES(mode) {
-    // DOC: Set text screen mode
-    // 0 - normal text mode
-    // 1 - alt character set moden
+    // DOC: Set screen mode
+    // 0 - text mode
+    // 1 - alt character
+    // New: "LORES" => preserve text!
 
     // TODO:
+    // New: LORES 2 background attr mode!
+    //   (draw w any color! 25x40
     // New: N lines scroll text at bottom
     // 3 - like 'HIRES' with 3 lines text
     // N - same but with N lines
-    // LORES - attr mode! (draw w any color!)
-    tPos(mode);
+
+    //tPos(mode);
 
     // actually, LORES fills screen with
     // background == black
 
-    let a = mode==0 ? 8 : 9;
-    fill(1, 0, SCREEN_ROWS-1, SCREEN_COLS, a);
+    let text = 8, alt = 9;
 
-    lores = mode;
+    if (mode > 0) {
+      let a = mode==0 ? text : alt;
+      fill(1, 0, SCREEN_ROWS-1, SCREEN_COLS, a);
+
+      lores = mode;
+      return;
+    }
+
+    // NEW!
+
+    // TODO: and back -> default text
+    // change any 9,9 -> 8,9!
+
+    // tries to preserve text!
+    let last, lasthi;
+    for(let r=1; r<SCREEN_ROWS; r++) {
+      // ignore paper + ink ...
+      screen(r, 0, 32); // set first col
+      screen(r, 1, 32); // set second col
+      
+      last = undefined; lasthi = 0;
+      for(let c=0; c<SCREEN_COLS; c++) {
+
+	let ch = screen(r, c);
+	let hi = ch & 0x80f;
+	let c7 = ch & 0x7f;
+
+	//console.log(`${r} ${c} [${ch}]`);
+	if ((c7 === 0 || c7 === 7)
+	    && col === 1) {
+	  // default color, steal it!
+	  //screen(r, c, alt+hi); // alt
+	}
+
+	// steal any space!
+	// if text follows we'll fix it!
+	if (c7 === 32)
+	  screen(r, c, alt+hi); // alt
+	
+	if (c7 > 32 && last === 32) {
+	  // we got text, need to patch
+	  // c-1 is safe as we put 9 in 0
+	  screen(r, c-1, text+lasthi);
+	}
+	
+	last = c7; lasthi = hi;
+      }
+    }
   }
 
   function hires() {
@@ -1115,10 +1164,10 @@ So far the subject of writing
       // TODO: consider attr12 !
       if (alt) {
 	da.classList.add('alt');
-	t = 'A'.charCodeAt(0);
+	t = 'a'.charCodeAt(0);
       } else {
 	da.classList.add('standard');
-	t = 'T'.charCodeAt(0);
+	t = '$'.charCodeAt(0);
       }
 
       if (blink)
@@ -3568,6 +3617,7 @@ errorObj : ${errorObj}
   // This is probably a crazy idea!
   // adding full TELETEXT EDITING!
   function editExt(k, kc, a, s, c, e) {
+    e.preventDefault();
     try{
       cursorHide();
       //if (!k.match(/[0-9a-z]/)) return;
@@ -3580,7 +3630,7 @@ errorObj : ${errorObj}
 	// ins char shift right after cursor
       case 'i': 
 	if (c) {
-	  for(let i=SCREEN_COLS-1; i>col; i--)
+	  for(let i=SCREEN_COLS-2; i>col; i--)
 	    screen(row, i, screen(row, i-1));
 	  screen(row, col, 32);
 	}
@@ -3689,6 +3739,7 @@ errorObj : ${errorObj}
   // - ink
   // - write/erase (xor?)
 
+  // this contains state as well as impl
   var gCommands = {
     ox: undefined,
     oy: undefined,
@@ -3698,7 +3749,7 @@ errorObj : ${errorObj}
     stack: [], // lol
     index: 0,
 
-    'h': function home() {
+    h: function home() {
       this.ox = curx;
       this.oy = cury;
       if (hires()) {
@@ -3713,20 +3764,20 @@ errorObj : ${errorObj}
       CURMOV(0, 0, 2);
       this.mark();
     },
-    '0': function clear() {
+    0: function unset() {
       CURMOV(0, 0, 0);
       this.mark();
     },
-    '1': function set() {
+    1: function set() {
       CURMOV(0, 0, 1);
       this.mark();
     },
-    'm': function mark() {
+    m: function mark() {
       this.ox = curx;
       this.oy = cury;
       this.push();
     },
-    'o': function other() {
+    o: function other() {
       let x=curx; curx=this.ox; this.ox=x;
       let y=cury; cury=this.oy; this.oy=y;
       CURSET(curx, cury, 3);
@@ -3747,25 +3798,28 @@ errorObj : ${errorObj}
       CURSET(r.x, r.y, 3);
       return this.stack.length;
     },
-    'p': function prev() {
+    p: function prev() {
       if (this.index > 0) this.index--;
       let pos = this.stack[this.index];
       CURSET(pos.x, pos.y, 3);
       return this.index;
     },
-    'n': function next() {
+    n: function next() {
       if (this.index+1 < this.stack.length)
 	this.index++;
       let pos = this.stack[this.index];
       CURSET(pos.x, pos.y, 3);
       return this.index;
     },
-    'l': function line() {
+    L: function lores() {
+      LORES();
+    },
+    l: function line() {
       this.other();
       DRAW(this.ox-curx, this.oy-cury, this.mode);
       this.mark();
     },
-    'c': function circle() {
+    c: function circle() {
       sq = (v)=>v*v;;
       let r = SQR(sq(this.ox-curx) + sq(this.oy-cury));
       this.other();
@@ -3775,7 +3829,7 @@ errorObj : ${errorObj}
       this.push();
       return INT(r);
     },
-    'r': function rect() {
+    r: function rect() {
       let x = curx, y = cury;
       this.other();
       DRAW(this.ox-x, 0, this.mode);
@@ -3784,32 +3838,32 @@ errorObj : ${errorObj}
       DRAW(0, y-this.oy, this.mode);
       this.other();
     },
-    'q': function quit() {
+    q: function quit() {
       if (hires()) {
 	throw 'GEDIT: quit not defined for hires yet!';
       } else {
-	// move cursor to same cell!
-	col = INT(curx / 2);
-	row = INT(cury / 3);
+
       }
 
-      // cleanup
-      this.cross();
-      this.ocross();
       gedit = false;
 
       cursorShow();
-      return 'GEDIT BYE!';
+      return 'BYE!';
     },
     // also works as init function
-    cross: function cross() {
+    init: function init() {
+      cursorHide();
+
       if (typeof this.ox === 'undefined') {
-	// init
+	// init if first time only
 	this.h();
 	this.ox = curx;
 	this.oy = cury;
       }
 
+      gedit = true;
+    },
+    cross: function cross() {
       let x=curx;
       let y=cury;
       let z=5;
@@ -3834,15 +3888,44 @@ errorObj : ${errorObj}
 
       CURSET(sx, sy, 3);
     },
-
     arrowup: function(){cury-=this.step},
     arrowdown: function(){cury+=this.step},
     arrowleft: function(){curx-=this.step},
     arrowright: function(){curx+=this.step},
 
-    nofunc: function NOFUNC(k) {
-      return `"${k}"`;
+    nofunc: function nofunc(k) {
+      return `?-help q-quit`;
     },
+
+    // unhifted ?
+    '/': function(){this.help()},
+    '?': function help() {
+      // TODO: saveScreen();
+      let h =
+`
+G(raphical) EDIT
+  by (c) Jonas S Karlsson
+
+A raw screen editor:
+- text and attr line editing (TEXT)
+- graphical TELETEXT drawing (LORES 1)
+`;
+      
+      CLS();
+      print(h);
+      // print K-name ...
+      Object.keys(this).filter(
+	k=>k.length==1).sort().map(
+	  k=>k+'-'+this[k].name)
+	.forEach(s=>{
+	  if (s.length + POS() >= SCREEN_COLS)
+	    TAB();
+	  princ(s); TAB();
+	});
+	
+      // TODO: restoreScreen();
+    },
+
   };
   // make all functions keys too!
   Object.keys(gCommands).forEach(
@@ -3859,14 +3942,19 @@ errorObj : ${errorObj}
       iplot(0, 0, txt);
     }
     
-    // draw x
-    g.cross();
+    // undraw if needed
+    if (gedit) {
 
-    // undraw o
-    if (typeof editG.ox !== 'undefined')
-      g.ocross(editG.ox, editG.oy);
-    editG.ox = undefined;
+      // undraw x
+      g.cross();
 
+      // undraw o
+      if (typeof editG.ox !== 'undefined')
+	g.ocross(editG.ox, editG.oy);
+      editG.ox = undefined;
+    }
+
+    // increase step length!
     if (s)
       g.step = 10;
     else if (a)
@@ -3878,19 +3966,26 @@ errorObj : ${errorObj}
     //if (c && g.last) g.last.call(g);
     //if (c) g.circle();
 
-    let f = g[k] || g.nofunc;
-    msg('GEDIT.' + f.name);
-    let r;
-    try  {
-      r = f.call(g, k, kc, a, s, c, e);
-    } catch(e) {
-      r = '?ERROR: ' + e;
-    }
-    if (r)
-      msg('GEDIT.' + f.name + ': ' + r);
+    if (s && k.length===1) k=k.toUpperCase();
 
-    let p = '\3'+`${ABS(curx-g.ox)} ${ABS(cury-g.oy)}`+'\2'+`${curx} ${cury}`;
-    iplot(40-p.length, 0, p);
+    let f = g[k];
+    if (!f) {
+      msg('GEDIT: ?-help q-quit');
+    } else {
+      msg('GEDIT.' + f.name);
+      let r;
+      try  {
+	r = f.call(g, k, kc, a, s, c, e);
+      } catch(e) {
+	alert('GEDIT.'+f.name+': ERROR\n'+e);
+      }
+      if (r)
+	msg('GEDIT.' + f.name + ': ' + r);
+      
+      // update pos in right corner
+      let pos = '\3'+`${ABS(curx-g.ox)} ${ABS(cury-g.oy)}`+'\2'+`${curx} ${cury}`;
+      iplot(40-pos.length, 0, pos);
+    }
    
     // save for undo
     //if (c) g.circle();
@@ -3900,6 +3995,17 @@ errorObj : ${errorObj}
   //} else {
     //g.last = f;
   //}
+
+    if (hires()) {
+      throw 'GEDIT: Hires mode note done!';
+    } else {
+      // update cursor to same cell!
+      col = INT(curx / 2);
+      row = INT(cury / 3);
+    }
+
+    // if we're exiting don't draw!
+    if (!gedit) return;
 
     // draw o
     editG.ox = g.ox;
@@ -3985,8 +4091,8 @@ errorObj : ${errorObj}
     if (c && a)
       dom('screen').classList.toggle('show-attr');
 
-    // if in gedit mode, don't do any more
-    if (gedit && k.length!=1)
+    // if in gedit mode and arrow, exit
+    if (gedit && k.startsWith('arrow'))
       return editG(k, kc, a, s, c, e);
 
     // make ctrl click sound
@@ -4033,9 +4139,12 @@ errorObj : ${errorObj}
 
     // gedit mode?
     if (a && !c && k=='g') {
-      cursorHide();
-      editG('cross');
-      return showStatus(gedit=!gedit);
+      if (gedit) {
+	editG('quit');
+      } else {
+	editG('init');
+	showStatus();
+      }
     }
     
     // too easy boot? lol
