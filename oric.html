@@ -619,6 +619,7 @@ INFO:<br><span id='info'></span>
       ink = 7,
 
       // 0=TEXT=LORES0, 1=LORES1, -1=HIRES
+      gedit = false,
       lores = 0,
       curx = 0,
       cury = 0;
@@ -664,6 +665,7 @@ INFO:<br><span id='info'></span>
     paper = 0;
     ink = 7;
 
+    gedit = false;
     lores = 0;
     curx = 0;
     cury = 0;
@@ -732,10 +734,10 @@ ORIC EXTENDED BASIC Vl.1
     // background == black
 
     // TODO: debug, this give black on black
-    //fill(1, 2, SCREEN_ROWS-1, SCREEN_COLS-2, 17);
+    fill(1, 2, SCREEN_ROWS-1, SCREEN_COLS-2, 9);
     // then first column is 9 for graphics
     let a = mode==0 ? 8 : 9;
-    fill(1, 0, SCREEN_ROWS-1, 1,  a);
+//    fill(1, 0, SCREEN_ROWS-1, 1,  a);
 
     // TODO: ink white (maybe not needed?)
     //fill(1, 1, SCREEN_ROWS-1, 1, 7);
@@ -770,6 +772,12 @@ ORIC EXTENDED BASIC Vl.1
     function updatebit(r, c, mask) {
       r = INT(r); c = INT(c);
       if (r < 0 || c < 0) return;
+
+      if (!hires()) {
+	r++;  // skip status line
+	c+=2; // skip control columns
+      }
+
       if (r < SCREEN_ROWS &&
 	  c < SCREEN_COLS) {
 
@@ -778,6 +786,8 @@ ORIC EXTENDED BASIC Vl.1
 	let c7 = ch & 0x7f;
 	if (c7 < 32 || c7 > 96)
 	  ch = 32 | (ch & 0x80);
+	//if (ch < 32 || ch > 96)
+	//ch = 32;
 
 	switch(m) {
 	case 0: ch &= ~mask; break;
@@ -826,7 +836,7 @@ ORIC EXTENDED BASIC Vl.1
     // New: you can draw outside of screen!
     curx += dx;
     cury += dy;
-    setbit(x, y, m);
+    setbit(curx, cury, m);
   }
 
   function DRAW(dx, dy, m) {
@@ -841,6 +851,8 @@ ORIC EXTENDED BASIC Vl.1
       x += ix; y += iy;
       setbit(x, y, m);
     }
+    curx = curx + dx;
+    cury = cury + dy;
   }
 
   function CIRCLE(r, m) {
@@ -3637,6 +3649,198 @@ errorObj : ${errorObj}
     
   }
   
+  // A graphical edit mode!
+  var gCommands = {
+    ox: undefined,
+    oy: undefined,
+    mode: 2, // xor
+    step: 1,
+
+    stack: [], // lol
+    index: 0,
+
+    'h': function home() {
+      this.ox = curx;
+      this.oy = cury;
+      if (hires()) {
+	throw "gCommands: hires mode not implemented";
+      } else {
+	curx = (SCREEN_COLS-2) * 2 / 2;
+	cury = (SCREEN_ROWS-1) * 3 / 2;
+	this.mark();
+      }
+    },
+    ' ': function toggle() {
+      CURMOV(0, 0, 2);
+      this.mark();
+    },
+    '0': function clear() {
+      CURMOV(0, 0, 0);
+      this.mark();
+    },
+    '1': function set() {
+      CURMOV(0, 0, 1);
+      this.mark();
+    },
+    'm': function mark() {
+      this.ox = curx;
+      this.oy = cury;
+      this.push();
+    },
+    'o': function other() {
+      let x=curx; curx=this.ox; this.ox=x;
+      let y=cury; cury=this.oy; this.oy=y;
+      CURSET(curx, cury, 3);
+    },
+    push: function push() {
+      let last = this.stack[this.stack.length-1];
+      if (last && last.x == curx && last.y == cury)
+	return;
+
+      this.stack.push({x: curx,y: cury});
+      this.index = this.stack.length-1;
+      return this.stack.length;
+    },
+    pop: function pop() {
+      let r = this.stack.pop();
+      if (!r) return 'No more positions!';
+      
+      CURSET(r.x, r.y, 3);
+      return this.stack.length;
+    },
+    'p': function prev() {
+      if (this.index > 0) this.index--;
+      let pos = this.stack[this.index];
+      CURSET(pos.x, pos.y, 3);
+      return this.index;
+    },
+    'n': function next() {
+      if (this.index+1 < this.stack.length)
+	this.index++;
+      let pos = this.stack[this.index];
+      CURSET(pos.x, pos.y, 3);
+      return this.index;
+    },
+    'l': function line() {
+      this.other();
+      DRAW(this.ox-curx, this.oy-cury, this.mode);
+      this.mark();
+    },
+    'c': function circle() {
+      sq = (v)=>v*v;;
+      let r = SQR(sq(this.ox-curx) + sq(this.oy-cury));
+      this.other();
+      CIRCLE(r, this.mode);
+      this.other();
+      this.mark();
+      return INT(r);
+    },
+    'r': function rectangle() {
+      let x = curx, y = cury;
+      DRAW(this.ox-x, 0, this.mode);
+      DRAW(0, this.oy-y, this.mode);
+      DRAW(x-this.ox, 0, this.mode);
+      DRAW(0, y-this.oy, this.mode);
+      this.mark();
+    },
+    'q': function quit() {
+      if (hires()) {
+	throw 'GRAPHICS:quit not defined for hires yet!';
+      } else {
+	col = curx / 2;
+	row = cury / 3;
+      }
+
+      // cleanup
+      this.cross();
+      gedit = false;
+
+      return 'GRAPHICS OFF';
+    },
+    // also works as init function
+    cross: function cross() {
+      if (typeof this.ox === 'undefined') {
+	// init
+	this.h();
+	this.ox = curx;
+	this.oy = cury;
+      }
+
+      let x=curx;
+      let y=cury;
+      let z=7;
+
+      CURMOV(z/2, 0, 3);
+      DRAW(-z, 0, 2);
+      CURMOV(z/2, z/2, 3);
+      DRAW(0, -z, 2);
+
+      CURSET(x, y, 3);
+    },
+    arrowup: function(){cury-=this.step},
+    arrowdown: function(){cury+=this.step},
+    arrowleft: function(){curx-=this.step},
+    arrowright: function(){curx+=this.step},
+
+    nofunc: function NOFUNC(k) {
+      return `"${k}"`;
+    },
+  };
+  // make all functions keys too!
+  Object.keys(gCommands).forEach(
+    k=>{ let f = gCommands[k];
+	 if (f && f.name)
+	   gCommands[f.name]=f;
+       });
+
+  function editG(k, kc, a, s, c, e) {
+    let g = gCommands;
+
+    function msg(txt) {
+      clearline(0);
+      iplot(0, 0, txt);
+    }
+    
+    try  {
+    g.cross();
+} catch(e) {alert('cross: ' +e); }
+
+    if (s)
+      g.step = 10;
+    else if (a)
+      g.step = 25;
+    else
+      g.step = 1;
+
+    // undo
+    //if (c && g.last) g.last.call(g);
+    if (c) g.circle();
+
+    let f = g[k] || g.nofunc;
+    msg('GRAPHICS.' + f.name);
+    let r;
+    try  {
+      r = f.call(g, k, kc, a, s, c, e);
+    } catch(e) {
+      r = '?ERROR: ' + e;
+    }
+    if (r)
+      msg('GRAPHICS.' + f.name + ': ' + r);
+    let p = `(${curx} ${cury})`;
+    iplot(40-p.length, 0, p);
+   
+    // save for undo
+    if (c) g.circle();
+    
+    //if (c && g.last) {
+    //g.last.call(g);
+  //} else {
+    //g.last = f;
+  //}
+
+    g.cross();
+  }
+
   function editArrow(ch) {
     cursorHide();
     switch(ch) {
@@ -3676,6 +3880,9 @@ errorObj : ${errorObj}
     
     clearline(0);
     
+    // gEdit mode
+    update(0, gedit, 'GRAPHICS MODE');
+
     // CTRL-Q: toggle cursor
     update(-4, caps, 'CAPS');
 
@@ -3733,9 +3940,12 @@ function hscroll(srow, erow, noClr) {
     let c=e.ctrlKey,a=e.altKey,s=e.shiftKey;
     let k = e.key.toLowerCase();
     let ch = e.code;
-    let kc = e.keyCode;
+    let kc = e.keyCode; // legacy
 
-    console.log("KEY kc="+kc+" c="+c+" a="+a+" s="+s);
+    //console.log("KEY kc="+kc+" c="+c+" a="+a+" s="+s);
+
+    if (gedit && k.length!=1)
+      return editG(k, kc, a, s, c, e);
 
     if ((c && !a && !s && k !== 'control')
 	|| kc==13 || kc==8
@@ -3781,6 +3991,13 @@ function hscroll(srow, erow, noClr) {
     // my extensions
     if ((c || a) && k.length==1)
       editExt(k, kc, a, s, c, e);
+
+    // gedit mode
+    if (a && !c && k=='g') {
+      cursorHide();
+      editG('cross');
+      return showStatus(gedit=!gedit);
+    }
     
     // too easy boot? lol
     if (c && k=='r') window.location.reload();
@@ -3822,9 +4039,16 @@ function hscroll(srow, erow, noClr) {
   })
 
   dom('exp').addEventListener('keypress', function(e) {
-    let c = e.ctrlKey, k = e.key; s = e.shiftKey;
-    let legc = e.charCode, legk = e.keyCode;
+    let c=e.ctrlKey,a=e.altKey,s=e.shiftKey;
+    let k = e.key.toLowerCase();
     let ch = e.code;
+    let kc = e.keyCode; // legacy
+    let legc = e.charCode;
+
+    // override all chars in gedit mode!
+    if (gedit && k.length==1)
+      return editG(k, kc, a, s, c, e);
+
     //    if (legk > 16) 
     //    alert(`k=${k} legc=${legc} legk=${legk} ch=${ch}`);
     // TODO: use e.code - but it's crap
