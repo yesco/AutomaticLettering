@@ -244,6 +244,18 @@
     src: url('oric-atmos-alt-jsk.ttf');
 }
 
+#screen {
+    white-space: nowrap;
+
+    /* todo: remove? */
+    font-size: 1.5rem;
+
+    color: white;
+    background: black;
+
+    overflow: hidden;
+}
+
 .text, .hires {
     //position: relative;
     //top: 4px;
@@ -266,8 +278,8 @@
 }
 
 /*container element*/
-.text, .hires, .standard, .oric {
-    font-family: 'oric-atmos', monospace;
+.text, .hires, .standard, .oric, .attr {
+    font-family: 'ORIC-ATMOS', monospace;
 }
 
 /* span elements inside the container div */
@@ -331,6 +343,7 @@
 }
 
 .attr {
+    font-family: 'ORIC-ATMOS';
     visibility: var(--vis-attr, hidden);
     font-weight: bold;
     /* this shows white on white! */
@@ -425,7 +438,7 @@ g
 
 <!-- seemingly useless span, but need for getting correct width of 'screen'-->
 <center><span id='foo'>
-<div id='screen' class='text' style='color:white; background:black; font-size: 1.5rem; overflow:hidden;  white-space:nowrap; '>
+<div id='screen' class='text'>
 </div>
 </span></center>
 
@@ -602,6 +615,8 @@ INFO:<br><span id='info'></span>
       tron = false, // TRON/TROFF
       row = 1,
       col = 2,
+      paper = 0,
+      ink = 7,
 
       // 0=TEXT=LORES0, 1=LORES1, -1=HIRES
       lores = 0,
@@ -646,6 +661,12 @@ INFO:<br><span id='info'></span>
     
     row = 1;
     col = 2;
+    paper = 0;
+    ink = 7;
+
+    lores = 0;
+    curx = 0;
+    cury = 0;
     
     // at start only one channel enabled!
     PLAY['con1'] = 1;
@@ -699,16 +720,26 @@ ORIC EXTENDED BASIC Vl.1
     // DOC: Set text screen mode
     // 0 - normal text mode
     // 1 - alt character set moden
+
+    // TODO:
     // New: N lines scroll text at bottom
     // 3 - like 'HIRES' with 3 lines text
     // N - same but with N lines
+    // LORES - attr mode! (draw w any color!)
     tPos(mode);
 
-    let a = mode==0 ? 8 : 9;
-    fill(1, 0, SCREEN_ROWS-1,  a); // alt
-    fill(1, 1, SCREEN_ROWS-1, 16); // black
+    // actually, LORES fills screen with
+    // background == black
 
-    alert('done');
+    // TODO: debug, this give black on black
+    //fill(1, 2, SCREEN_ROWS-1, SCREEN_COLS-2, 17);
+    // then first column is 9 for graphics
+    let a = mode==0 ? 8 : 9;
+    fill(1, 0, SCREEN_ROWS-1, 1,  a);
+
+    // TODO: ink white (maybe not needed?)
+    //fill(1, 1, SCREEN_ROWS-1, 1, 7);
+
     lores = mode;
   }
 
@@ -727,8 +758,14 @@ ORIC EXTENDED BASIC Vl.1
 
   HELP.related.push('HIRES CIRCLE CHAR CURMOV CURSET DRAW FILL PATTERN POINT  ');
 
+  // set/get bit identified by mask
+  // relative lores mode
+  // 0 = off
+  // 1 = on
+  // undefined = outside screen  (off)
   function setbit(x, y, m) {
-    if (m == 3) return;
+    x = INT(x+0.5);
+    y = INT(y+0.5);
 
     function updatebit(r, c, mask) {
       r = INT(r); c = INT(c);
@@ -737,24 +774,38 @@ ORIC EXTENDED BASIC Vl.1
 	  c < SCREEN_COLS) {
 
 	let ch = screen(r, c);
-	
+
+	let c7 = ch & 0x7f;
+	if (c7 < 32 || c7 > 96)
+	  ch = 32 | (ch & 0x80);
+
 	switch(m) {
 	case 0: ch &= ~mask; break;
 	case 1: ch |= mask; break;
 	case 2: ch ^= mask; break;
 	}
-	    
-	screen(r, c, ch);
+
+	if ((ch & 96) == 96)
+	  ch ^= 32;
+	if (ch > 96)
+	  ch ^= 32;
+	if (ch < 32) ch += 32;
+
+	if (m < 3) screen(r, c, ch);
+
+	return (c & mask) ? 1 : 0;
+      } else {
+	return;
       }
     }
 
     if (hires()) {
       let mask = 1 << (x % 6);
-      updatebit(y, x/6, mask);
+      return updatebit(y, x/6, mask);
     } else {
       let bit = (x % 2) + 2*(y % 3);
       let mask = bit<5 ? 1 << bit : 64;
-      updatebit(y/3, x/2, mask);
+      return updatebit(y/3, x/2, mask);
     }
   }
 
@@ -776,6 +827,51 @@ ORIC EXTENDED BASIC Vl.1
     curx += dx;
     cury += dy;
     setbit(x, y, m);
+  }
+
+  function DRAW(dx, dy, m) {
+    let steps = ABS(
+      ABS(dx) > ABS(dy) ?
+	dx : dy);
+
+    let ix = dx/steps;
+    let iy = dy/steps;
+    let x = curx, y = cury;
+    for(let i=0; i<steps; i++) {
+      x += ix; y += iy;
+      setbit(x, y, m);
+    }
+  }
+
+  function CIRCLE(r, m) {
+    if (r <= 0) return;
+
+    function set(x, y) {
+      setbit(curx + x, cury + y, m);
+    }
+    
+    function setall(x, y) {
+      // 8 symmetries!
+      set(x, y);
+      set(-x, y);
+      set(x, -y);
+      set(-x, -y);
+
+      set(y, x);
+      set(-y, x);
+      set(y, -x);
+      set(-y, -x);
+    }
+
+    let rr = r*r;
+    let x = r, y = 0;
+    while (x > y) {
+      setall(x, y);
+      y++;
+      x = SQR(rr - y*y);
+    }
+    // for xor mode 2 it's soso...
+    //setall(x, y);
   }
 
   function FILL(rows, cols, v) {
@@ -966,7 +1062,11 @@ So far the subject of writing
     // interpret char/attribute
     let c = ch & 0x7f;
 
-    dc.classList.remove('attr');
+    //dc.classList.remove('attr');
+    da.style = '';
+    da.class = '';
+    dc.style = '';
+    dc.class = '';
 
     if (ch > 255) { // unicode! lol
       if (ch == 127) {
@@ -1059,14 +1159,14 @@ So far the subject of writing
   screen.writecount = 0;
 
   function INK(color) {
-    INK.color = color;
+    ink = color;
     // skip status line
     for(let row=1; row<SCREEN_ROWS; row++) {
       screen(row, 1, color);
     }
   }
   function PAPER(color) {
-    PAPER.color = color;
+    paper = color;
     // skip status line
     for(let row=1; row<SCREEN_ROWS; row++) {
       screen(row, 0, 16+color);
@@ -1277,6 +1377,8 @@ CODE CHARACTER Control Code
       for(let c=2; c<SCREEN_COLS; c++) {
 	screen(row, c, 32);
       }
+      //screen(row, 0, paper);
+      //screen(row, 1, ink);
       //dom('info', 'scroll time='+(Date.now()-start), 'lp');
     }
   }

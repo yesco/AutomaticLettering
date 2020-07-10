@@ -133,6 +133,32 @@ function ORIC_generate_BDF(alt) {
       //console.log();
       out.push(bdf);
     }
+
+    // some garbage to fill out 
+    function r64() {
+      return Math.floor(Math.random()*64);
+    }
+      
+    let frame = 0x21; // 100001
+    for(let c=96; c<112; c++) {
+      let hex = '2F';
+      for(let i=0; i<6; i++) {
+	// set most bits (or twice!)
+	// 2 chars for sure!
+	hex += (r64() | r64() | frame)
+	  .toString(16);
+      }
+      hex += '2F';
+      out.push(
+	ORIC_char_BDF(
+	  c, hex, 6, 8));
+    }
+
+    // the rest is empty
+    for(let c=112; c<128; c++) {
+      out.push(
+	ORIC_char_BDF(c, '0000000000000000', 6, 8));
+    }
   } else {
     // dump the ORIC FONT
     for(let c=32; c<128; c++) {
@@ -142,8 +168,6 @@ function ORIC_generate_BDF(alt) {
 
   // extra spaces
   // (32 is not fixed width in browser!)
-  out.push(
-    ORIC_char_BDF(128, '0000000000000000', 6, 8));
   out.push(
     ORIC_char_BDF(128 + 32, '0000000000000000', 6, 8));
 
