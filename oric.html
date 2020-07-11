@@ -44,7 +44,8 @@
 	  let ch = doc.charCodeAt(i)
 
 	  TAB(mincol);
-	  if (ch == 10 & col > SCREEN_COLS-1)
+	  if (ch == 10 & (
+	    col > SCREEN_COLS-1 || col == mincol))
 	    ;
 	  else
 	    putc(ch);
@@ -56,7 +57,7 @@
 	let rel = HELP.related.filter(
 	  g=>g.match(RegExp(`\\b${cmd}\\b`))
 	);
-	if (rel)  {
+	if (rel.length)  {
 	  print('\nRelated:');
 	  rel.forEach(r=>print(r));
 	}
@@ -76,7 +77,7 @@
 	num++;
       });
       if (num) {
-	if (col > 2) print();
+	if (col > columns) print();
 	princ(num);
 	print('WORDS ' + msg);
       }
@@ -346,7 +347,7 @@
     visibility: var(--vis-attr, hidden);
     font-weight: bold;
     /* this shows white on white! */
-    filter: invert(3g0%);
+    filter: invert(30%);
 }
 
 /* INVERSE */
@@ -597,21 +598,21 @@ INFO:<br><span id='info'></span>
 	LastOne = 'foo';
 
   // Global ORIC ATMOS state
-  let vars = {},
+  var vars = {},
       stack = [], // [ [lno, restline] ...]
       line = '',
       lineToDo = [], // queue
       lineno = 0,
       caps = true,
       click = true,
-      column = false,
+      column = 2, // protected columns
       scoff = 0, // screen off if > 0 (count!)
       printer = undefined,
       double = false,
       trace = false, // debug tracing CTRL-P
       tron = false, // TRON/TROFF
       row = 1,
-      col = 2,
+      col = column,
       paper = 0,
       ink = 7,
 
@@ -649,7 +650,7 @@ INFO:<br><span id='info'></span>
     lineToDo = [];
     caps = true;
     click = true;
-    column = false;
+    column = 2;
     printer = undefined;
     double = false;
     trace = false;
@@ -658,7 +659,7 @@ INFO:<br><span id='info'></span>
     forceUpdateLimit = 1024*1024;
     
     row = 1;
-    col = 2;
+    col = column;
     paper = 0;
     ink = 7;
 
@@ -822,6 +823,7 @@ ORIC EXTENDED BASIC Vl.1
 	  c < SCREEN_COLS) {
 
 	let ch = screen(r, c);
+	print(ch + ' ' + mask);
 
 	let c7 = ch & 0x7f;
 	if (c7 < 32 || c7 > 96)
@@ -843,7 +845,8 @@ ORIC EXTENDED BASIC Vl.1
 
 	if (m < 3) screen(r, c, ch);
 
-	return (c & mask) ? 1 : 0;
+	print(ch + ' ' + mask);
+	return (ch & mask) ? 1 : 0;
       } else {
 	return;
       }
@@ -859,27 +862,37 @@ ORIC EXTENDED BASIC Vl.1
     }
   }
 
+  function POINT(x, y) {
+    // DOC: return 1 if pixel set at X,Y
+    return setbit(x, y, 3)?1:0;
+  }
+    
   function CURSET(x, y, m) {
-    // Set graphics cursor X, Y
-    // MODE: 0 = clear bit  1 = set bit,
-    //       2 = xor        3 = ignore
-    // New: you can draw outside of screen!
+    // DOC: Set graphics cursor X, Y, MODE
+    // 0 = clear bit  1 = set bit
+    // 2 = xor        3 = ignore
+    // New: draw outside of screen!
+    // New: works in LORES mode!
     curx = x;
     cury = y;
     setbit(x, y, m)
   }
 
   function CURMOV(dx, dy, m) {
-    // Set graphics cursor X, Y
+    // DOC: Set graphics cursor X, Y
     // MODE: 0 = clear bit  1 = set bit,
     //       2 = xor        3 = ignore
-    // New: you can draw outside of screen!
+    // New: draw outside of screen!
+    // New: works in LORES mode!
     curx += dx;
     cury += dy;
     setbit(curx, cury, m);
   }
 
   function DRAW(dx, dy, m) {
+    // DOC: Draw a line relative DX,DY
+    // New: draw outside of screen!
+    // New: works in LORES mode!
     let steps = ABS(
       ABS(dx) > ABS(dy) ?
 	dx : dy);
@@ -896,6 +909,9 @@ ORIC EXTENDED BASIC Vl.1
   }
 
   function CIRCLE(r, m) {
+    // DOC: Draws a circle of RADIUS
+    // New: draw outside of screen!
+    // New: works in LORES mode!
     if (r <= 0) return;
 
     function set(x, y) {
@@ -927,7 +943,7 @@ ORIC EXTENDED BASIC Vl.1
   }
 
   function FILL(rows, cols, v) {
-    // Fills area of screen set by cursor
+    // DOC: Fill area of screen at cursor
     // ROWS: number of rows to fill
     // COLS: number of cols to fill
     // CELL: Cell value to use
@@ -988,7 +1004,6 @@ So far the subject of writing
 */
 
   HELP.related.push('HIRES TEXT LORES GRAB HIMEM RELEASE');
-  HELP.related.push('HIRES CIRCLE CHAR CURMOV CURSET DRAW FILL PATTERN POINT  ');
   HELP.related.push('RUN CLEAR GOTO GOSUB RETURN POP IF THEN ELSE ON FOR TO STEP NEXT REPEAT UNTIL PULL');
   HELP.related.push('RUN STOP CONT GOTO TRON TROFF');
   HELP.related.push('LOAD AUTO CSAVE STORE RECALL NEW DIM CLEAR');
@@ -1340,9 +1355,8 @@ function scroll(srow, erow, noClr) {
 	screen(r, c, nw);
     }
   }
-  // TODO: if not hidden column mode?
   if (!noClr) {
-    for(let c=2; c<SCREEN_COLS; c++)
+    for(let c=column; c<SCREEN_COLS; c++)
       screen(srow, c, 32);
   }
 }
@@ -1428,15 +1442,12 @@ CODE CHARACTER Control Code
       c = ch = undefined;
     }
 
-    if (ch == 10) { row++; col = 2; }
+    if (ch == 10) { row++; col = column; }
 
     // backspace
     if (ch == 8) {
       col--;
-      if (col < 2) col = 2;
-      // TODO: I don't think backspace wraps?
-      //if (col < 2) { col = 39; row--; }
-      //if (row < 1) { col = 2; row = 1; }
+      if (col < column) { col = 39; row--; }
       screen(row, col, 32);
     }
 
@@ -1666,7 +1677,7 @@ CODE CHARACTER Control Code
     if (typeof pos === 'string')
       pos = -INT(SCREEN_COLS/(+pos));
     let width = (pos < 0) ? -pos : 8;
-    while((col-2) % width !== 0)
+    while((col-column) % width !== 0)
       putc(32);
     
     // return '' as I think it's used in PRINT
@@ -3261,7 +3272,7 @@ l80 REM*** WAUES ***
     tPos(p, p < 65536);
     tPos(v, v > 15);
     if (c > 3)
-      implemented_error("SOUND: doesn't support noise yet!");
+      throw "SOUND: doesn't support noise yet!";
     v = INT(100 * v / 15) / 100;
     const MAGIC = 30800;
     let f = INT(MAGIC / p);
@@ -3566,8 +3577,14 @@ errorObj : ${errorObj}
   
   function editBackspace() {
     cursorHide();
-    line = line.substring(0, line.length-1);
-    putc(8);
+    // Oric: move to newline if...
+    if (!line) {
+      if (col > column) print();
+    } else {
+      // delete char
+      putc(8);
+      line = line.substring(0, line.length-1);
+    }
     cursorShow();
   }
   
@@ -3580,6 +3597,9 @@ errorObj : ${errorObj}
   }
 
   function editCopy() {
+    // DOC: CTRL-A copies char from screen into edit buffer
+    // New: If it's 0--31 - an attribute it's prefixed by ESC (27)
+    // ORIC programs can handle and display ESC and attributes so encoded
     let c = screen(row, col);
     // escape read attributes
     if ((c & 0x7f) < 32) {
@@ -3617,6 +3637,28 @@ errorObj : ${errorObj}
   // This is probably a crazy idea!
   // adding full TELETEXT EDITING!
   function editExt(k, kc, a, s, c, e) {
+    // DOC: New! Extended full screen editing!
+    // CTRL-A copy ATTR/chr at cursor
+    // ALT-G  enter GEDIT mode!
+    // CTRL-H DEL char (scroll left)
+    // CTRL-I INS spc (scroll right)
+    // CTRL-J toggle protected col 2
+    // CTRL-M CR, move to col 2
+    // CTRL-P toggle "printer" log
+    // CTRL-R reload sim (reset)
+    // CTRL-Y yanks (pastes) the edit
+    // CTRL-BS delete line, scroll up
+    // CTRL-ENTER insert line, " down
+    // CTRL-arrow copy ATTR to dir
+    // CTRL-? help for color ATTRs
+    // CTRL-1 insert INK 1 (red)
+    // ALT-3  insert PAPER 3 (yellow)
+    // CTRL-ALT toggle show ATTRs
+    // CTRL-U "uglies" charcode+1
+    // - TELETEXT/ALT block chars
+    // CTRL-SHIFT-1 toggle bit 1
+    // CTRL-SHIFT-6 toggle bit 6
+    
     e.preventDefault();
     try{
       cursorHide();
@@ -3630,7 +3672,7 @@ errorObj : ${errorObj}
 	// ins char shift right after cursor
       case 'i': 
 	if (c) {
-	  for(let i=SCREEN_COLS-2; i>col; i--)
+	  for(let i=SCREEN_COLS-1; i>col; i--)
 	    screen(row, i, screen(row, i-1));
 	  screen(row, col, 32);
 	}
@@ -3660,10 +3702,6 @@ errorObj : ${errorObj}
 	  if (row >= SCREEN_ROWS) row=0;
 	}
 	break; }
-
-	// any use?
-      case '8': break;
-      case '9': break;
 
 	// uglies - block graphics
       case 'u': uglies(x=>x+1); break;
@@ -3902,15 +3940,13 @@ errorObj : ${errorObj}
     '?': function help() {
       // TODO: saveScreen();
       let h =
-`
-G(raphical) EDIT
+'\23\4'+`G(raphical) EDIT`+'\0\27'+`
   by (c) Jonas S Karlsson
 
 A raw screen editor:
 - text and attr line editing (TEXT)
 - graphical TELETEXT drawing (LORES 1)
 `;
-      
       CLS();
       print(h);
       // print K-name ...
@@ -3934,7 +3970,12 @@ A raw screen editor:
 	   gCommands[f.name]=f;
        });
 
-  function editG(k, kc, a, s, c, e) {
+  function GEDIT(k, kc, a, s, c, e) {
+    // DOC: G(raphical) EDIT!
+    // For HIRES or LORES mode
+    // Simple key commands to draw
+    // ALT-G to activate
+    // ?-for help, q-quit
     let g = gCommands;
 
     function msg(txt) {
@@ -3949,9 +3990,9 @@ A raw screen editor:
       g.cross();
 
       // undraw o
-      if (typeof editG.ox !== 'undefined')
-	g.ocross(editG.ox, editG.oy);
-      editG.ox = undefined;
+      if (typeof GEDIT.ox !== 'undefined')
+	g.ocross(GEDIT.ox, GEDIT.oy);
+      GEDIT.ox = undefined;
     }
 
     // increase step length!
@@ -4008,10 +4049,10 @@ A raw screen editor:
     if (!gedit) return;
 
     // draw o
-    editG.ox = g.ox;
-    editG.oy = g.oy;
-    if (typeof editG.ox !== 'undefined')
-      g.ocross(editG.ox, editG.oy);
+    GEDIT.ox = g.ox;
+    GEDIT.oy = g.oy;
+    if (typeof GEDIT.ox !== 'undefined')
+      g.ocross(GEDIT.ox, GEDIT.oy);
 
     // draw x
     g.cross();
@@ -4026,8 +4067,7 @@ A raw screen editor:
     case 40: row++; break; // down
     }
     // move cursor, wrap around (?)
-    // TODO: columns mode?
-    if (col < 2) col = 39;
+    if (col < column) col = 39;
     if (col > 39) col = 2;
     if (row < 0) row = 27;
     if (row > 27) row = 0;
@@ -4070,11 +4110,6 @@ A raw screen editor:
     update(Math.floor(SCREEN_COLS-10)/2,
 	     saved, 'SCREEN OFF');
 
-    // TODO: column enable disable CTRL-J
-    if (column) {
-    } else {
-    }
-
     // restore, no write to screen
     scoff = saved;
   }
@@ -4093,7 +4128,7 @@ A raw screen editor:
 
     // if in gedit mode and arrow, exit
     if (gedit && k.startsWith('arrow'))
-      return editG(k, kc, a, s, c, e);
+      return GEDIT(k, kc, a, s, c, e);
 
     // make ctrl click sound
     if ((c && !a && !s && k !== 'control')
@@ -4140,9 +4175,9 @@ A raw screen editor:
     // gedit mode?
     if (a && !c && k=='g') {
       if (gedit) {
-	editG('quit');
+	GEDIT('quit');
       } else {
-	editG('init');
+	GEDIT('init');
 	showStatus();
       }
     }
@@ -4181,7 +4216,7 @@ A raw screen editor:
     if (k=='f') clickToggle();
     if (k=='g') bell();
 
-    if (k=='j') showStatus(column = !column);
+    if (k=='j') showStatus(column=2-column);
 
     //if (c) e.preventDefault();
   })
@@ -4195,7 +4230,7 @@ A raw screen editor:
 
     // override all chars in gedit mode!
     if (gedit && k.length==1)
-      return editG(k, kc, a, s, c, e);
+      return GEDIT(k, kc, a, s, c, e);
 
     //    if (legk > 16) 
     //    alert(`k=${k} legc=${legc} legk=${legk} ch=${ch}`);
@@ -4569,7 +4604,7 @@ instruction
     n=>window[n]=()=>implemented_error(n));
 
   // remove non-basic names... not extensions
-  'DBG,OKK,OKC,TEMPORARY,PERSISTENT,EVAL,HTML,STORE'.split(',').map(
+  'DBG,OKK,OKC,TEMPORARY,PERSISTENT,EVAL,HTML,STORE,GEDIT'.split(',').map(
     n=>{
       delete OricKeywords.status[n];
     });
