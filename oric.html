@@ -823,7 +823,6 @@ ORIC EXTENDED BASIC Vl.1
 	  c < SCREEN_COLS) {
 
 	let ch = screen(r, c);
-	print(ch + ' ' + mask);
 
 	let c7 = ch & 0x7f;
 	if (c7 < 32 || c7 > 96)
@@ -845,7 +844,6 @@ ORIC EXTENDED BASIC Vl.1
 
 	if (m < 3) screen(r, c, ch);
 
-	print(ch + ' ' + mask);
 	return (ch & mask) ? 1 : 0;
       } else {
 	return;
@@ -1084,7 +1082,6 @@ So far the subject of writing
   // nodejs can't handle it?
   // let braille =⠀"⠁⠂⠃⠄⠅⠆⠇⠈⠉⠊⠋⠌⠍⠎⠏⠐⠑⠒⠓⠔⠕⠖⠗⠘⠙⠚⠛⠜⠝⠞⠟";
 	 
-	 
   // this is like equivalent of POKE!
   // READ   screen(row, col) => ch
   // WRITE  screen(row, col, ch)
@@ -1105,7 +1102,9 @@ So far the subject of writing
     // --- READ screen?
     if (ch === undefined) {
       screen.readcount++;
-      return dc.screenchar;
+      if (dc.screenchar === undefined)
+	dc.screenchar = 32;
+    return dc.screenchar;
     }
 
     // --- WRITE!
@@ -1230,6 +1229,43 @@ So far the subject of writing
 
   screen.readcount = 0;
   screen.writecount = 0;
+
+  function screenSaved(rows=SCREEN_ROWS, cols=SCREEN_COLS) {
+    let sc = {
+      rows: SCREEN_ROWS,
+      cols: SCREEN_COLS,
+      row: row,
+      col: col,
+      curx: curx,
+      cury: cury,
+      lores: lores,
+    };
+
+    for(let r=0; r<SCREEN_ROWS; r++) {
+      let h = '';
+      for(let c=0; c<SCREEN_COLS; c++) {
+	if (screen(r,c) === undefined)
+	  console.log('scundef '+r+' '+c);
+	h += screen(r, c).toString(16).padStart(2, '0');
+      }
+      sc[r] = h;
+    }
+
+    return sc;
+  }
+
+  // TODO: draw portion at offset
+  function screenDraw(sc) {
+    let rows = Math.min(SCREEN_ROWS, sc.rows);
+    let cols = Math.min(SCREEN_COLS, sc.cols);
+    for(let r=0; r<rows; r++) {
+      let h = sc[r];
+      for(let c=0; c<cols; c++) {
+	let ch = parseInt(h.substr(c*2, 2), 16);
+	screen(r, c, ch);
+      }
+    }
+  }
 
   function INK(color) {
     ink = color;
@@ -1358,6 +1394,8 @@ function scroll(srow, erow, noClr) {
   if (!noClr) {
     for(let c=column; c<SCREEN_COLS; c++)
       screen(srow, c, 32);
+    screen(0, srow, paper+16);
+    screen(1, srow, ink);
   }
 }
 
@@ -1625,13 +1663,13 @@ CODE CHARACTER Control Code
   // TODO: manual says it'll clear screen
   // AND: set it to current INK/PAPER!!!?
   function CLS() {
-    showStatus();
     let start = Date.now();
-    // don't touch mode-line
-    fill(1, 2, SCREEN_ROWS-1, SCREEN_COLS-2, 32);
-
+    fill(0, 0, SCREEN_ROWS, SCREEN_COLS, 32);
     row = 1; col = 2; raw = false;
+    PAPER(paper);
+    INK(ink);
     //dom('error', 'CLS time ' + (Date.now()-start));
+    showStatus();
   }
 
   // 20 INPUT"ENTER SALE PRICE";SELL
@@ -3787,6 +3825,8 @@ errorObj : ${errorObj}
     stack: [], // lol
     index: 0,
 
+    saved: undefined,
+
     h: function home() {
       this.ox = curx;
       this.oy = cury;
@@ -3886,6 +3926,7 @@ errorObj : ${errorObj}
       gedit = false;
 
       cursorShow();
+      setTimeout(showStatus, 500);
       return 'BYE!';
     },
     // also works as init function
@@ -3931,21 +3972,29 @@ errorObj : ${errorObj}
     arrowleft: function(){curx-=this.step},
     arrowright: function(){curx+=this.step},
 
-    nofunc: function nofunc(k) {
-      return `?-help q-quit`;
-    },
-
     // unhifted ?
     '/': function(){this.help()},
     '?': function help() {
-      // TODO: saveScreen();
+      // toggle - restore if saved
+      if (this.saved) {
+ 	screenDraw(this.saved);
+	this.saved = '';
+	return;
+      } else {
+	this.saved = screenSaved();
+      }
+
+      // show help
       let h =
-'\23\4'+`G(raphical) EDIT`+'\0\27'+`
+'\33\3\33\24'+`G(raphical) EDIT`+'\33\20\33\7'+`
   by (c) Jonas S Karlsson
 
-A raw screen editor:
-- text and attr line editing (TEXT)
-- graphical TELETEXT drawing (LORES 1)
+A raw screen editor (LORES 1)
+- text and attr line editing
+- graphical TELETEXT drawing
+
+- SHIFT/ALT-arrow move 10/25
+    (? again to go back)
 `;
       CLS();
       print(h);
@@ -3958,8 +4007,8 @@ A raw screen editor:
 	    TAB();
 	  princ(s); TAB();
 	});
-	
-      // TODO: restoreScreen();
+
+      print('? again to toggle help off!');
     },
 
   };
