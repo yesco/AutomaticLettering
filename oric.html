@@ -1236,14 +1236,24 @@ So far the subject of writing
   screen.writecount = 0;
 
   function screenSaved(rows=SCREEN_ROWS, cols=SCREEN_COLS) {
+    let g = gCommands;
     let sc = {
-      rows: SCREEN_ROWS,
-      cols: SCREEN_COLS,
-      row: row,
-      col: col,
-      curx: curx,
-      cury: cury,
-      lores: lores,
+      name: screen.name,
+      version: screen.version,
+      time: Date.now(),
+      date: new Date().toISOString(),
+      rows, cols,
+      row, col, curx, cury,
+      ink, paper,
+      lores,
+      gedit: {
+	ox: g.ox, oy: g.oy,
+	mode: g.mode,
+	stack: g.stack,
+	index: g.index,
+	ink: g.ink,
+	paper: g.paper,
+      },
     };
 
     for(let r=0; r<SCREEN_ROWS; r++) {
@@ -1261,6 +1271,28 @@ So far the subject of writing
 
   // TODO: draw portion at offset
   function screenDraw(sc) {
+    // TODO: really restore all?
+    screen.name = sc.name;
+    screen.version = sc.version;
+    
+    //name: screen.name,
+    //version: screen.version,
+    //time: Date.now(),
+    //date: new Date.toISOString(),
+    row = sc.row; col = sc.col;
+    curx = sc.curx; cury = sc.cury;
+    ink = sc.ink; paper = sc.paper;
+    lores = sc.lores;
+    
+    let g = gCommands;
+    g.ox = sc.gedit.ox;
+    g.oy = sc.gedit.oy;
+    g.mode = sc.gedit.mode;
+    g.stack = sc.gedit.stack;
+    g.index = sc.gedit.index;
+    g.ink = sc.gedit.ink;
+    g.paper = sc.gedit.paper;
+
     let rows = Math.min(SCREEN_ROWS, sc.rows);
     let cols = Math.min(SCREEN_COLS, sc.cols);
     for(let r=0; r<rows; r++) {
@@ -4278,6 +4310,51 @@ q-quit  ?-back to edit  q-quit
     scoff = saved;
   }
   
+  function writeScreen() {
+    // now to give it a name?
+    // string put in 0,0? lol?
+    let sc = screenSaved();
+    let name = sc.name || 'noname';
+    let id = 'SCREEN:' + name + ' ' + sc.date;
+    sc.id = id;
+
+    let dispid = sc.date.replace(/\..*$/, '')
+	.replace(/[:-]/g, '')
+	.replace('T', ' ');
+    dispid = name + ' ' + dispid;
+    clearline(0); iplot(0, 0, dispid);
+    sc.dispid = dispid;
+
+    let msg = lsput(id, JSON.stringify(sc)) ?
+	'\2--SAVED' : '\1--FAILED';
+    iplot(dispid.length, 0, msg);
+    // TODO: make current state as not dirty
+  }
+
+  function readScreen() {
+    // TODO: if dirty,save first!
+    let q = readScreen.queue;
+    if (!q || !q.length) {
+      q = readScreen.queue = lssearch('SCREEN:');
+    }
+    let id = q.pop();
+    let sc = lsget(id);
+    if (sc) {
+      sc = JSON.parse(sc);
+      screenDraw(sc);
+      let dispid = sc.dispid;
+      if (dispid) {
+	clearline(0);
+	iplot(0, 0, dispid);
+
+	let index = ' ' + q.length;
+	iplot(40-index.length, 0, index);
+      }
+    } else {
+      clearline(0); iplot(0,0,'\1FAIL: '+id);
+    }
+  }
+
   dom('exp').addEventListener('keydown', function(e) {
     let c=e.ctrlKey,a=e.altKey,s=e.shiftKey;
     let k = e.key.toLowerCase();
@@ -4319,12 +4396,18 @@ q-quit  ?-back to edit  q-quit
     }
 
     if (c && k=='n') clearline(row, 2);
-    if (c && k=='j') ; // down (rotate?)
-    if (c && k=='k') ; // up (rotate?)
     if (c && k=='m') col = 2; // CR
     //if (c && k=='u') ; // uglies
 
-    // arrow, C-arrow
+    if (c && k=='j') ; // down (rotate?)
+    if (c && k=='k') ; // up (rotate?)
+
+    // save screen!
+    if (c && k=='w') writeScreen();
+    if (c && k=='k') readScreen();
+    if (a && k=='arrowup') readScreen();
+
+    // arrow, C-arrow = copy
     let char = screen(row, col);
     if (37<=kc && kc<=40) {
       editArrow(kc);

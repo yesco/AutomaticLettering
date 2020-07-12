@@ -186,7 +186,8 @@ timestamp.is = tid=>tid.length==17 && tid[0]=='t';
 // easy access localStorage
 function lsput(n, v) {
   try {
-    return localStorage.setItem(n, v);
+    localStorage.setItem(n, v);
+    return true;
   } catch(e) {
     console.log('lsput: ', e);
   }
