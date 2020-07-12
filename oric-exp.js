@@ -265,6 +265,9 @@ if (typeof required !== undefined) {
 }
 
 function tokenizer(line, keywordz='') {
+  let rkeywordz = keywordz.split(/,/).filter(k=>k.length).join('|');
+  rkeywordz = RegExp('^('+rkeywordz+')');
+
   let i = -1, c = '', t = '';
   function spc() {
     while (c == ' ' && skip());
@@ -277,15 +280,27 @@ function tokenizer(line, keywordz='') {
   }
   function step() {
     if (c) t += c;
-    //console.log('STEP:', c);
+    console.log('STEP:', c);
     skip();
     c = line[i];
     return !!c;
   }
+  // true if next is keyword
+  function nextiskeyword() {
+    let m = line.substring(i).match(rkeywordz);
+    return m && m[0];
+  }
+  function keyword() {
+    let kw = nextiskeyword();
+    if (!kw) return;
+    i += kw.length;
+    t = kw;
+    c = line[i];
+    return true;
+  }
   let ret = [];
   function emit(typ) {
     if (t) {
-      console.log('EMIT '+typ.padEnd(8, ' ')+'  - '+t);
       ret.push([typ, t]);
       t = '';
       return true;
@@ -307,6 +322,7 @@ function tokenizer(line, keywordz='') {
   }
 
   function letter() {
+    if (nextiskeyword()) return;
     return r(/[A-Z]/);
   }
   function digit() {
@@ -329,10 +345,11 @@ function tokenizer(line, keywordz='') {
       return emit('number');
     } else if (op()) {
       return emit('op');
+    } else if (keyword()) {
+      return emit('keyword');
     } else if (letter()) {
       do {
-	if (keywordz.includes(`,${t},`))
-	  return emit('keyword');
+	spc();
       } while(letter() || digit());
       r(/[\%\$]/);
       return emit('name');
@@ -348,6 +365,91 @@ function tokenizer(line, keywordz='') {
   return ret;
 }
 
+function parse(line) {
+  let tokens = tokenizer(line);
+  let r = [];
+
+  let c, t, s;
+  let was;
+  function skip() {
+    c = tokens.shift();
+    if (c) {
+      wasa = t;
+      was = s;
+      t = c[0];
+      s = c[1];
+    }
+    if (c) return true;
+  }
+  function have(es) {
+    if (s === es) return skip();
+  }
+  function isa(et) {
+    if (t === et) return skip();
+  }
+  function geta(et) {
+    if (t === et) {
+      skip();
+      return was;
+    }
+  }
+
+  // function, operator, parameter, instruction
+  function xyzstatement() {
+    if (have("'")) return pQuote();
+    if (isa('keyword')) {
+      switch(s) {
+      case 'REM': return pREM();
+      case 'IF': return pIF();
+      //case 'THEN': 
+      //case 'ELSE': return;
+      case 'REPEAT': return ()=>push();
+      case 'UNTIL': return pUNTIL();
+      case 'FOR': return pFOR();
+      //case 'TO': break;
+      //case 'STEP': break;
+      case 'NEXT': return pNEXT();
+      case 'ON': return pON();
+      case 'GO': throw 'What? "GO"';
+      case 'DEF': return pDEF();
+      case 'DIM': return pDIM();
+      case '!': return PBANG();
+      case 'GET': return pGET();
+      case 'INPUT': return pINPUT();
+      case 'LET': return pLET();
+      case 'LLIST':
+      case 'LIST': {
+	let cmd = was;
+	let start = geta('number');
+	expect('-');
+	let end = geta('number');
+	let match = geta('string');
+	return ()=>LIST(start, end, match, cmd); }
+
+// normal instruction, just generate a call
+      default: return ()=>window[was].call(was, pArgs);
+      }
+    }
+    throw 'Unexpected token: ' + s + ' of type ' + t;;
+  }
+  function statements() {
+  }
+  function pUnaryOp(num) {
+  }
+  function pOp(num) {
+  }
+  function pSOp(str) {
+  }
+  function pLET(was) {
+  }
+  function pExp() {
+    if (isa('op')) return ()=>pUnaryOp(was);
+    if (isa('number')) return ()=>pOp(was);
+    if (isa('string')) return ()=>pSOp(was) || pLET(was);
+  }
+}
+
+
 console.log("\n\n");
 console.log("---------------------------");
 console.log(tokenizer('   (   3    3+4 55 5 )   '));
@@ -355,6 +457,94 @@ console.log(tokenizer(' 3A$B(55)" f o   ob  ar3+5 "9'));
 console.log(tokenizer(' 3A"fish'));
 console.log(tokenizer('PRINT 3', ',PRINT,'));
 console.log(tokenizer('PRINT 3+4', ',PRINT,'));
+
+
+  // returns a miniparser object
+  function parser(line) {
+    let tokens = tokenizer(line, ',LIST,LLIST,');
+    let r = [];
+
+    let c, t, s;
+    let was = '', wasa = '';
+
+    let p = {
+      type() { return t },
+      val() { return s },
+
+      next() {
+	c = tokens.shift();
+	wasa = t;
+	was = s;
+	t = c && c[0];
+	s = c && c[1];
+	if (c) return true;
+      },
+      skip(es) {
+	if (s === es) {
+	  p.next();
+	  return was;
+	}
+      },
+      get(et) {
+	if (t === et) {
+	  p.next();
+	  return was;
+	}
+      },
+      getnum(alt) {
+	let n = p.get('number');
+	return (n === undefined) ? alt :
+	  +n;
+      },
+      getstr(alt) {
+	let s = p.get('string');
+	return (s === undefined) ? alt :
+	  (s.match(/^"(.*)"$/) || ['',alt])[1];
+      }
+    };
+
+    p.skip();
+    return p;
+  }
+
+  function LIST() {
+    // DOC: List program lines
+    // LIST 10 | 10- | -10 | 10-20
+    // New: LIST "PRINT" - matches!
+
+    // shouild be passed in as arg, or this?
+    let p = parser(this);
+
+    let printer = p.skip('LLIST');
+    if (!printer && !p.skip('LIST')) return;
+
+    let start = p.getnum(0);
+    let end = (p.skip('-') ?
+	       p.getnum(0) : start)
+	|| 65536;
+    p.skip(',');
+    let match = p.getstr('');
+
+    console.log({this: this, start, end, match, printer});
+  }
+
+console.log("--------------------------------------------------------------------------------------------------------------");
+
+LIST.call('LIST');
+LIST.call('LIST 10');
+LIST.call('LIST 10-');
+LIST.call('LIST 10-30');
+LIST.call('LIST -30');
+LIST.call('LIST "A"');
+LIST.call('LIST 10- "A"');
+LIST.call('LLIST 42 "A"');
+LIST.call('LLIST 42 \'A\'');
+LIST.call('LLIST 42 "A\'BC\'"');
+
+
+console.log(tokenizer('IF I THEN 3 ELSE 4', ',IF,THEN,ELSE,'));
+
+console.log(tokenizer('IFITHENPRINT33ELSE4', ',IF,THEN,ELSE,PRINT,'));
 
 
 

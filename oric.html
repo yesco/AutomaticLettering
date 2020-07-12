@@ -127,6 +127,11 @@
     throw msg;
   }
 
+  // NEW
+  function run_error(name, e) {
+    error('?'+name+' BROKE: ', ''+(e && e.msg));;
+  }
+
   function subscript_error(info) {
     error("?BAD SUBSCRIPT ERROR", info);
   }
@@ -1317,7 +1322,7 @@ l0 FOR I=0 TO 7
 	else if (c === 6) c = '[ TOGGLE KEYCLICK ]';
 	else if (c === 7) c = '[ BELL ]';
 	else if (c === 8) c = '[ BACKSPACE ]';
-	else if (c === 9) c = '[ RIGHT ]';
+	else if (c === 9) c = '        '; // TODO: TAB
 	else if (c === 12) c = '\n[ CLEAR SCREEN ]\n';
 	else if (c === 13) c = '[ CR ]';
 	else if (c === 14) c = '[ CLEAR LINE ]';
@@ -1962,19 +1967,121 @@ This command works exactly the same as a PRINT statement except that it is used 
   //
   //}
 
-  function LIST(n) {
+  // returns a miniparser object
+  function parser(line) {
+    let tokens = tokenizer(line, ORIC_TOKENZ);
+    print(JSON.stringify(tokens));
+    let r = [];
+
+    let c, t, s;
+    let was = '', wasa = '';
+
+    let p = {
+      rest() {
+	// umparse lol
+	let all = [...tokens];
+	all.unshift(c);
+	return all.map(([t,s])=>s).join(' ');
+      },
+      // -- these just test
+      // return type or test if type
+      end() {
+	return !c;
+      },
+      type(optT) {
+	if (optT) return optT === t;
+	return t;
+      },
+      num() { return this.type('number') },
+      string() { return this.type('string') },
+      keyword() { return this.type('keyword') },
+      op() { return this.type('op') },
+      name() { return this.type('name') },
+	
+      // return val or test if value
+      val(optV) {
+	if (optV) return optV === s;
+	return s;
+      },
+
+      // - the following will go to next if match
+      next() {
+	c = tokens.shift();
+	wasa = t;
+	was = s;
+	t = c && c[0];
+	s = c && c[1];
+	if (c) return true;
+      },
+      skip(es) {
+	if (s === es) {
+	  p.next();
+	  return was;
+	}
+      },
+      get(et) {
+	if (t === et) {
+	  p.next();
+	  return was;
+	}
+      },
+      getnum(alt) {
+	let n = p.get('number');
+	return (n === undefined) ? alt :
+	  +n;
+      },
+      getstr(alt) {
+	let s = p.get('string');
+	return (s === undefined) ? alt :
+	  (s.match(/^"(.*)"$/) || ['',alt])[1];
+      },
+      // TODO: this is crap - wont work use next()
+      seek(es) {
+	while(p.val() != es) {
+	  if (p.end()) return;
+	  print('SEEK.skip> ' + p.val());
+	  p.next();
+	}
+	return p.skip(es);
+      },
+    };
+
+    p.skip();
+    return p;
+  }
+
+  function LIST() {
+    // DOC: List program lines
+    // LIST 10 | 10- | -10 | 10-20
+    // New: LIST "PRINT" - matches!
+
+    // shouild be passed in as arg, or this?
+    let p = parser(this);
+
+    let printer = p.skip('LLIST');
+    if (!printer && !p.skip('LIST')) return;
+
+    let start = p.getnum(0);
+    let end = (p.skip('-') ?
+	       p.getnum(0) : start)
+	|| 65536;
+    p.skip(',');
+    let match = p.getstr('');
+
+    // INIT
     line = '';
-    lineno = -1;
+    lineno = start - 1;
     print();
     
     RUN.interval = setInterval(_=>{
       for(let i=0; i>=0; i--) {
 	nextline();
-	if (!line) {
+	if (!line || lineno > end) {
 	  lineno = 0;
 	  line = '';
 	  stop();
 	} else {
+	  if (match && !line.match(match)) continue;
 	  princ(lineno);
 	  print(line);
 	}
@@ -2183,121 +2290,127 @@ This command works exactly the same as a PRINT statement except that it is used 
   // IF ("") THEN ?1 ELSE ?2 => ?FORMULA COMPL
   // IF "A" THEN ?1 ELSE ?2 => 1
   // IF ("A") THEN ?1 ELSE ?2 => 1
+
   
-  let traceif = 0;
-  function IF(e) {
-    if (traceif) print("IF.hello");
-    let line = this;
-    while (line.match(/(IF|THEN|ELSE)/)) {
-      if (traceif) print('IF: ' + line);
-      line = line.trim();
-
-      // we're (maybe) in the THEN
-      // - skip the first statement after ELSE
-      // continue with the rest!
-      if (line.match(/^ELSE/)) {
-	if (traceif) print('ELSE: ' + line);
-	// remove anything before ':'
-	//   (':' inside "string" ok)
-	line = line.replace(
-	  /^[^:"]*("[^"]*"[^:"]*)\s*/,
-	  '');
-
-	if (traceif) print('ELSE.replace: ' + line);
-
-	// if just a single statement no ':'
-	if (line.length && line[0] != ':')
-	  return;
-
-	// we've skipped the ELSE part
-	// IF 1 THEN ?3:?4 ELSE ?5:?6:?7=>3467
-	// how to go to "run"?
-
-	// TODO: make cont()/nextline()
-	//   use queue to pull next thing?
-
-	lineToDo.unshift(line);
-	return;
-      }
-      
-      let exp, expr;
-      line = line.replace(
-	/^IF\s*(.*?)\s*THEN\s*/,
-	(_, e)=>{
-	  exp = e;
-	  // string constant, strange!
-	  if (exp.startsWith('"')) {
-	    // "" => false
-	    // "A" => true
-	    expr = (exp !== '""')?-1:0;
-	  } else if (exp.match(/^[A-Z]\w*\$/)) {
-	    // any string variale => true
-	    expr = -1;
-	  } else { // ok, let's guess number?
-	    expr = EVAL(exp);
-	  }
-	  return '';
-	});
-
-      if (traceif) print('------------');
-      if (traceif) print('IF.left: >' + line);
-      if (traceif) print('IF.exp: ' + exp);
-      if (traceif) print('IF.expr: ' + expr);
-
-      // did we get it?
-      if (exp === undefined || expr === undefined)
-	syntax_error();
-
-      // not true => ELSE
-      if (!expr) {
-	if (traceif) print('IF.false ' + expr);
-	// TOOD: this cheats: "foo ELSE ..."
-	let t = line.indexOf('THEN');
-	let e = line.indexOf('ELSE');
-
-	if (traceif) print('IF.false t=' + t + ' e=' + e);
-
-	// no ELSE - we're done!
-	if (e < 0) return;
-
-	// TODO: check, for loop in THEN?
-	// and can it have ELSE inside? LOL
-	// see gphotos: IF-FOR-ELSE!!!
-	// seems
-	// IF THEN ?1:FORI=0:IF THEN ELSE:NEXT:?77 ELSE <never reached> - so it's OK!
-
-	// have more THEN - ELSE=not ours!
-	if (t >= 0) return;
-
-	// skip to after ELSE and do rest
-	line = line.substring(e+4);
-	
-	let g = line.match(/^\s*(\d+)\s*/);
-	if (g) return GOTO(+g)
-      }
-
-      line = line.trim();
-
-      // if true - just continue!
-      // TODO: this doesn't work for nested...
-      line = line.replace(
-	/^\s*(.*?)\s*(ELSE.*)\s*$/,
-	(_, th, el)=>{
-	  if (+th == th)
-	    GOTO(+th);
-	  else
-	    run(th);
-	  return ''
-	});
-      // but keep in mind that when
-      // reach 'ELSE ?3:?4:?5' skip to
-      // ?4 ...
-    }
-    // remaining to run!
-    // TODO: ok, false for ?35 ELSE ?35:?36
-    run(line);
+  function IF() {
+    let p = parser(this);
+    p.next();
+    pIF(p);
   }
-  
+
+  // TODO: BAD ONE....
+  function getExp(p) {
+    let x = '';
+    while(p.val() != 'THEN') {
+      x += p.val();
+      if (!p.next()) return;
+    }
+    return EVAL(x);
+    // TODO: make it return a closure()?
+  }
+
+  function pIF(p) {
+    print('pIF:'+p.rest());
+    let exp = getExp(p);
+    if (exp) {
+      print('pIF.then> '+p.rest());
+      print('pIF.val> '+p.val());
+      p.skip('THEN') || syntax_error();
+      print('pIF.afterthen> '+p.rest());
+    } else {
+      print('pIF.else> '+p.rest());
+      if (!p.seek('ELSE')) return;
+      print('pIF.else> '+p.rest());
+      // Not sure correct - may need to abort
+      // if find IF or other ELSE...
+      // How about nested
+      // IF THEN FOR...:IF THEN ELSE : NEXT : ELSE
+    }
+
+    print('pIF.run> '+p.rest());
+    if (p.num()) return GOTO(p.getnum());
+    statements(p);
+
+    // statements need to implement
+    // ELSE to skip one and continue
+  }
+
+  function statements(p) {
+    while(statement(p)) {
+      // ELSE skipme : gohere
+      if (p.skip('ELSE')) p.seek(':');
+      if (!p.skip(':')) break;
+    }
+    return true;
+  }
+  function isParser(f) {
+    let p = f.isParser;
+    if (p) return p;
+    let n = f.isNormal;
+    if (n) return false;
+    // we don't know - investigate
+    let code = f.toString();
+    p = code.match(/^function \w+\(p\)/);
+    if (p)
+      f.isParser = true;
+    else
+      f.isNormal = true;
+    // tail it
+    return isParser(f);
+  }
+  function statement(p) {
+    print('STMT> ' + p.rest());
+    // comments
+    if (p.skip('REM')) return;
+    if (p.skip("'")) return;
+
+    print('STMT> ' + p.rest());
+    if (p.keyword() || p.name()) {
+      let name = p.val();
+      print('STMT.name> ' + name);
+      // first try parser version
+      let f = window[name];
+      if (!f) syntax_error(name);
+      print('STMT.func> ' + f.name);
+      try {
+	if (isParser(f)) {
+	  print('STMT.isParser> ' + name);
+	  // call with parser
+	  p.next();
+	  f.call(p, p); // redundant!
+	} else {
+	  print('STMT.isNormal> ' + name);
+	  let line = p.rest();
+	  print('LINE= '+line);
+
+	  return run(line);
+	  // TODO
+	  print('LINE= '+line);
+	  let args = evalArgs(p);
+	  print('ARGS= ' + JSON.stringify(args));
+	  f.apply(line, args);
+	  //f.apply(p.rest(), evalArgs(p));
+	}
+      } catch(e) {
+	run_error(name, e);
+      }
+      return true;
+    }
+    // if it's not statement then LET!
+    return LET(p);
+  }
+  // evaluate list of arguments till end of statement, or error
+  function evalArgs(p) {
+    let res = [];
+    let exp = expression(p);
+    do {
+      let r = EVAL(exp);
+      res.push(r);
+      exp = expression(p);
+    } while (exp);
+    return res;
+  }
+
   function REPEAT() {}
   function UNTIL() {}
 
@@ -3483,39 +3596,15 @@ errorObj : ${errorObj}
     cursorShow();
   }
 
-  // reads from line variable
-  function nextExp(line) {
-    let r;
-    r = tokenizer(line, ORIC_TOKENZ);
-    if (trace) {
-      print('======== TOKENS =========');
-      print(JSON.stringify(r));
-    }
-    if (0)
-    while(line) {
-      //r = parseExp(line, ORIC_TOKENZ);
-      
-      if (trace) {
-	print();
-	princ('-------------TOKEN:');
-	print(JSON.stringify(r));
-	princ('x.RES ');
-	print(JSON.stringify(r.res));
-	princ('x.REV ');
-	print(JSON.stringify(r.rev));
-	princ('x.TOK ');
-	print(JSON.stringify(r.tok));
-      }
-      line = r[1];
-    }
-    return;
-  }
-
   // interprets and runs one line
   // returns true if ok
   // END return false
   function run(line) {
-    nextExp(line);
+    let toks = tokenizer(line, ORIC_TOKENZ);
+    if (trace) {
+      princ('TOKENS:');
+      print(JSON.stringify(toks, null, 2));
+    }
     
     line = line.trim();
 
@@ -3580,7 +3669,7 @@ errorObj : ${errorObj}
     if (trace) print('------' + a.join(' | '));
 
     // hehe - crap!
-    if (!orig.match(/^(LPRINT|PRINT|LET|INPUT|FOR|HELP|DIM|CLOAD|CSAVE|REM|IF|REPEAT|WHILE|UNTIL|NEXT|GET)/)) {
+    if (!orig.match(/^(LIST|LLIST|LPRINT|PRINT|LET|INPUT|FOR|HELP|DIM|CLOAD|CSAVE|REM|IF|REPEAT|WHILE|UNTIL|NEXT|GET)/)) {
       if (trace) print('---EVAL---' + a.join(' | '));
       a = a.map((x,i)=>!i?x:EVAL(x));
     }
@@ -3827,6 +3916,10 @@ errorObj : ${errorObj}
 
     saved: undefined,
 
+    // colors will be multiples of 8+color...
+    ink: 7, 
+    paper: 0,
+
     h: function home() {
       this.ox = curx;
       this.oy = cury;
@@ -3890,6 +3983,8 @@ errorObj : ${errorObj}
       return this.index;
     },
     L: function lores() {
+      this.ink = ink;
+      this.paper = paper;
       LORES();
     },
     l: function line() {
@@ -3915,6 +4010,12 @@ errorObj : ${errorObj}
       DRAW(x-this.ox, 0, this.mode);
       DRAW(0, y-this.oy, this.mode);
       this.other();
+    },
+    I: function Ink() {
+      INK(++this.ink % 8);
+    },
+    P: function Paper() {
+      PAPER(++this.paper % 8);
     },
     q: function quit() {
       if (hires()) {
@@ -3993,11 +4094,26 @@ A raw screen editor (LORES 1)
 - text and attr line editing
 - graphical TELETEXT drawing
 
-- SHIFT/ALT-arrow move 10/25
-    (? again to go back)
+SHIFT/ALT-arrow move 10/25
+
+----------------------------------------
+move    h-home     o-other   arrow-keys
+        p-prev     n-next    CTRL/SHIFT
+
+pixel   SPC-toggle 1-set     0-unset
+draw    l-line     c-circle  r-rect
+fill               C         R
+
+----------------------------------------
+---------x---------x---------x---------x
+color    I-Ink     P-Paper 
+m-mode   L-lores 
+
+q-quit  ?-back to edit  q-quit
 `;
       CLS();
       print(h);
+      return;
       // print K-name ...
       Object.keys(this).filter(
 	k=>k.length==1).sort().map(
@@ -4008,7 +4124,6 @@ A raw screen editor (LORES 1)
 	  princ(s); TAB();
 	});
 
-      print('? again to toggle help off!');
     },
 
   };
