@@ -612,14 +612,15 @@ INFO:<br><span id='info'></span>
       click = true,
       column = 2, // protected columns
       scoff = 0, // screen off if > 0 (count!)
+      scstop = 0, // screen pause
       printer = undefined,
       double = false,
       trace = false, // debug tracing CTRL-P
       tron = false, // TRON/TROFF
       row = 1,
       col = column,
-      paper = 0,
-      ink = 7,
+      paper = 7,
+      ink = 0,
 
       // 0=TEXT=LORES0, 1=LORES1, -1=HIRES
       gedit = false,
@@ -656,6 +657,8 @@ INFO:<br><span id='info'></span>
     caps = true;
     click = true;
     column = 2;
+    scoff = 0;
+    scstop = 0;
     printer = undefined;
     double = false;
     trace = false;
@@ -665,8 +668,8 @@ INFO:<br><span id='info'></span>
     
     row = 1;
     col = column;
-    paper = 0;
-    ink = 7;
+    paper = 7;
+    ink = 0;
 
     gedit = false;
     lores = 0;
@@ -693,11 +696,11 @@ INFO:<br><span id='info'></span>
     // action
     showStatus();
 
-    print(`
-ORIC EXTENDED BASIC Vl.1
-(C) 1983 TANGERINE
+    print(
+`ORIC EXTENDED BASIC V1.2
+\` 1983 TANGERINE
 
-372631 BYTES FREE`);
+ 372631 BYTES FREE`);
   }
 
   // TODO: define imgs for each character?
@@ -915,6 +918,8 @@ ORIC EXTENDED BASIC Vl.1
     // DOC: Draws a circle of RADIUS
     // New: draw outside of screen!
     // New: works in LORES mode!
+
+    // TODO: https://www.geeksforgeeks.org/bresenhams-circle-drawing-algorithm/?fbclid=IwAR3fO_Ib4oC6is3FBdcw_9U1HvvYRMg2CIEKaHR3-ohMMew-0oHXL5Ou4W4
     if (r <= 0) return;
 
     function set(x, y) {
@@ -1409,19 +1414,13 @@ l0 FOR I=0 TO 7
   }
   
 function scroll(srow, erow, noClr) {
-  //alert(srow + ', ' + erow + ' dir='+dir);
   let dir = srow > erow ? 1 : -1;
-  //srow += dir;
-  //erow += dir;
-  //alert(srow + ', ' + erow + ' dir='+dir);
 
-  console.log('srow='+srow+' erow='+erow+' dir='+dir);
   // copy FROM row
   for(let r=erow; r!=srow; r+= erow<srow?1:-1) {
     console.log('r=', r);
     // generalize for sideways scroll!
     for(let c=0; c<SCREEN_COLS; c++) {
-      //console.log('r=', r, 'c=', c);
       let old = screen(r, c);
       let nw = screen(r+dir,c);
       if (nw != old)
@@ -1429,10 +1428,11 @@ function scroll(srow, erow, noClr) {
     }
   }
   if (!noClr) {
-    for(let c=column; c<SCREEN_COLS; c++)
+    for(let c=0; c<SCREEN_COLS; c++)
       screen(srow, c, 32);
-    screen(0, srow, paper+16);
-    screen(1, srow, ink);
+    console.log(JSON.stringify({paper, ink}));
+    screen(srow, 0, paper+16);
+    screen(srow, 1, ink);
   }
 }
 
@@ -1522,7 +1522,10 @@ CODE CHARACTER Control Code
     // backspace
     if (ch == 8) {
       col--;
-      if (col < column) { col = 39; row--; }
+      if (col < column) {
+	col = SCREEN_COLS-1;
+	row--;
+      }
       screen(row, col, 32);
     }
 
@@ -2106,6 +2109,8 @@ This command works exactly the same as a PRINT statement except that it is used 
     print();
     
     RUN.interval = setInterval(_=>{
+      if (scstop) return;
+
       for(let i=0; i>=0; i--) {
 	nextline();
 	if (!line || lineno > end) {
@@ -2207,6 +2212,8 @@ This command works exactly the same as a PRINT statement except that it is used 
     if (running()) return;
     
     RUN.interval = setInterval(_=>{
+      if (scstop) return;
+
       cont.intervalcount++;
       let start = Date.now();
       let millis;
@@ -3813,12 +3820,12 @@ errorObj : ${errorObj}
     // CTRL-1 insert INK 1 (red)
     // ALT-3  insert PAPER 3 (yellow)
     // CTRL-ALT toggle show ATTRs
-    // CTRL-U "uglies" charcode+1
+    // CTRL-ALT-U "uglies" charcode+1
     // - TELETEXT/ALT block chars
     // CTRL-SHIFT-1 toggle bit 1
     // CTRL-SHIFT-6 toggle bit 6
     
-    e.preventDefault();
+    //e.preventDefault();
     try{
       cursorHide();
       //if (!k.match(/[0-9a-z]/)) return;
@@ -3826,7 +3833,7 @@ errorObj : ${errorObj}
 
       // TODO:
       switch(k) {
-      case 'v': alert("editExt: can't catch 'v"); break;
+      //case 'v': alert("editExt: can't catch 'v"); break;
       
 	// ins char shift right after cursor
       case 'i': 
@@ -3863,7 +3870,7 @@ errorObj : ${errorObj}
 	break; }
 
 	// uglies - block graphics
-      case 'u': uglies(x=>x+1); break;
+      case 'u': if (c && a) uglies(x=>x+1); break;
 
 	// fg: CTRL-# bg: ALT-#
 	// (and CTRL-ALT-# uglies)
@@ -3946,12 +3953,52 @@ errorObj : ${errorObj}
     stack: [], // lol
     index: 0,
 
+    ops: [],
+
     saved: undefined,
+
 
     // colors will be multiples of 8+color...
     ink: 7, 
     paper: 0,
 
+    save: function save(name) {
+      this.ops.push([name, this.getState()]);
+    },
+    getState: function getState() {
+      return {
+	curx, cury,
+	ox: this.ox, oy: this.oy,
+	mode: this.mode,
+	ink: this.ink,
+	paper: this.paper,
+      };
+    },
+    applyState: function applyState(s) {
+      curx = s.curx; cury = s.cury;
+      this.ox = s.ox; s.oy = s.oy;
+      this.mode = s.mode;
+      this.ink = s.ink;
+      this.paper = s.paper;
+    },
+    A_r: function replay() {
+      // TOOD: save text?
+      // TODO: save and restore stack
+      CLS(); LORES(1);
+      console.log('replay.1');
+      this.ops.forEach(op=>{
+	console.log('replay.2');
+	let o = op[0];
+	let s = op[1];
+	console.log('replay.3 op=' + op + ' ' + JSON.stringify(s));
+	this.applyState(s);
+	console.log('replay.4');
+	// replay command!
+	(this[o])(); // no args
+	console.log('replay.5');
+      });
+      console.log('replay.6 done');
+    },
     h: function home() {
       this.ox = curx;
       this.oy = cury;
@@ -3964,18 +4011,26 @@ errorObj : ${errorObj}
       }
     },
     ' ': function toggle() {
+      this.save('toggle');
       CURMOV(0, 0, 2);
       this.mark();
     },
     0: function unset() {
+      this.save('unset');
       CURMOV(0, 0, 0);
       this.mark();
     },
     1: function set() {
+      this.save('set');
       CURMOV(0, 0, 1);
       this.mark();
     },
     m: function mark() {
+      // don't mark twice (keep other)
+      // erh? this is a noop..
+      // keep for thirdx...
+      if (this.ox == curx && this.oy == cury)
+	return;
       this.ox = curx;
       this.oy = cury;
       this.push();
@@ -3987,6 +4042,7 @@ errorObj : ${errorObj}
     },
     push: function push() {
       let last = this.stack[this.stack.length-1];
+      // don't push if already at top
       if (last && last.x == curx && last.y == cury)
 	return;
 
@@ -4020,11 +4076,15 @@ errorObj : ${errorObj}
       LORES();
     },
     l: function line() {
+      this.save('line');
       this.other();
+      this.push();
       DRAW(this.ox-curx, this.oy-cury, this.mode);
+      this.push();
       this.mark();
     },
     c: function circle() {
+      this.save('circle');
       sq = (v)=>v*v;;
       let r = SQR(sq(this.ox-curx) + sq(this.oy-cury));
       this.other();
@@ -4035,6 +4095,7 @@ errorObj : ${errorObj}
       return INT(r);
     },
     r: function rect() {
+      this.save('rect');
       let x = curx, y = cury;
       this.other();
       DRAW(this.ox-x, 0, this.mode);
@@ -4105,6 +4166,11 @@ errorObj : ${errorObj}
     arrowleft: function(){curx-=this.step},
     arrowright: function(){curx+=this.step},
 
+    CA_arrowup: function(){cury-=this.step},
+    CA_arrowdown: function(){cury+=this.step},
+    CA_arrowleft: function(){curx-=this.step},
+    CA_arrowright: function(){curx+=this.step},
+
     // unhifted ?
     '/': function(){this.help()},
     '?': function help() {
@@ -4142,6 +4208,58 @@ color    I-Ink     P-Paper
 m-mode   L-lores 
 
 q-quit  ?-back to edit  q-quit
+
+---------x---------x---------x---------x
+CTRL-    ALT-         G(raphical)EDIT
+   C-? help               ? help
+=================  =====================
+                   SPC toggle pixel
+-A copy            a copy   
+-B  -              b?brush  
+-C break           c circle  C fill    
+-D double                             
+-E  -              e?erase   E?export       
+-F keyclck         f?fill    F Flip
+---------x---------x---------x---------x
+-G bell                             
+-H del             h home              
+-I insert A-inv              I ink
+-J column                        
+-K                                    
+-L CLS    A-Load   l line    L LORES  
+-M |<--            m mark    M?mode
+-N clrline         n next       
+-O out-off         o other      
+-P printer         p prev    P paper
+---------x---------x---------x---------x  
+-Q cursor          q quit          
+-R reload          r rect    R fill
+-S screen A-Save   s?swap       
+-T caps            t text    T textfont
+-U  -                             
+-V  -                              
+-W?write           w?write
+-X cancel                          
+-Y yank            y?yank        
+-Z?undo            z?undo
+---------x---------x---------x---------x
+-? color help
+-0 black bkground  0 unset
+-1 red       "     1 set
+-2 green     "     
+-3 blue      "
+-4 yellow    "
+-5 magnenta  "
+-6 cyan      "
+-7 white     "     
+-8 textmode        8 flip
+-9 blockgrph       9 rotate
+                   +
+                   -
+---------x---------x---------x---------x
+-arrw copy step25 step 1    step 10
+C-RET insert line
+C-BS delete line
 `;
       CLS();
       print(h);
@@ -4203,9 +4321,14 @@ q-quit  ?-back to edit  q-quit
     //if (c && g.last) g.last.call(g);
     //if (c) g.circle();
 
-    if (s && k.length===1) k=k.toUpperCase();
+    if (s && k.length===1)
+      k=k.toUpperCase();
+    // if alt key do prefix by CAS_key
+    if (a)
+      k=(c?'C':'')+(a?'A':'')+(s?'S':'')+'_'+k;
 
     let f = g[k];
+    console.log('GEDIT: ' + k + ' ' + (f?f.name:'nope'));
     if (!f) {
       msg('GEDIT: ?-help q-quit');
     } else {
@@ -4237,8 +4360,10 @@ q-quit  ?-back to edit  q-quit
       throw 'GEDIT: Hires mode note done!';
     } else {
       // update cursor to same cell!
-      col = INT(curx / 2);
-      row = INT(cury / 3);
+      col = INT(curx / 2) % SCREEN_COLS;
+      row = INT(cury / 3) % SCREEN_ROWS;
+      if (col < 0) col += SCREEN_COLS;
+      if (row < 0) row += SCREEN_ROWS;
     }
 
     // if we're exiting don't draw!
@@ -4263,10 +4388,10 @@ q-quit  ?-back to edit  q-quit
     case 40: row++; break; // down
     }
     // move cursor, wrap around (?)
-    if (col < column) col = 39;
-    if (col > 39) col = 2;
-    if (row < 0) row = 27;
-    if (row > 27) row = 0;
+    if (col < column) col = SCREEN_COLS-1
+    if (col > SCREEN_COLS-1) col = column;
+    if (row < 0) row = SCREEN_ROWS-1;
+    if (row > SCREEN_ROWS-1) row = 0;
     cursorShow();
   }
 
@@ -4302,9 +4427,16 @@ q-quit  ?-back to edit  q-quit
     // CTRL-P: toggle printer
     update(-4 -2 -7, printer, 'PRINTER');
     
-    // CTRL-S: toggle screen (centered)
+    // CTRL-O: toggle screen (centered)
     update(Math.floor(SCREEN_COLS-10)/2,
 	     saved, 'SCREEN OFF');
+
+    // CTRL-S: toggle screen (centered)
+    if (scstop) {
+      // only overwrite status ofscoff if scstop
+      update(Math.floor(SCREEN_COLS-12)/2,
+	     scstop, 'SCREEN PAUSE');
+    }
 
     // restore, no write to screen
     scoff = saved;
@@ -4355,20 +4487,157 @@ q-quit  ?-back to edit  q-quit
     }
   }
 
+  function wget(url, cb) {
+    // plain on JSONP! (works from file://)
+    let s = document.createElement('script');
+    // create a callback that cleans up
+    wget.cb = wget.cb || {};
+    wget.url = wget.url || {};
+    let n = wget.n = (wget.n || 0) + 1;
+    wget.url[n] = url;
+    wget.cb[n] = function(data){
+      cb(data, undefined, n);
+      // cleanup
+      s.remove();
+      delete wget.cb[n];
+    };
+    s.src = 'http://yesco.org/wget.pl?jsonp=(wget.cb['+n+'])&'+url;
+    // TODO: cleanup on error
+    s.onerror = 'print("load err");';
+    s.onload  = 'print("load ok");';
+    // actrivate
+    document.body.appendChild(s);
+  }
+
+  function HTML2TELETEXT(nid, h) {
+    // TODO: move styling to stylemap
+    // TODO: base URL
+    let n = 0;
+    h = h.replace(/<img.*?src=(\S+?)>/g, '[!IMG $1]')
+      .replace(
+	/<a.*?href=(\S+?)>(.*?)<\/a>/g,
+	(a,href,t)=>{
+	  n++;
+	  let id = `${nid} ${n}`;
+	  wget.url[id] = href;
+	  return '\4' + t + ' [!WWW ' + id + ']\0';
+	})
+      .replace(/<button.*?>(.*?)<\/button>/g, '[? $1 ]')
+      .replace(/<(\w+).*?>/g, '<$1>')
+      .replace(/<head.*?\/head>/g, '')
+      .replace(/<script.*?\/script>/g, '')
+      .replace(
+	/<pre>(.*?)<\/pre>/gi,
+	(a)=>a.replace(/\n/g, '\212\20\2')
+	  .replace(/ /g, '\240'))
+      .replace(/\n/g, ' ')
+      .replace(/ +/g, ' ')
+      .replace(/<br>/g, '\n')
+      .replace(/<hr>/g, '\n---\n')
+      .replace(/<b>(.*?)<\/b>/g, '\1$1\0')
+      .replace(/<i>(.*?)<\/i>/g, '\5$1\0')
+      .replace(/<li>\s*/g, '\n* ')
+      .replace(/<p>\s*/g, '\n\240\240')
+      .replace(/<div>/g, '\n')
+      .replace(/\/<div>/g, '\n')
+      .replace(/\n\n+/g, '\n\n')
+      .replace(/<h1>/g, '\n\20\7')
+      .replace(/<h2>/g, '\n\22\0')
+      .replace(/<h3>/g, '\n\23\0')
+      .replace(/<h4>/g, '\n\26\0')
+      .replace(/<.*?>/g, ' ')
+      .replace(/ +/g, ' ')
+      .replace(/ *\n */g, '\n')
+      .replace(/ *([\0-\37]) */g, '$1')
+      .replace(/^\n*/, '')
+      .trim();
+    return h;
+  }
+
+  function urlView() {
+    // TODO: get url from screen!
+    let url = 'http://yesco.org';
+    clearline(0);
+    iplot(0, 0, 'WWW: Loading '+url+' ...');
+    wget(
+      url,
+      function showPage(h, err, nid){
+	CLS();
+	let u = '[!WWW '+nid+'] '+url;
+	iplot(0, 0, u.substring(0, SCREEN_COLS-1));
+
+	let txt = HTML2TELETEXT(nid, h);
+	let i = 0;
+	let step = 20;
+	RUN.interval = setInterval(
+
+	function printSlow() {
+	  if (scstop) return;
+
+	  let end = i + step;
+	  for(; i<end; i++) {
+
+	    if (i > txt.length) {
+	      print();
+	      print('Finished!');
+	      stop();
+	      return;
+	    }
+
+	    let ch = txt.charCodeAt(i);
+
+	    // optimize corner cases
+	    if (col == column && (ch == 32 || ch == 10)) {
+	    } else if (col == 2 && ch < 32) { // && !(ch & 0x10)) {
+	      // start with color - use first columns
+	      if (ch < 8)
+		screen(row, 1, ch);
+	      else if (ch < 24)
+		screen(row, 0, ch);
+	    } else {
+	      // escape control codes
+	      if (ch != 10 && ch < 32) putc(ESC);
+	      // hard newline
+	      if (ch == 0x212) ch = 0x12;
+	      putc(ch);
+	    }
+
+	    // top when screen full
+	    if (0 && row >= SCREEN_ROWS-3) {
+	      print();
+	      princ('Next page: [!WWW '+nid+' '+i+'-]');
+	      return;
+	    }
+	  }
+	},
+	  0);
+      });
+  }
+
   dom('exp').addEventListener('keydown', function(e) {
     let c=e.ctrlKey,a=e.altKey,s=e.shiftKey;
     let k = e.key.toLowerCase();
     let ch = e.code;
     let kc = e.keyCode; // legacy
 
-    //console.log("KEY kc="+kc+" c="+c+" a="+a+" s="+s);
+    //console.log("KEY k='+k+' kc="+kc+" c="+c+" a="+a+" s="+s);
 
     // magicall show attributes!
     if (c && a)
       dom('screen').classList.toggle('show-attr');
 
+    // gedit mode?
+    if (a && !c && k=='g') {
+      if (gedit) {
+	GEDIT('quit');
+      } else {
+	GEDIT('init');
+	showStatus();
+      }
+    }
+
     // if in gedit mode and arrow, exit
-    if (gedit && k.startsWith('arrow'))
+    if (gedit && (a || k.startsWith('arrow')))
       return GEDIT(k, kc, a, s, c, e);
 
     // make ctrl click sound
@@ -4397,7 +4666,7 @@ q-quit  ?-back to edit  q-quit
 
     if (c && k=='n') clearline(row, 2);
     if (c && k=='m') col = 2; // CR
-    //if (c && k=='u') ; // uglies
+    if (c && k=='u') urlView();
 
     if (c && k=='j') ; // down (rotate?)
     if (c && k=='k') ; // up (rotate?)
@@ -4409,7 +4678,7 @@ q-quit  ?-back to edit  q-quit
 
     // arrow, C-arrow = copy
     let char = screen(row, col);
-    if (37<=kc && kc<=40) {
+    if (!a && (37<=kc && kc<=40)) {
       editArrow(kc);
       // drag/trail char to new pos!
       if (c) screen(row, col, char);
@@ -4418,17 +4687,7 @@ q-quit  ?-back to edit  q-quit
     // my extensions
     if ((c || a) && k.length==1)
       editExt(k, kc, a, s, c, e);
-
-    // gedit mode?
-    if (a && !c && k=='g') {
-      if (gedit) {
-	GEDIT('quit');
-      } else {
-	GEDIT('init');
-	showStatus();
-      }
-    }
-    
+   
     // too easy boot? lol
     if (c && k=='r') window.location.reload();
     // tracer
@@ -4458,9 +4717,9 @@ q-quit  ?-back to edit  q-quit
     if (k=='q') cursorToggle();
     if (k=='p') showStatus(printerToggle());
     if (k=='t') showStatus(caps = !caps);
-    if (k=='s') showStatus(scoff=scoff?0:1);
+    if (k=='o') showStatus(scoff=scoff?0:1);
+    if (k=='s') showStatus(scstop=!scstop);
     if (k=='d') showStatus(double=!double);
-    if (k=='f') clickToggle();
     if (k=='g') bell();
 
     if (k=='j') showStatus(column=2-column);
