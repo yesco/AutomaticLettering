@@ -300,6 +300,8 @@
       position: relative;
       width: 0.30rem;
       border: 0px;
+      padding: 0px;
+      margin: 0px;
       padding-right: 0.25rem;
       max-height: 12px;
   }
@@ -358,7 +360,16 @@
 /* INVERSE */
 /* TODO: not correct as it only blinks specified colors? */
 .inverse {
+    position:relative;
+    left:-3px;
     filter: invert(100%);
+    margin:0;
+    padding:0;
+
+    color: black;
+    background-color: white;
+    //color: white;
+    //background-color: black;
 }
 
 .cursor {
@@ -372,8 +383,11 @@
     visibility: visible;
 
     animation: cursor_blinker 0.5s step-start infinite;
-    background-color: black;
-    color: inherit;
+//    background-color: black;
+//    color: inherit;
+
+color: white;
+background-color: black;
     /* this is confusing, it only inverts background when set! */
 
 }
@@ -645,8 +659,6 @@ INFO:<br><span id='info'></span>
 
   function boot() {
     stop('noprompt');
-    CLS();
-    
     
     // init
     vars = {};
@@ -694,8 +706,8 @@ INFO:<br><span id='info'></span>
     cont.millis = 0;
 
     // action
+    CLS();
     showStatus();
-
     print(
 `ORIC EXTENDED BASIC V1.2
 \` 1983 TANGERINE
@@ -899,6 +911,10 @@ INFO:<br><span id='info'></span>
     // DOC: Draw a line relative DX,DY
     // New: draw outside of screen!
     // New: works in LORES mode!
+
+    // TODO: https://www.geeksforgeeks.org/bresenhams-line-generation-algorithm/?ref=rp
+    // OR: https://www.geeksforgeeks.org/mid-point-line-generation-algorithm/?ref=rp
+
     let steps = ABS(
       ABS(dx) > ABS(dy) ?
 	dx : dy);
@@ -1080,6 +1096,25 @@ So far the subject of writing
     return col;
   }
   
+  function ROW() {
+    // DOC: New: Row number
+    return row;
+  }
+  
+  // return text for one line,
+  // if nohi strips 7bit
+  // if noattr replace them with ' '
+  function getScreenLine(r, nohi, noattr) {
+    let t = '';
+    for(let c=0; c<SCREEN_COLS; c++) {
+      let ch = screen(r, c);
+      if (nohi) ch = ch & 0x7f;
+      if (noattr && (ch < 32)) ch = 32;
+      t += String.fromCharCode(screen(r, c));
+    }
+    return t;
+  }
+
   // BRAILLE
   // https://en.m.wikipedia.org/wiki/Braille_Patterns
   // bit-value:
@@ -1148,17 +1183,14 @@ So far the subject of writing
 
     // process byte
     if (ch > 255) { // unicode! lol
-      if (ch == 127) {
-	// ATMOS font put it in unicode place!
-	t = '&copy;';
-      } else {
-	// pass through, we don't c(h)ar(e)
-	t = ch;
-      }
+      // pass through, we don't c(h)ar(e)
+      t = ch;
     } else if (c >= 32) { // ascii
       // TODO: implement inverse!
       // remove high-bit as it means inverse
-      t = ch & 0x7f; 
+      t = ch & 0x7f;
+      if (ch & 0x80)
+	dc.classList.add('inverse');
     } else if (ch < 0) { // bits...
       t =  BRAILLE - ch; // so it get's "added"
     } else if (c < 8) { // INK
@@ -1694,9 +1726,14 @@ CODE CHARACTER Control Code
   
   // fill text/graphics cells
   function fill(row, col, rows, cols, v) {
+    let f = v;
+    if (typeof f !== 'function') f = ()=>v;
+
     for(let r=0; r<rows; r++)
       for(let c=0; c<cols; c++)
-	screen(row + r, col + c, v);
+	screen(
+	  row + r, col + c,
+	  f(row + r, col + c));
   }
 
   // Also CTRL-L
@@ -3108,8 +3145,23 @@ $276,$277 Spare counter — also used by WAIT (and printer in V1.0).
 50 DATA 14,17, 17,17,62,34,34,0 
 `;
 
+  function OLD() {
+    // DOC: New: Get old program back
+    if (OLD.stack.length)
+      lines = OLD.stack.pop();
+    else
+      print('?NOTHING TOO OLD');
+  }
+  OLD.stack = []; // don't clean
+
   function NEW() {
+    // DOC: Delete currerent program
+    // New: use OLD to get it back...
+
+    // TODO: ask if program is dirty...
+    // maybe autosave?
     stop(true);
+    OLD.stack.push(lines);
     lines = {};
   }
   
@@ -3118,6 +3170,9 @@ $276,$277 Spare counter — also used by WAIT (and printer in V1.0).
   // CLOAD "" [,S] - search/list
   // CLOAD "filename", J [,S] - join! 
   // CLOAD "filename", V [,S] - verify
+  // TODO: add DIR()
+  // TODO: remember name
+  // TODO: add versions
   function CLOAD(name, info) {
     // DOC: Loads a file "NAME"
     // New: Without arguments lists examples
@@ -3497,7 +3552,6 @@ l80 REM*** WAUES ***
   }
   
   TEXT();
-  CLS();
 
   boot(); //run('boot'); prints prommpt
   prompt();
@@ -3589,15 +3643,207 @@ errorObj : ${errorObj}
     cursorShow();
   }    
 
-  function editEnter() {
-    cursorHide(); // turned on by run/stop
+  function INVERSE(...args) {
+    // DOC: New: Inverse part of the screen
+    // New: INVERSE row, col, len
+    // New: INVERSE "STR"
+    // New: INVERSE ' - turns off all
+
+    let lochar = c=>String.fromCharCode(c.charCodeAt(0)&0x7f);
+      
+    if (args.length === 0) {
+      fill(0, 0, SCREEN_ROWS, SCREEN_COLS,
+	   (r,c)=>{
+	     let ch = screen(r, c);
+	     let c7 = ch & 0x7f;
+	     if (c7 !== ch) screen(r, c, c7);
+	   });
+    } else if (args.length === 3) {
+      let [r,c,len] = args;
+      // set hibit
+      for(let i=0; i<len; i++)
+	screen(r, c+i, screen(r, c+i)|0x80);
+    } else if (args.length === 1) {
+      let s = args[0];
+      let len = s.length;
+      // protect regexp chars
+      s = s.replace(/([^\w])/g, '\\$1');
+
+      for(let r=1; r<SCREEN_ROWS; r++) {
+	getScreenLine(r).replace(
+	  RegExp(s, 'g'), (a,i)=>
+	    INVERSE(r, i, len));
+      }
+    }
+  }
+
+  function doAction(action) {
+    INVERSE();
+
+    // go one down line
     print();
-    // TODO: right place? lol
-    // (we hide it in case of error)
-    dom('exp').value = line;
-    
-    run(line);
-    line = '';
+
+    try {
+      if (action.www)
+	return urlView(action.www);
+      else if (action.linktext) {
+	// TODO:
+      } else if (action.button)
+	return run(action.button);
+    } catch (e) {
+      alert('doAction.error: ' + e + '\n' +
+	    e.stack);
+    }
+  }
+
+  // only return match if cursor at it
+  function atmatch(s, re, dbg) {
+    let res;
+    s.replace(RegExp(re, 'g'), (a,m,i)=>{
+      if (i <= col && col <= i+m.length)
+	res = m;
+      if (dbg) alert('atmatch: i='+i+' m='+m);
+    });
+    return res;
+  }
+
+  function findAction() {
+    try {
+
+      // TODO: use alt inverse so we don't deastroy inverse on the screen by user
+      INVERSE();
+      let r = xfindAction();
+      if (r) {
+	if (r.linktext) {
+	  let id = `${wget.pageid} ${r.linktext}`;
+	  let url = wget.url[id];
+	  //alert('Lookup '+r.linktext+'\n='+url);
+	  if (url) {
+	    r.www = url;
+	  } else {
+	    // partial match...
+	    let m = Object.keys(wget.url)
+		.filter(k=>k.match(r.linktext));
+	    if (!m) {
+	      r.msg = 'link not matched';
+	    } else if (m.length == 1)
+	      r.www = m[0];
+	    else { // choices
+	      r.msg = 'too many matches';
+	      r.www = m[0]; // what the heck
+	    }
+	  }
+	  
+	  if (r.www) r.type = 'WWW';
+	}
+
+	// fix url (if all uppercase)
+	if (r.www) {
+	  if (r.www === r.www.toUpperCase())
+	    r.www = r.www.toLowerCase();
+	}
+
+	let txt = r.button || r.www || r.msg;
+	if (!txt) {
+	  txt = Object.keys(r).filter(
+	    k=>k.match(/(www|button|linktext)/))
+	      .map(
+		k=>`${k.toUpperCase()} ${r[k]}`).join('');
+	}
+
+	txt = r.type + ' ' + txt;
+	clearline(0);
+	iplot(0, 0, txt.substr(0, SCREEN_COLS));
+
+	INVERSE(r.hilite);
+      }
+      return r;
+
+    } catch(e) {alert(e);}
+  }
+  function xfindAction() {
+    // TODO:
+    // - CTRL-U should go to top bar and
+    // - show current URL, return there
+    // - should go to it
+
+    let ln = getScreenLine(row, 'nohi');
+
+    // - [!WWW 1 3] - button
+    let button = atmatch(
+      ln,
+      /(\[!{0,1}[^\]]+\])/);
+    if (button) return {
+      button: rget(button, /\[!{0,1}(.*)\]/)[0],
+      hilite: button,
+      type: 'button',
+    };
+
+    // - blue link name under cursor
+    // (ok this is sketchy: 'blue')
+    // (what if change markup?)
+    // match till next attr
+    // '\4link\4link\0'
+    // TODO: attr inside linktext
+    let linktext = atmatch(
+      ln, /(?<=\4)([^\0-\37]{2,})[\0-\037]/);
+    if (linktext) return {
+      type: 'linktext',
+      linktext,
+      hilite: linktext,
+    }
+
+    // try till EOL
+    linktext = atmatch(
+      ln, /\4([^\0-\37]{2,})$/g);
+    if (linktext) return {
+      type: 'linktext',
+      linktext,
+      hilite: linktext,
+      partial: true,
+    }
+
+    // - under/before around current cursor
+    let atCursor = atmatch(
+      ln, /([^\0-\37\s]{3+)/);
+    if (atCursor) {
+      // - url under cursor (more strict)
+      let [url] = rget(
+	atCursor,
+	/\b([\w\.\/\?:&=\+%\-\"\'!\$~@#\^\*_]{3,}[^\.])\b/i);
+      if (url && url.match(/\S\.\S/))
+	return {
+	  type: 'WWW',
+	  www: url,
+	  hilite: url,
+	};
+    }
+
+    // nothing
+    return;
+  }
+
+  function editEnter() {
+    // DOC: Run line buffer command
+    // New: If emtpy find [button] at cursor or URL
+    cursorHide(); // turned on by run/stop
+    if (line) {
+      print();
+      // TODO: right place? lol
+      // (we hide it in case of error)
+      dom('exp').value = line;
+      // run turns on cursor if appropriate
+      // and not if background running
+      run(line);
+      line = '';
+      return;
+    } else {
+      let action = findAction();
+      if (action)
+	return doAction(action);
+    }
+    print();
+    cursorShow();
   }
 
   // basically make other arguments splittable
@@ -3639,6 +3885,13 @@ errorObj : ${errorObj}
   // returns true if ok
   // END return false
   function run(line) {
+    // special commands
+    if (line.match(/^\S+\S/))
+      return urlView(line);
+    // TODO: [button]?
+    // TODO: NAME [.COM] (any file...)
+    // TODO: !EXTNAME [.COM] (new funcs)
+
     let toks = tokenizer(line, ORIC_TOKENZ);
     if (trace) {
       princ('TOKENS:');
@@ -4392,6 +4645,9 @@ C-BS delete line
     if (col > SCREEN_COLS-1) col = column;
     if (row < 0) row = SCREEN_ROWS-1;
     if (row > SCREEN_ROWS-1) row = 0;
+
+    findAction();
+
     cursorShow();
   }
 
@@ -4487,132 +4743,270 @@ C-BS delete line
     }
   }
 
-  function wget(url, cb) {
-    // plain on JSONP! (works from file://)
-    let s = document.createElement('script');
-    // create a callback that cleans up
-    wget.cb = wget.cb || {};
-    wget.url = wget.url || {};
-    let n = wget.n = (wget.n || 0) + 1;
-    wget.url[n] = url;
-    wget.cb[n] = function(data){
-      cb(data, undefined, n);
-      // cleanup
-      s.remove();
-      delete wget.cb[n];
-    };
-    s.src = 'http://yesco.org/wget.pl?jsonp=(wget.cb['+n+'])&'+url;
-    // TODO: cleanup on error
-    s.onerror = 'print("load err");';
-    s.onload  = 'print("load ok");';
-    // actrivate
-    document.body.appendChild(s);
+// wget.url["pageid linkid"] = url
+// wget.url["pageid linktxt"] = url
+// wget.pageid = pageid // last seen  
+function wget(url, cb) {
+  // plain on JSONP! (works from file://)
+  let s = document.createElement('script');
+  // create a callback that cleans up
+  wget.cb = wget.cb || {};
+  wget.url = wget.url || {};
+  let n = wget.n = (wget.n || 0) + 1;
+  wget.url[n] = url;
+  wget.pageid = n;
+  wget.cb[n] = function(data){
+    cb(data, undefined, n);
+    // cleanup
+    s.remove();
+    delete wget.cb[n];
+  };
+  s.src = 'http://yesco.org/wget.pl?jsonp=(wget.cb['+n+'])&'+url;
+  // TODO: cleanup on error
+  s.onerror = 'print("load err");';
+  s.onload  = 'print("load ok");';
+  // actrivate
+  document.body.appendChild(s);
+}
+
+function HTML2TELETEXT(nid, h) {
+  // TODO: move styling to stylemap
+  // TODO: base URL
+  // TODO: handle link broken by end of screen, and attr not follow...
+  
+  // (These retain color after new line)
+  // - \u0102 set green START
+  // - \u0202 set green END (matching)
+  // - \u0112 set green back START
+  // - \u0212 set green back END (matching)
+
+  let n = 0;
+  h = h.replace(/<img.*?src=(\S+?)>/g, '[!IMG $1]')
+    .replace(
+      /<a.*?href=(\S+?)>(.*?)<\/a>/g,
+      (a,href,txt)=>{
+	n++;
+	// save as '1 2'
+	// and     '1 TXT'
+	href = href.replace(
+	  /^(['"])(.*)\1$/, '$2');
+	wget.url[`${nid} ${txt}`] = href;
+	let lid = `${nid} ${n}`;
+	wget.url[lid] = href;
+	return '\u0104' + txt + '\u0204';
+	//return '\u0104(' + txt + ')\u0204[!WWW ' + lid + '] ';
+      })
+    .replace(/\u0204(\s+)\u0104/g, '\u0304$1')
+    .replace(/<button.*?>(.*?)<\/button>/g, '[? $1 ]')
+    .replace(
+      /<input.*name=([^\s>]+).*?>/g,
+      (a,id)=>{
+	return `\n[WWW ${nid} ${id}          ]\n`;
+      })
+    .replace(
+      /<textarea.*name=([^\s>]+).*?>(.*?)<\/textarea>/g,
+      (a,id,val)=>{
+	return `\n[WWW ${nid} ${id}\n${val}\n]\n`;
+      })
+
+    .replace(/<(\w+).*?>/g, '<$1>')
+    .replace(/<head[\s\S]*?\/head>/g, '')
+    .replace(/<script[\s\S]*?\/script>/g, '')
+    .replace(
+      /<pre>([\s\S]*?)<\/pre>/gi,
+      (a)=>a.replace(/\n/g, '\u010a\u0120\u0120')
+	.replace(/ /g, '\u0120'))
+
+    .replace(/\n/g, ' ')
+    .replace(/ +/g, ' ')
+
+    .replace(/<br>/g, '\n')
+    .replace(/<hr>/g, '\n--------------------\n')
+
+    .replace(/<b>([\s\S]*?)<\/b>/g, '\u0101$1\u0201')
+    .replace(/<i>([\s\S]*?)<\/i>/g, '\u0105$1\u0205')
+
+    .replace(/<li>\s*/g, '\n* ')
+    .replace(/<p>\s*/g, '\n\u0120\u0120')
+    .replace(/<div>/g, '\n')
+    .replace(/\/<div>/g, '\n')
+    .replace(/\n\n+/g, '\n\n')
+
+    .replace(/<h1>([\s\S]*?)<\/h1>/g, '\n\u0110\u0107$1\n\u0210\u0207')
+    .replace(/<h2>([\s\S]?)<\/h2>/g, '\n\u0112\u0100$1\n\u0212\u0200')
+    .replace(/<h3>([\s\S]*?)<\/h3>/g, '\n\u0113\u0100$1\n\u0213\u0200')
+    .replace(/<h4>([\s\S]*?)<\/h4>/g, '\n\u0116\u0100$1\n\u0216\u0200')
+    .replace(/<.*?>/g, ' ')
+
+    .replace(/ +/g, ' ')
+    .replace(/ *\n */g, '\n')
+    .replace(/ *([\0-\37]) */g, '$1')
+    .replace(/^\n*/, '')
+
+    .replace(/&nbsp;/ig, '\u0120')
+    .replace(/&copy;/ig, '\`')
+    .replace(/&gt;/ig, '>')
+    .replace(/&lt;/ig, '>')
+    .replace(/&raquo;/ig, '>>')
+    .replace(/&amp;/ig, '&')
+
+    .trim();
+  return h;
+
+//    .replace(/(?<=[\u0000-\u0007])([\u0000-\u0007])/g, '$1')
+//    .replace(/(?<=[\u0010-\u0017])([\u0000-\u0017])/g, '$1')
+
+}
+
+function urlView(url) {
+  clearline(0);
+  iplot(0, 0, 'WWW: Loading '+url+' ...');
+  wget(
+    url,
+    function(h, err, nid) {
+      CLS();
+      let u = '[!WWW '+nid+'] '+url;
+      iplot(0, 0, u.substring(0, SCREEN_COLS-1));
+      showPage(h, err, nid);
+    });
+}
+
+function showPage(h, err, nid){
+  let txt = HTML2TELETEXT(nid, h);
+  let i = 0;
+  let step = 20;
+
+  // colors
+  let isink = c7=>(c7 <= 7);
+  let ispaper = c7=>(16 <= c7 && c7 <= 24);
+
+  // charcodes of current inc/paper
+  let cink = ink;
+  let cpaper = paper + 16;
+
+  let cstack = [];
+
+  function myputc(ch) {
+    // horunge (bastad childs)
+    // TOOD: fix ugly word breaks
+    // TODO: cheat at .,:,? at EOL?
+
+    let c7 = ch & 0x7f;
+
+    // optimize corner cases
+    // if at beginning of line and space
+    if (col == column && (ch == 32 || ch == 10)) {
+      // ignore such space!
+      return;
+    } else if (col == 2 && col == column
+	      && (isink(c7) || ispaper(c7))) {
+      // save space by using protected
+      lastwasspace = true; // kindof
+
+      //let cont = (ch & 0x0F00 != 0x0300);
+      if (isink(c7)) {
+	screen(row, 1, cink = c7);
+      } else if (ispaper(c7)) {
+	screen(row, 0, cpaper = c7);
+      }
+
+      return; // done here
+    } else if (ch == 32 && lastwasspace) {
+      // ignore soft spaces
+      return;
+    } else {
+      lastwasspace = (ch == 32);
+
+      // hard newline (pre, br)
+      if (ch == 0x010a) ch = 10;
+
+      // hard space (pre)
+      if (ch == 0x0120) ch = 32;
+      
+      // just to make sure
+      ch = ch & 0x7f;
+
+      // escape control codes
+      if (ch != 10 && ch < 32) {
+	lastwasspace = true;
+	putc(ESC);
+	putc(ch+64);
+	// TODO: if write at last pos...?
+      } else {
+	// finally print it!
+	putc(ch);
+      }
+
+      // at newline need continue color
+      if (col == column) {
+	// but only if default is different
+	if (ink != cink)
+	  myputc(cink);
+	if (paper != cpaper)
+	  myputc(cpaper);
+      }
+    }
   }
 
-  function HTML2TELETEXT(nid, h) {
-    // TODO: move styling to stylemap
-    // TODO: base URL
-    let n = 0;
-    h = h.replace(/<img.*?src=(\S+?)>/g, '[!IMG $1]')
-      .replace(
-	/<a.*?href=(\S+?)>(.*?)<\/a>/g,
-	(a,href,t)=>{
-	  n++;
-	  let id = `${nid} ${n}`;
-	  wget.url[id] = href;
-	  return '\4' + t + ' [!WWW ' + id + ']\0';
-	})
-      .replace(/<button.*?>(.*?)<\/button>/g, '[? $1 ]')
-      .replace(/<(\w+).*?>/g, '<$1>')
-      .replace(/<head.*?\/head>/g, '')
-      .replace(/<script.*?\/script>/g, '')
-      .replace(
-	/<pre>(.*?)<\/pre>/gi,
-	(a)=>a.replace(/\n/g, '\212\20\2')
-	  .replace(/ /g, '\240'))
-      .replace(/\n/g, ' ')
-      .replace(/ +/g, ' ')
-      .replace(/<br>/g, '\n')
-      .replace(/<hr>/g, '\n---\n')
-      .replace(/<b>(.*?)<\/b>/g, '\1$1\0')
-      .replace(/<i>(.*?)<\/i>/g, '\5$1\0')
-      .replace(/<li>\s*/g, '\n* ')
-      .replace(/<p>\s*/g, '\n\240\240')
-      .replace(/<div>/g, '\n')
-      .replace(/\/<div>/g, '\n')
-      .replace(/\n\n+/g, '\n\n')
-      .replace(/<h1>/g, '\n\20\7')
-      .replace(/<h2>/g, '\n\22\0')
-      .replace(/<h3>/g, '\n\23\0')
-      .replace(/<h4>/g, '\n\26\0')
-      .replace(/<.*?>/g, ' ')
-      .replace(/ +/g, ' ')
-      .replace(/ *\n */g, '\n')
-      .replace(/ *([\0-\37]) */g, '$1')
-      .replace(/^\n*/, '')
-      .trim();
-    return h;
-  }
+  RUN.interval = setInterval(
+    function printSlow() {
+      if (scstop) return;
 
-  function urlView() {
-    // TODO: get url from screen!
-    let url = 'http://yesco.org';
-    clearline(0);
-    iplot(0, 0, 'WWW: Loading '+url+' ...');
-    wget(
-      url,
-      function showPage(h, err, nid){
-	CLS();
-	let u = '[!WWW '+nid+'] '+url;
-	iplot(0, 0, u.substring(0, SCREEN_COLS-1));
+      let end = i + step;
+      for(; i<end; i++) {
 
-	let txt = HTML2TELETEXT(nid, h);
-	let i = 0;
-	let step = 20;
-	RUN.interval = setInterval(
+	if (i > txt.length) {
+	  print();
+	  stop();
+	  return;
+	}
 
-	function printSlow() {
-	  if (scstop) return;
+	let ch = txt.charCodeAt(i);
+	let c7 = ch & 0x7f;
 
-	  let end = i + step;
-	  for(; i<end; i++) {
-
-	    if (i > txt.length) {
-	      print();
-	      print('Finished!');
-	      stop();
-	      return;
-	    }
-
-	    let ch = txt.charCodeAt(i);
-
-	    // optimize corner cases
-	    if (col == column && (ch == 32 || ch == 10)) {
-	    } else if (col == 2 && ch < 32) { // && !(ch & 0x10)) {
-	      // start with color - use first columns
-	      if (ch < 8)
-		screen(row, 1, ch);
-	      else if (ch < 24)
-		screen(row, 0, ch);
-	    } else {
-	      // escape control codes
-	      if (ch != 10 && ch < 32) putc(ESC);
-	      // hard newline
-	      if (ch == 0x212) ch = 0x12;
-	      putc(ch);
-	    }
-
-	    // top when screen full
-	    if (0 && row >= SCREEN_ROWS-3) {
-	      print();
-	      princ('Next page: [!WWW '+nid+' '+i+'-]');
-	      return;
-	    }
+	if (ch >= 0x0300) {
+	  // continue color (delimiter)
+	  myputc(ch);
+	} else if (ch >= 0x0200) {
+	  // end color
+	  let t = cstack.pop();
+	  if (!t) {
+	    // ingore unmatched
+	    //myputc(32);
+	    myputc('?'.charCodeAt(0));
+	  } else if (cpaper != t.cpaper) {
+	    // restore paper
+	    myputc(t.cpaper);
+	  } else if (cink != t.cink) {
+	    // restore ink
+	    myputc(t.cink);
+	  } else {
+	    // TODO: graphics ???
+	    myputc(32);
 	  }
-	},
-	  0);
-      });
-  }
+	} else if (ch >= 0x0100) {
+	  // start color
+	  cstack.push({c7, cink, cpaper});
+	  if (c7 == cink || c7 == cpaper) {
+	    // same
+	    myputc(32);
+	  } else {
+	    myputc(c7);
+	  }
+	} else {
+	  myputc(ch);
+	}
+	
+	// top when screen full
+	if (0 && row >= SCREEN_ROWS-3) {
+	  print();
+	  princ('Next page: [!WWW '+nid+' '+i+'-]');
+	  return;
+	}
+      } // for
+    }, 0); // set interval
+} // 
+
 
   dom('exp').addEventListener('keydown', function(e) {
     let c=e.ctrlKey,a=e.altKey,s=e.shiftKey;
@@ -4648,7 +5042,6 @@ C-BS delete line
 
     // editing
     if (kc==13) {
-      console.log("ENTER c="+c);
       if (c) {
 	scroll(row, SCREEN_ROWS-3, true);
       } else {
@@ -4666,7 +5059,7 @@ C-BS delete line
 
     if (c && k=='n') clearline(row, 2);
     if (c && k=='m') col = 2; // CR
-    if (c && k=='u') urlView();
+    if (c && k=='u') findAction();
 
     if (c && k=='j') ; // down (rotate?)
     if (c && k=='k') ; // up (rotate?)
@@ -4720,7 +5113,7 @@ C-BS delete line
     if (k=='o') showStatus(scoff=scoff?0:1);
     if (k=='s') showStatus(scstop=!scstop);
     if (k=='d') showStatus(double=!double);
-    if (k=='g') bell();
+    if (k=='g') ping();
 
     if (k=='j') showStatus(column=2-column);
 
@@ -4747,12 +5140,6 @@ C-BS delete line
     // hmmm, doesn't work?
     //if (c) e.preventDefault();
   });
-
-  // TODO: this shouldn't be needed,
-  // but setting background-color changes
-  // layout!
-  PAPER(7);
-  INK(0);
 
   if (0) window.onerror = function(e) {
     dom('error', ''+e);
@@ -5151,7 +5538,7 @@ l REM***MUSIC***
     // let t = ''+args[0];
     let b = document.body;
     t = `<div style='color:red;background:white;'>E:${t}</div>`;
-    b.insertAdjacentHTML('afterend', t);
+    b.insertAdjacentHTML('afterbegin', t);
     return false;
   };
 </script>

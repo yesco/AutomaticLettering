@@ -1,6 +1,17 @@
 // misc js library
 // (c) Jonas S karlsson, jsk@yesco.org
 
+// usage:
+// let [a,b,c] = rget('foobar', /(o*)x(|y)/);
+// --> ['oo', 'y', undefined]
+// no match -> all undefined
+function rget(str, re) {
+  let m = str.match(re);
+  if (!m) return [];
+  m.shift();
+  return m;
+}
+
 function randHex(len) {
   const bits = 32;
   let h = '';
