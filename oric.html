@@ -4751,7 +4751,7 @@ function wget(url, cb) {
   wget.url[n] = url;
   wget.pageid = n;
   wget.cb[n] = function(data){
-    cb(data, undefined, n);
+    cb(data, undefined, n, url);
     // cleanup
     s.remove();
     delete wget.cb[n];
@@ -4807,14 +4807,14 @@ function HTML2TELETEXT(nid, h) {
 	return '\u0104' + txt + '\u0204';
       })
     .replace(/\u0204(\s+)\u0104/g, '\u0304$1')
-    .replace(/<button.*?>(.*?)<\/button>/g, '[? $1 ]')
+    .replace(/<button[\s\S]*?>([\s\S]*?)<\/button>/g, '[? $1 ]')
     .replace(
-      /<input.*name=([^\s>]+).*?>/g,
+      /<input[\s\S]*name=([^\s>]+)[\s\S]*?>/g,
       (a,id)=>{
 	return `\n[WWW ${nid} ${id}          ]\n`;
       })
     .replace(
-      /<textarea.*name=([^\s>]+).*?>(.*?)<\/textarea>/g,
+      /<textarea[\s\S]*name=([^\s>]+)[\s\S]*?>([\s\S]*?)<\/textarea>/g,
       (a,id,val)=>{
 	return `\n[WWW ${nid} ${id}\n${val}\n]\n`;
       })
@@ -4824,7 +4824,7 @@ function HTML2TELETEXT(nid, h) {
       (a,q,alt)=>{
 	return '{IMG: ${alt}}';
       })
-    .replace(/<(\w+).*?>/g, '<$1>')
+    .replace(/<(\w+)[\s\S]*?>/g, '<$1>')
     .replace(/<!--[\s\S]*?-->/g, '')
     .replace(/<head[\s\S]*?\/head>/g, '')
     .replace(/<title[\s\S]*?\/title>/g, '')
@@ -4854,7 +4854,7 @@ function HTML2TELETEXT(nid, h) {
     .replace(/<h2>([\s\S]*?)<\/h2>/g, '\n\u0112\u0100$1\n\u0212\u0200')
     .replace(/<h3>([\s\S]*?)<\/h3>/g, '\n\u0113\u0100$1\n\u0213\u0200')
     .replace(/<h4>([\s\S]*?)<\/h4>/g, '\n\u0116\u0100$1\n\u0216\u0200')
-    .replace(/<.*?>/g, ' ')
+    .replace(/<[\s\S]*?>/g, ' ')
 
     .replace(/ +/g, ' ')
     .replace(/ *\n */g, '\n')
@@ -4883,14 +4883,14 @@ function HTML2TELETEXT(nid, h) {
 // TODO: ibm.com too much empty lines
 function urlView(url) {
   clearline(0);
-  iplot(0, 0, 'WWW: Loading '+url+' ...');
+  iplot(0, 0, 'Loading '+url+' ...');
   wget(
     url,
-    function(h, err, nid) {
+    function(h, err, nid, url) {
       CLS();
       let u = url;
       iplot(0, 0, u.substring(0, SCREEN_COLS));
-      showPage(h, err, nid. url);
+      showPage(h, err, nid, url);
     });
 }
 
