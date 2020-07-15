@@ -129,7 +129,14 @@
 
   // NEW
   function run_error(name, e) {
-    error('?'+name+' BROKE: ', ''+(e && e.msg));;
+    // TODO: print stacktrace?
+    let msg = '?'+name+' BROKE: ';
+    let emsg = ''+(e && e.msg || '');
+    console.log(msg, emsg);
+    let st = ''+e.stack;
+    st = st.replace(/\(.*?\)/g, '');
+    console.log(st);
+    error(msg, emsg);
   }
 
   function subscript_error(info) {
@@ -1841,7 +1848,7 @@ CODE CHARACTER Control Code
     let nonewline = false;
     for(let i=0; i<line.length; i++) {
       let c = line[i];
-      if (trace) print('PRINT.c: ' + c);
+      //if (trace) print('PRINT.c: ' + c);
 
       function finish(ev) {
 	if (exp.length && !exp.match(/^\s*$/))
@@ -2038,7 +2045,7 @@ This command works exactly the same as a PRINT statement except that it is used 
   // returns a miniparser object
   function parser(line) {
     let tokens = tokenizer(line, ORIC_TOKENZ);
-    print(JSON.stringify(tokens));
+    if (trace) print(JSON.stringify(tokens));
     let r = [];
 
     let c, t, s;
@@ -2047,6 +2054,7 @@ This command works exactly the same as a PRINT statement except that it is used 
     let p = {
       rest() {
 	// umparse lol
+	if (!c) return '';
 	let all = [...tokens];
 	all.unshift(c);
 	return all.map(([t,s])=>s).join(' ');
@@ -2103,11 +2111,10 @@ This command works exactly the same as a PRINT statement except that it is used 
 	return (s === undefined) ? alt :
 	  (s.match(/^"(.*)"$/) || ['',alt])[1];
       },
-      // TODO: this is crap - wont work use next()
       seek(es) {
 	while(p.val() != es) {
 	  if (p.end()) return;
-	  print('SEEK.skip> ' + p.val());
+	  if (trace) print('SEEK.skip> ' + p.val());
 	  p.next();
 	}
 	return p.skip(es);
@@ -2373,48 +2380,39 @@ This command works exactly the same as a PRINT statement except that it is used 
   // TODO: BAD ONE....
   function getExp(p) {
     let x = '';
-    while(p.val() != 'THEN') {
+    // TODO:  This is probably too 'promiscous'!
+    // Compared to ORIC it just will give less errors
+    while(p.val() != 'THEN' && p.val() != ':' && p.val() != 'ELSE') {
       x += p.val();
-      if (!p.next()) return;
+      if (!p.next()) break;
     }
+    if (trace) print('EVAL.exp= ' + x);
     return EVAL(x);
     // TODO: make it return a closure()?
   }
 
   function pIF(p) {
-    print('pIF:'+p.rest());
     let exp = getExp(p);
-    if (exp) {
-      print('pIF.then> '+p.rest());
-      print('pIF.val> '+p.val());
-      p.skip('THEN') || syntax_error();
-      print('pIF.afterthen> '+p.rest());
-    } else {
-      print('pIF.else> '+p.rest());
-      if (!p.seek('ELSE')) return;
-      print('pIF.else> '+p.rest());
-      // Not sure correct - may need to abort
-      // if find IF or other ELSE...
-      // How about nested
-      // IF THEN FOR...:IF THEN ELSE : NEXT : ELSE
-    }
-
-    print('pIF.run> '+p.rest());
+    p.skip('THEN') || syntax_error();
+    if (!exp && !p.seek('ELSE')) return;
     if (p.num()) return GOTO(p.getnum());
     statements(p);
-
-    // statements need to implement
-    // ELSE to skip one and continue
   }
+
+  function pPRINT(p) {
+    let exp = getExp(p);
+    print(exp);
+    return true;
+  };
 
   function statements(p) {
-    while(statement(p)) {
-      // ELSE skipme : gohere
-      if (p.skip('ELSE')) p.seek(':');
-      if (!p.skip(':')) break;
-    }
+    do {
+      while (p.skip('ELSE') && p.seek(':')
+	     || p.skip(':'));
+    } while (statement(p));
     return true;
   }
+
   function isParser(f) {
     let p = f.isParser;
     if (p) return p;
@@ -2430,36 +2428,40 @@ This command works exactly the same as a PRINT statement except that it is used 
     // tail it
     return isParser(f);
   }
-  function statement(p) {
-    print('STMT> ' + p.rest());
-    // comments
-    if (p.skip('REM')) return;
-    if (p.skip("'")) return;
 
-    print('STMT> ' + p.rest());
+  function statement(p) {
+    if (trace) print('STMT> ' + p.rest());
+    // comments
+    if (p.skip('REM') || p.skip("'")) {
+      while(!p.end());
+      return false;
+    }
+
     if (p.keyword() || p.name()) {
       let name = p.val();
-      print('STMT.name> ' + name);
+      if (trace) print('STMT.name> ' + name);
       // first try parser version
-      let f = window[name];
+      // (for now pNAME is preferred over NAME)
+      let f = window['p'+name] || window[name];
       if (!f) syntax_error(name);
-      print('STMT.func> ' + f.name);
+
+      if (trace) print('STMT.func> ' + f.name);
       try {
 	if (isParser(f)) {
-	  print('STMT.isParser> ' + name);
+	  if (trace) print('STMT.isParser> ' + name);
 	  // call with parser
 	  p.next();
 	  f.call(p, p); // redundant!
+	  if (trace) print('3CALL.done> ' + p.rest());
 	} else {
 	  print('STMT.isNormal> ' + name);
 	  let line = p.rest();
-	  print('LINE= '+line);
+	  if (trace) print('LINE= '+line);
 
-	  return run(line);
+	  //return run(line);
 	  // TODO
-	  print('LINE= '+line);
 	  let args = evalArgs(p);
-	  print('ARGS= ' + JSON.stringify(args));
+	  if (trace) print('ARGS= ' + JSON.stringify(args));
 	  f.apply(line, args);
 	  //f.apply(p.rest(), evalArgs(p));
 	}
@@ -2468,19 +2470,99 @@ This command works exactly the same as a PRINT statement except that it is used 
       }
       return true;
     }
+
     // if it's not statement then LET!
     return LET(p);
   }
+
+  // each function "return;" when can't go on
+  function expression(p) {
+    if (p.num()) return op(p, p.getnum());
+    if (p.str()) return concat(p, p.getstr());
+    if (p.skip('-')) return exp(p)
+    if (p.skip('+')) return exp(p);
+    if (p.keyword()) return func(p, p.get('keyword'));
+    if (p.name()) return varr(p, p.get('name'));
+    if (p.skip('(')) {
+      let e = expression(p);
+      p.skip(')') || syntax_error('NO ")"');
+      return e;
+    }
+  }
+
+  function op(p, val) {
+    let o = p.get('op');
+    let e = expression(p);
+    if (e === undefined) throw "op: operand missing!";
+    switch(o) {
+    case '+': return val + e;
+    case '-': return val - e; // 5-3*4+3
+      // TODO: priorioties??
+    case '*': return val * e;
+    case '/': return val / e;
+    case '^': return Math.pow(val, e);
+
+    case '=': return (val === e) ? -1 : 0;
+    case '<': return (val < e) ? -1 : 0;
+    case '<=': return (val <= e) ? -1 : 0;
+    case '<>': return (val !== e) ? -1 : 0;
+    case '>': return (val !== e) ? -1 : 0;
+    case '>=': return (val !== e) ? -1 : 0;
+    default: syntax_error(o);
+    }
+  }
+
+  function varr(p, name) {
+
+    function retval(v) {
+      if (v !== undefined) return v;
+      // default value
+      switch(name.substr(-1)) {
+	case '%': return 0;
+	case '$': return '';
+	default: return 0.0;
+      }
+    }
+
+    let arr_i = p.val('(') && index(p);
+    let v = vars[name];
+    if (!arr_i) return retval(v);
+
+    // autodim? DIM name(10)
+    if (typeof v !== 'object' || !Array.isArray(v))
+      v = vars[name] = {};
+
+    // iterate through indices
+    let i;
+    while (i = arr_i.pop()) {
+      if (typeof v !== 'object' || !Array.isArray(v))
+	subscript_error();
+      v = v[i];
+    }
+    return retval(v);
+  }
+
+  function index(p) {
+    if (!p.skip('(')) return;
+
+    let i, a = [];
+    while ((i = expression(p)) !== undefined) {
+      a.push(i);
+      if (!p.skip(',')) break;
+    }
+    if (!p.skip(')')) syntax_error('MISSING ")"');
+    return a;
+  }
+
   // evaluate list of arguments till end of statement, or error
   function evalArgs(p) {
-    let res = [];
-    let exp = expression(p);
-    do {
-      let r = EVAL(exp);
-      res.push(r);
-      exp = expression(p);
-    } while (exp);
-    return res;
+    let a = [];
+    let e;
+    while (((e = expression(p)) !== undefined)) {
+      a.push(e);
+      if (!p.skip(',')) break;
+    }
+    return a;
   }
 
   function REPEAT() {}
@@ -3220,8 +3302,10 @@ $276,$277 Spare counter — also used by WAIT (and printer in V1.0).
     // to load (instead of list, require match  to be proper prefix)
     if (trace) { print("NAMES:"); print(names); }
     
-    if (names.length == 1
-	&& names[0].match(RegExp(`^(?:example_*|CSAVE:)${name}`))) {
+    name = name.replace(/"/g,'');
+
+    if (names.length == 1 &&
+      names[0].match(RegExp(`^(?:example_*|CSAVE:)${name}`))) {
       let src;
       
       // try load from examplesNAME...
@@ -3966,7 +4050,7 @@ errorObj : ${errorObj}
 
     // make numbers great again
     a = a.map(x=>(+x==x?+x:x));
-    if (trace) print('--num---' + a.join(' | '));
+    //if (trace) print('--num---' + a.join(' | '));
 
     let cmd = a.shift();
 
