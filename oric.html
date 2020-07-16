@@ -1276,7 +1276,7 @@ So far the subject of writing
   screen.writecount = 0;
 
   function screenSaved(rows=SCREEN_ROWS, cols=SCREEN_COLS) {
-    let g = gCommands;
+    let g = gCMD;
     let sc = {
       name: screen.name,
       version: screen.version,
@@ -1289,6 +1289,7 @@ So far the subject of writing
       gedit: {
 	ox: g.ox, oy: g.oy,
 	mode: g.mode,
+	xmode: g.xmode,
 	stack: g.stack,
 	index: g.index,
 	ink: g.ink,
@@ -1324,14 +1325,14 @@ So far the subject of writing
     ink = sc.ink; paper = sc.paper;
     lores = sc.lores;
     
-    let g = gCommands;
-    g.ox = sc.gedit.ox;
-    g.oy = sc.gedit.oy;
-    g.mode = sc.gedit.mode;
-    g.stack = sc.gedit.stack;
-    g.index = sc.gedit.index;
-    g.ink = sc.gedit.ink;
-    g.paper = sc.gedit.paper;
+    let g = gCMD;
+    g.ox = sc.gedit.ox || 0;
+    g.oy = sc.gedit.oy || 0;
+    g.xmode = sc.gedit.mode || 0;
+    g.stack = sc.gedit.stack || [];
+    g.index = sc.gedit.index || 0;
+    g.ink = sc.gedit.ink || ink;
+    g.paper = sc.gedit.paper || paper; 
 
     let rows = Math.min(SCREEN_ROWS, sc.rows);
     let cols = Math.min(SCREEN_COLS, sc.cols);
@@ -4279,10 +4280,11 @@ errorObj : ${errorObj}
   // - write/erase (xor?)
 
   // this contains state as well as impl
-  var gCommands = {
+  var gCMD = {
     ox: undefined,
     oy: undefined,
     mode: 2, // xor
+    xmode: 0, // crosshair
     step: 1,
 
     stack: [], // lol
@@ -4292,11 +4294,27 @@ errorObj : ${errorObj}
 
     saved: undefined,
 
-
     // colors will be multiples of 8+color...
     ink: 7, 
     paper: 0,
 
+    // const - don't save
+
+    xmodes: 'x+/ ',
+
+    // functions as map
+    // (all functions are added by name too!)
+    //    l: functinon draw()... key='l'
+    //    L: fucntion... key = 'L'
+    //  A_l: fun... key = 'ALT-l'
+    //
+    // it can be called by can be called by
+    //   gCMD.apply(gCMD, 'l');
+    //   gCMD.apply(gCMD, 'draw');
+    //
+    // screen update func: call save('func')
+    // this enables 'replay'!
+    
     save: function save(name) {
       this.ops.push([name, this.getState()]);
     },
@@ -4305,6 +4323,7 @@ errorObj : ${errorObj}
 	curx, cury,
 	ox: this.ox, oy: this.oy,
 	mode: this.mode,
+	xmode: this.xmode,
 	ink: this.ink,
 	paper: this.paper,
       };
@@ -4338,7 +4357,7 @@ errorObj : ${errorObj}
       this.ox = curx;
       this.oy = cury;
       if (hires()) {
-	throw "gCommands: hires mode not implemented";
+	throw "gCMD: hires mode not implemented";
       } else {
 	curx = INT((SCREEN_COLS-1) * 2 / 2);
 	cury = INT((SCREEN_ROWS-1) * 3 / 2);
@@ -4487,24 +4506,47 @@ errorObj : ${errorObj}
 
       gedit = true;
     },
+    x: function crossmode() {
+      this.xmode = (this.xmode+1) % this.xmodes.length;
+      return this.xmodes[this.xmode].repeat(10);
+    },
     cross: function cross() {
+      // save
       let x=curx;
       let y=cury;
-      let z=5;
 
-      CURSET(x, y, 3); DRAW(+z, 0, 2);
-      CURSET(x, y, 3); DRAW(-z, 0, 2);
-      CURSET(x, y, 3); DRAW( 0,+z, 2);
-      CURSET(x, y, 3); DRAW( 0,-z, 2);
+      let m = this.xmodes[this.xmode];
+      switch(m) {
+      case '+':   // long cross
+      case 'x': { // straight cross
+	let z = m == 'x' ? 5 : 300;
+	CURSET(x, y, 3); DRAW(+z, 0, 2);
+	CURSET(x, y, 3); DRAW(-z, 0, 2);
+	CURSET(x, y, 3); DRAW( 0,+z, 2);
+	CURSET(x, y, 3); DRAW( 0,-z, 2);
+	break; }
+      case '/': {
+	let z = 5;
+	CURSET(x, y, 3); DRAW(+z+1,-z-1, 2);
+	CURSET(x+1, y-2, 3); DRAW(+z,-z, 2);
+	CURSET(x+2, y-1, 3); DRAW(+z,-z, 2);
+	// we need to draw x,y even times!
+	CURSET(x, y, 2);
+	break; }
+      default: // none;
+      }
 
+      // restore
       CURSET(x, y, 3);
     },
     // show other "cross"
     ocross: function ocross(x, y) {
       let sx=curx;
       let sy=cury;
-      let z=3;
+      let m = this.xmodes[this.xmode];
+      if (m !== 'x' && m !== '+') return;
 
+      let z = m == 'x' ? 3 : 300;
       CURSET(x, y, 3); DRAW(+z,+z, 2);
       CURSET(x, y, 3); DRAW(-z,-z, 2);
       CURSET(x, y, 3); DRAW(+z,-z, 2);
@@ -4629,10 +4671,10 @@ C-BS delete line
 
   };
   // make all functions keys too!
-  Object.keys(gCommands).forEach(
-    k=>{ let f = gCommands[k];
+  Object.keys(gCMD).forEach(
+    k=>{ let f = gCMD[k];
 	 if (f && f.name)
-	   gCommands[f.name]=f;
+	   gCMD[f.name]=f;
        });
 
   function GEDIT(k, kc, a, s, c, e) {
@@ -4641,7 +4683,7 @@ C-BS delete line
     // Simple key commands to draw
     // ALT-G to activate
     // ?-for help, q-quit
-    let g = gCommands;
+    let g = gCMD;
 
     function msg(txt) {
       clearline(0);
@@ -4711,8 +4753,8 @@ C-BS delete line
       throw 'GEDIT: Hires mode note done!';
     } else {
       // update cursor to same cell!
-      col = INT(curx / 2) % SCREEN_COLS;
-      row = INT(cury / 3) % SCREEN_ROWS;
+      col = 1 + INT(curx / 2) % SCREEN_COLS;
+      row = 1 + INT(cury / 3) % SCREEN_ROWS;
       if (col < 0) col += SCREEN_COLS;
       if (row < 0) row += SCREEN_ROWS;
     }
@@ -4864,15 +4906,15 @@ function wget(url, cb) {
     s.remove();
     delete wget.cb[n];
   };
-  if (1) {
-      s.src = 'google.com.js';
+  if (url == 'g.coom') {
+    s.src = 'google.com.js';
   } else {
-      s.src = 'http://yesco.org/wget.pl?jsonp=(wget.cb['+n+'])&'+url;
-}
+    s.src = 'http://yesco.org/wget.pl?jsonp=(wget.cb['+n+'])&'+url;
+  }
   console.log(s.src);
   // TODO: cleanup on error
-  s.onerror = 'print("load err");';
-  s.onload  = 'print("load ok");';
+  s.onerror = 'alert("load err");';
+  s.onload  = 'alert("load ok");';
   // actrivate
   document.body.appendChild(s);
 }

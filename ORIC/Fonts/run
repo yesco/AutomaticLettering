@@ -1,0 +1,8 @@
+node ../../oric-charset.js > oric-atmos-jsk.bdf && \
+node ../../oric-charset.js alt > oric-atmos-alt-jsk.bdf && \
+./bdf2ttf oric-atmos-jsk.bdf oric-atmos-jsk.ttf && \
+./bdf2ttf oric-atmos-alt-jsk.bdf oric-atmos-alt-jsk.ttf
+
+echo copy files
+
+cp oric-atmos-alt-jsk.ttf oric-atmos-jsk.ttf oric-font.html ../../WWW
