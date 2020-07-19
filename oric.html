@@ -134,8 +134,9 @@
     let emsg = ''+(e && e.msg || '');
     console.log(msg, emsg);
     let st = ''+e.stack;
-    st = st.replace(/\(.*?\)/g, '');
+    st = st.replace(/\s*at\s(\S+)\s*\(.*?([^\/]+?:\d+).*?\)/g, '\n$2-$1');
     console.log(st);
+    print(st);
     error(msg, emsg);
   }
 
@@ -4052,6 +4053,11 @@ errorObj : ${errorObj}
   // returns true if ok
   // END return false
   function run(line) {
+    let p = parser(line);
+    let r = statement(p);
+    print('statement=> ' + r);
+    return;
+
     try {
       return xrun(line);
     } catch(e) {alert('run: ' + e + '\n' + e.stack)}
