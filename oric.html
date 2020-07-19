@@ -2485,8 +2485,8 @@ This command works exactly the same as a PRINT statement except that it is used 
     if (trace) print('STMT> ' + p.rest());
     // comments
     if (p.skip('REM') || p.skip("'")) {
-      while(!p.end());
-      return false;
+      while(!p.end() && p.next());
+      return true;
     }
 
     if (p.keyword() || p.name()) {
@@ -4077,6 +4077,18 @@ errorObj : ${errorObj}
   // returns true if ok
   // END return false
   function run(line) {
+    if (!line) return;
+    run.count++;
+
+    // NN PRINT ... new line?
+    // New: retains initial spacing! lola
+    let linedef = line.match(/^\s*(\d+)(.*)$/);
+    if (linedef) {
+      saveline(+linedef[1], linedef[2]);
+      return (cursorShow(), 'EDIT');
+    }
+
+    // commands to execute
     let p = parser(line);
     let r = statement(p);
     prompt();
