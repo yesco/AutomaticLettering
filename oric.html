@@ -546,29 +546,50 @@ g
   
 </script>
 
-<!---input id="file" type="file"/-->
+<!-- hidden: activate by fileInput.click()! -->
+<input id='file' type='file' accept='.bas,.tap,.bac,.txt' style='display:none'/>
 <script>
-  // inspired by https://stackoverflow.com/questions/16495125/parsing-binary-files-in-client-side-js
-  // REFERENCE:
-  //  https://developer.mozilla.org/en-US/docs/Web/API/FileReader
-  // readAsBinaryString
-  function readFile() {
-    let fileInput = dom('file');
-    let fReader = new FileReader();
+// call by code -> cb(name, size, type, text, bytes))
+function loadFile(cb) {
+  loadFile.cb = cb;
+  dom('file').click();
+}
+loadFile.cb = ()=>alert('loadFile: no callback set yet!');
 
-    fReader.onload = function(e) {
-      /// <-- this contains an ArrayBuffer
-      console.log(e.target.result);
-    }
+try {
+{
+  let fileInput = dom('file');
+  fileInput.onchange = function(e) {
+    let file = this.files[0];
+    console.log('FILE.name: ', file.name);
+    console.log('FILE.size: ', file.size);
+    console.log('FILE.type: ', file.type);
 
-    // onloadend
-    // https://developer.mozilla.org/en-US/docs/Web/API/FileReader/readAsBinaryString
-    // https://developer.mozilla.org/en-US/docs/Web/API/FileReader/readAsArrayBuffer
-    fileInput.onchange = function(e) {
-      let file = this.files[0];
-      fReader.readAsArrayBuffer(file);
-    }
+    file.arrayBuffer().then(buf=>{
+      console.log('inside arraybuffer promise!');
+      try{
+	console.log('inside.2');
+	let b = new Uint8Array(buf);
+	console.log('inside.3');
+	//var uint8array = new TextEncoder("utf-8").encode("¢");
+	//var string = new TextDecoder("utf-8").decode(uint8array);
+	var txt = new TextDecoder("utf-8").decode(b);
+	if (loadFile.cb)
+	  loadFile.cb(file.name, file.type, file.size, txt, b);
+	console.log('text: ', txt);
+	console.log('inside.4');
+	for(let i=0; i<Math.min(20, file.size); i++) {
+	  console.log(i, b[i], String.fromCharCode(b[i]));
+	}
+	console.log('inside.4');
+	console.log('inside.arr: ', [...b]);
+      }catch(e){alert('inside: '+e + '\n' + e.stack)}
+    }).catch(e=>console.error('arraybuffer: '+e));
+    console.log('after arraybuffer promise!');
   }
+}
+} catch(e){ alert('input: '+e)}
+
 </script>
 
 <center><b style='color:beige;'>PRINTER (toggle on/off with CTRL-P)</b></center>
@@ -2178,12 +2199,13 @@ This command works exactly the same as a PRINT statement except that it is used 
     RUN.interval = setInterval(_=>{
       if (scstop) return;
 
-      for(let i=0; i>=0; i--) {
+      for(let i=3; i>=0; i--) {
 	nextline();
 	if (!line || lineno > end) {
 	  lineno = 0;
 	  line = '';
 	  stop();
+	  return;
 	} else {
 	  if (match && !line.match(match)) continue;
 	  princ(lineno);
@@ -3292,10 +3314,10 @@ $276,$277 Spare counter — also used by WAIT (and printer in V1.0).
   // DRIVE A v11 SPAINT
   //
   // FILLCIRC  .HRS   34     FOOBBAR    .COM 33
-  
 
   function CLOAD(name, info) {
     // DOC: Loads a file "NAME"
+    // CLOAD "" will open the file dialogue
     // New: Without arguments lists examples
     // New: With 'CLOAD D' shows names with 'D'
     if (!name) name = '';
@@ -3304,7 +3326,7 @@ $276,$277 Spare counter — also used by WAIT (and printer in V1.0).
     function load(src) {
       if (!src) return;
       NEW();
-      let name = beautyname(names[0]);
+      name = beautyname(name);
       print('Program ' + name + ' loading...');
       let n = 0;
       ('\n'+src).replace(
@@ -3319,7 +3341,26 @@ $276,$277 Spare counter — also used by WAIT (and printer in V1.0).
       return true;
     }
     
-    // get names from window
+    // if CLOAD "" click on filedialogue
+    if (name === '""') {
+      loadFile((nme, type, size, txt, bytes)=>{
+	if (trace) {
+	  princ('nme: '); print(nme);
+	  princ('type: '); print(type);
+	  princ('size: '); print(size);
+	  princ('txt: ');
+	  print((''+txt).substr(0, 200));
+	}
+	name = nme;
+	if (name.match(/\.tap/))
+	  return alert('CLOAD: .tap file loading not implemented yet!');
+	load(txt);
+      })
+      // it'll happen in background, so, hmmm, ready will be printed first!
+      return;
+    }
+
+    // get names from window object
     let names = Object.keys(window)
 	.filter(n=>n.startsWith('example'));
     // add names from localstorage
@@ -3349,10 +3390,11 @@ $276,$277 Spare counter — also used by WAIT (and printer in V1.0).
 
     if (names.length == 1 &&
       names[0].match(RegExp(`^(?:example_*|CSAVE:)${name}`))) {
+      name = names[0];
       let src;
       
       // try load from examplesNAME...
-      src = window[names[0]];
+      src = window[name];
       if (src) {
 	// ok, it's not a string?
 	if (typeof src === 'function') try {
@@ -3362,7 +3404,7 @@ $276,$277 Spare counter — also used by WAIT (and printer in V1.0).
 
       // try localStorage
       if (!src)
-	src = lsget(names[0]);
+	src = lsget(name);
 
       if (load(src)) return;
     }
@@ -4010,6 +4052,11 @@ errorObj : ${errorObj}
   // returns true if ok
   // END return false
   function run(line) {
+    try {
+      return xrun(line);
+    } catch(e) {alert('run: ' + e + '\n' + e.stack)}
+  }
+  function xrun(line) {
     // special commands
     if (line.match(/^\S+\.\S/))
       return urlView(line);
@@ -6088,9 +6135,10 @@ instruction
     });
 
   // TODO: move? maybe move symbols out to oric-exp?
+  // for now ignore ops and special chars: only use \w+
   var ORIC_TOKENZ = ',' +
-      Object.keys(OricKeywords.name2code).join(',') + ',';
-
+      Object.keys(OricKeywords.name2code).map(
+	k=>k.match(/^\w+$/)).join(',') + ',';
 </script>
 
 <!--
