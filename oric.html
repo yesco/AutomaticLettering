@@ -812,6 +812,13 @@ INFO:<br><span id='info'></span>
     return lores < 0;
   }
 
+  // TODO: some basic programs hires,
+  // -- https://forum.defence-force.org/viewtopic.php?f=14&t=2109
+  // TODO: colorchart
+  // -- https://forum.defence-force.org/viewtopic.php?f=14&t=2069
+  // TODO: hires animation by flashhing? and invert?
+  // -- https://forum.defence-force.org/viewtopic.php?f=14&t=2022&p=20409#p20409 
+
   function HIRES(mode) {
     // DOC: Set hiresolution grahics mode
     // Three 3 lines at bottom is text
@@ -909,6 +916,12 @@ INFO:<br><span id='info'></span>
     setbit(curx, cury, m);
   }
 
+  //function PAINT
+  // TODO: https://forum.defence-force.org/viewtopic.php?f=14&t=965
+  // SPAINT - all basic
+  // - http://thespider.oric.org/oric_hires_colour.html
+
+
   function DRAW(dx, dy, m) {
     // DOC: Draw a line relative DX,DY
     // New: draw outside of screen!
@@ -917,6 +930,19 @@ INFO:<br><span id='info'></span>
     // TODO: https://www.geeksforgeeks.org/bresenhams-line-generation-algorithm/?ref=rp
     // OR: https://www.geeksforgeeks.org/mid-point-line-generation-algorithm/?ref=rp
 
+    // TODO: c64 ?
+    // -- https://forum.defence-force.org/viewtopic.php?f=4&t=386&hilit=line+drawing
+/*      initialize x, dx, etc.
+        xold = x
+        take a step in x: LSR X
+        have we hit the end of a column?  If so, then plot and check on y
+        is it time to take a step in y?
+        if not, take another step in x
+        if it is, then let a=x EOR xold
+                       plot a into the buffer
+                       let xold=x
+keep on going until we're finished
+*/
     let steps = ABS(
       ABS(dx) > ABS(dy) ?
 	dx : dy);
@@ -3252,6 +3278,22 @@ $276,$277 Spare counter — also used by WAIT (and printer in V1.0).
   // TODO: add DIR()
   // TODO: remember name
   // TODO: add versions
+  //
+  // TODO: cload this1
+  //   some basic programs hires,
+  // https://forum.defence-force.org/viewtopic.php?f=14&t=2109
+
+  // TODO: move dir out
+  // function DIR()
+  // two columns filenames
+  // .BAS
+  // .COM ? runnable bas? maybe, AUTO?
+  // .HRS - hires screens
+  // DRIVE A v11 SPAINT
+  //
+  // FILLCIRC  .HRS   34     FOOBBAR    .COM 33
+  
+
   function CLOAD(name, info) {
     // DOC: Loads a file "NAME"
     // New: Without arguments lists examples
@@ -4603,56 +4645,95 @@ m-mode   L-lores
 q-quit  ?-back to edit  q-quit
 
 ---------x---------x---------x---------x
-CTRL-    ALT-         G(raphical)EDIT
+CTRL-    ALT-         G(raphical)EDIT   ?Turtle
    C-? help               ? help
 =================  =====================
-                   SPC toggle pixel
--A copy            a copy   
--B  -              b?brush  
--C break           c circle  C fill    
--D double                             
--E  -              e?erase   E?export       
--F keyclck         f?fill    F Flip
+                   SPC toggle pixel     
+-A copy   copywrd? a?copy                
+-B  -     Blink?   b?brush  
+-C break  clipart? c circle  C?fill    
+-D double Double?                       down  
+-E TEXTRA export?  e?erase   E?export       
+-F keyclck file?   f?fill    F?Flip     forw
 ---------x---------x---------x---------x
--G bell                             
--H del             h home              
--I insert A-inv              I ink
--J column                        
--K                                    
--L CLS    A-Load   l line    L LORES  
--M |<--            m mark    M?mode
--N clrline         n next       
--O out-off         o other      
--P printer         p prev    P paper
+-G bell   GEDIT                         
+-H del    horiz    h home                
+-I insert ?Inv?icol          I ink
+-J column job?                       
+-K reKall  "" kill?                         
+-L CLS     list?   l line    L LORES    left
+-M |<--    menu?   m mark    M?mode
+-N clrline new?    n next       
+-O out-off open?   o other   OtherThird
+-P printer         p prev    P paper    
 ---------x---------x---------x---------x  
--Q cursor          q quit          
--R reload          r rect    R fill
--S screen A-Save   s?swap       
--T caps            t text    T textfont
--U  -                             
--V  -                              
--W?write           w?write
--X cancel                          
--Y yank            y?yank        
--Z?undo            z?undo
+-Q cursor quote?   q quit          
+-R reload Rotate?  r rect    R?fill     rig/rot
+-S scstop Scroll?  s?swap               shw set
+-T caps   term?    t?text    T?textfont times
+-U url    URL?     u                    up
+-V paste  view?    v
+-W write           w
+-X cancel Xut?     x xhair                
+-Y yank   Yank     y
+-Z?undo   Zoom?    z zigzagline cursor
 ---------x---------x---------x---------x
--? color help
--0 black bkground  0 unset
--1 red       "     1 set
--2 green     "     
--3 blue      "
--4 yellow    "
--5 magnenta  "
--6 cyan      "
--7 white     "     
--8 textmode        8 flip
--9 blockgrph       9 rotate
-                   +
-                   -
+-? color help      ? help
+-0 blacK bkground  0 unset
+-1 Red       "     1 set
+-2 Green     "     
+-3 Blue      "
+-4 Yellow    "
+-5 Magnenta  "
+-6 Cyan      "
+-7 White     "     
+-8 Textmode        8 twist?
+-9 altGrph         9 rotate/curl/spiral?
 ---------x---------x---------x---------x
--arrw copy step25 step 1    step 10
+C-arr copy step25 step 1    step 10
 C-RET insert line
 C-BS delete line
+---------x---------x---------x---------x
+# repeat
+[ ( start macro
+] ) end macro
+1 
+2
+3
+4
+5
+6
+7
+8
+9
+0
+space toggle color on in blockmode
+A attribute?
+B black Black
+C cycle Cycle
+D double?
+E 
+F fill?
+G graphics?
+H horizontal? Horizontal?
+I invert? ink?
+J jump?
+K klean? kill?
+L line? list?
+M mode? move?
+N new?w
+O open?
+P paper?
+Q quit Quit?
+R red Red
+S screen? scroll??
+T text? Text?
+U 
+V vertical? Vertical?
+W white White
+X crosshair? x-out? xecute?
+Y yank (paste)
+Z zoom? Zoom?
 `;
       CLS();
       print(h);
@@ -4676,6 +4757,9 @@ C-BS delete line
 	 if (f && f.name)
 	   gCMD[f.name]=f;
        });
+
+  // TODO: hiresman
+  // -- https://forum.defence-force.org/viewtopic.php?f=14&t=905
 
   function GEDIT(k, kc, a, s, c, e) {
     // DOC: G(raphical) EDIT!
@@ -4919,13 +5003,72 @@ function wget(url, cb) {
   document.body.appendChild(s);
 }
 wget.url = {};
-wget.db = {};
+wget.db = {}; // what? cache?
 wget.form = {};
 
+
+function img2teletext(tag, src, alt) {
+  // TODO: generalize
+  if (alt === 'Google') {
+    /* wow, this was difficult:
+       TOOD: return mixed with &nbsp; have effect on spacing...
+       TODO: \u0117 .. \u0110 without breakable space goes to column 0, hmmmm
+    */
+    return `
+\u030a
+\u0117
+&nbsp;
+\u0110
+&nbsp;&nbsp;
+&nbsp;&nbsp;
+&nbsp;&nbsp;
+&nbsp;&nbsp;
+&nbsp;&nbsp;&nbsp;&nbsp;
+\u0210
+\u0217
+
+\u030a
+\u0117
+&nbsp;
+\u0110
+&nbsp;
+\u0104G\u0204
+\u0101o\u0201
+\u0103o\u0203
+\u0104g\u0204
+\u0102l\u0202
+\u0101e\u0201
+&nbsp;&nbsp;
+\u0210
+\u0217
+
+\u030a
+\u0117
+&nbsp;
+\u0110
+&nbsp;&nbsp;
+&nbsp;&nbsp;
+&nbsp;&nbsp;
+&nbsp;&nbsp;
+&nbsp;&nbsp;&nbsp;&nbsp;
+\u0217
+`;
+  } else { 
+    // TODO: change default to:
+    // - background tall letters
+    // - with spacing (depend width?)
+    // - generate TELETEXT of alt-text
+    // - generate lores image
+    return ` [IMG ${lid}&nbsp;\u0112\u0100${alt?alt:''}&nbsp;\u0200\u0212] `;
+  }
+}
+
 function HTML2TELETEXT(nid, h) {
-  // TODO: move styling to stylemap
   // TODO: base URL
-  // TODO: handle link broken by end of screen, and attr not follow...
+  // TODO: move styling to stylemap
+  // TODO: handle inline font color
+  // TODO: handle style inline color
+  // TODO: handle style-sheet and class
   
   // - \u0320 non-breakable space
   // - \u030a force newline
@@ -4970,66 +5113,28 @@ function HTML2TELETEXT(nid, h) {
       (a,c)=>`\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`)
 
     .replace(
-      /<img [\s\S]*?src=(['"])(\S+?)\1[\s\S]*?>/g,
-      (a,q, src)=>{
+      /<img[\s\S]*?>/g,
+      (a)=>{
 	// TODO: hardcode some rendering
 	// TODO: render alt as "big font"?
-	let [_, alt] = rget(a, /alt=(['"])(\S+?)\1/);
+	let alt = getAttr(a, 'alt');
+	let src = getAttr(a, 'src');
+
 	// TODO:? use diff counter for images
 	n++;
-	if (alt)
-	  wget.url[`${nid} ${n}`] = alt;
+
 	let lid = `${nid} ${n}`;
 	wget.url[lid] = src;
-	// TODO: generalize
-	if (alt === 'Google') {
-	  /* wow, this was difficult:
-	   TOOD: return mixed with &nbsp; have effect on spacing...
-	   TODO: \u0117 .. \u0110 without breakable space goes to column 0, hmmmm
-	  */
-	   return `
-\u030a
-\u0117
-&nbsp;
-\u0110
-&nbsp;&nbsp;
-&nbsp;&nbsp;
-&nbsp;&nbsp;
-&nbsp;&nbsp;
-&nbsp;&nbsp;&nbsp;&nbsp;
-\u0210
-\u0217
 
-\u030a
-\u0117
-&nbsp;
-\u0110
-&nbsp;
-\u0104G\u0204
-\u0101o\u0201
-\u0103o\u0203
-\u0104g\u0204
-\u0102l\u0202
-\u0101e\u0201
-&nbsp;&nbsp;
-\u0210
-\u0217
-
-\u030a
-\u0117
-&nbsp;
-\u0110
-&nbsp;&nbsp;
-&nbsp;&nbsp;
-&nbsp;&nbsp;
-&nbsp;&nbsp;
-&nbsp;&nbsp;&nbsp;&nbsp;
-\u0217
-`;
-	  } else {
-	    return ` [IMG ${lid}&nbsp;\u0112\u0100${alt?alt:''}&nbsp;\u0200\u0212] `;
-	  }
+	return img2teletext(a, src, alt);
       })
+
+    .replace(/<br[\s\S]*?>/g, '\n')
+    .replace(/<hr[\s\S]*?>/g, '\n--------------------\n')
+
+    .replace(/<b>([\s\S]*?)<\/b>/g, '\u0101$1\u0201')
+    .replace(/<i>([\s\S]*?)<\/i>/g, '\u0105$1\u0205')
+
     .replace(
       /\s*<a [\s\S]*?>\s*([\s\S]*?)\s*<\/a>\s*/g,
       (a, txt)=>{
@@ -5102,12 +5207,6 @@ ${value}
 
     .replace(/\n/g, ' ')
     .replace(/ +/g, ' ')
-
-    .replace(/<br>/g, '\n')
-    .replace(/<hr>/g, '\n--------------------\n')
-
-    .replace(/<b>([\s\S]*?)<\/b>/g, '\u0101$1\u0201')
-    .replace(/<i>([\s\S]*?)<\/i>/g, '\u0105$1\u0205')
 
     .replace(/<li>\s*/g, '\n\u0101*\u0201')
     .replace(/<p>\s*/g, '\n\u0320\u0320')
@@ -5554,247 +5653,290 @@ still italic</i>back to bold</b>back to default<p>
 
   // ORIC BASIC KEYWORDS
   // https://www.defence-force.org/computing/oric/coding/annexe_1/index.htm
-
-  // Note: STR$ indicates a value of 334 for the token. It seems to be
-  // hard to put in a byte !
-  // NAME	CODE	TYPE
+  // list augumented with params (jsk)
+  // and CHAR was mssing?
+  // MID$ was wrong code
+  // Note: STR$ indicates a value of 334 for the token - hard to put in a byte! It seems it should be 224 which is free, corrrected (
+  // 
+  // NAME \t	CODE \t	PARAMS \n TYPE
+  //
+  // PARAMS is my addition:
+  //   -    = takes no parameters
+  //   ?    = special syntax
+  //   n    = takes one number
+  //   s    = takes one string
+  //   c    = is a constant
+  //   nn   = takes two numbers
+  //   sn   = string and number
+  //   x/y  = either x or y, both ok
+  //   n=>n = function taking and giving a num
+  //   -=>n = takes no params return one num
   function OricKeywords(cb) {
     `
-ABS	216	
+!	192	?
+instruction
+@	198	?
 function
-AND	209	
+#CA NOT - - #CB STEP - -  202 203
+
++	204	nn=>n
 operator
-ASC	236	
+-	205	nn=>n
+operator
+*	206	nn=>n
+operator
+/	207	nn=>n
+operator
+^	208	nn=>n
+operator
+>	211	nn=>n
+operator
+=	212	nn=>n
+operator
+<	213	nn=>n
+operator
+&	221	n=>n
 function
-ATN	229	
+ABS	216	n=>n
 function
-AUTO	199	
+AND	209	nn=>n
+operator
+ASC	236	s=>n
+function
+ATN	229	n=>n
+function
+AUTO	199	-
 parameter
-CALL	191	
+CALL	191	n
 instruction
-CHR$	237	
+CHAR	176	nnn
+instruction
+CHR$	237	s=>n
 function
-CIRCLE	173	
+CIRCLE	173	nn
 instruction
-CLEAR	189	
+CLEAR	189	-
 instruction
-CLOAD	182	
+CLOAD	182	?
 instruction
-CLS	148	
+CLS	148	-
 instruction
-CONT	187	
+CONT	187	-
 instruction
-COS	226	
+COS	226	n=>n
 function
-CSAVE	183	
+CSAVE	183	?
 instruction
-CURMOV	171	
+CURMOV	171	nnn
 instruction
-CURSET	170	
+CURSET	170	nnn
 instruction
-DATA	145	
+DATA	145	?
 instruction
-DEEK	231	
+DEEK	231	n=>n
 function
-DEF	184	
+DEF	184	?
 instruction
-DIM	147	
+DIM	147	?
 instruction
-DOKE	138	
+DOKE	138	nn
 instruction
-DRAW	172	
+DRAW	172	nnn
 instruction
-EDIT	129	
+EDIT	129	?
 instruction
-ELSE	200	
+ELSE	200	?
 instruction
-END	128	
+END	128	-
 instruction
-EXP	225	
+EXP	225	n=>n
 function
-EXPLODE	164	
+EXPLODE	164	-
 instruction
-FALSE	240	
+FALSE	240	c
 constant
-FILL	175	
+FILL	175	nnn
 instruction
-FN	196	
+FN	196	?
 function
-FOR	141	
+FOR	141	?
 instruction
-FRE	218	
+FRE	218	n=>n
 function
-GET	190	
+GET	190	?s
 function
-GO	247
+GONONOTTHERE	247	?
 instruction
-GOSUB	155	
+GOSUB	155	n
 instruction
-GOTO	151	
+GOTO	151	n
 instruction
-GRAB	159	
+GRAB	159	n
 instruction
-HEX$	220	
+HEX$	220	n=>s
 function
-HIMEM	158	
+HIMEM	158	n?
 instruction
-HIRES	162	
+HIRES	162	-
 instruction
-IF	153	
+IF	153	?
 instruction
-INK	178	
+INK	178	n
 instruction
-INPUT	146	
+INPUT	146	?s/n?
 instruction
-INT	215	
+INT	215	n=>n
 function
-KEY$	241	
+KEY$	241	-=>s
 function
-LEFT$	244	
+LEFT$	244	sn=>s
 function
-LEN	233	
+LEN	233	s=>n
 function
-LET	150	
+LET	150	?
 instruction
-LIST	188	
+LIST	188	?
 instruction
-LLIST	142	
+LLIST	142	?
 instruction
-LN	224	
+LN	224	n=>n
 function
-LOG	232	
+LOG	232	n=>n
 function
-LORES	137	
+LORES	137	n
 instruction
-LPRINT	143	
+LPRINT	143	?
 instruction
-MID$	146	
+MID$	246	snn=>s
 function
-MUSIC	168	
+MUSIC	168	nnnn
 instruction
-NEW	193	
+NEW	193	-
 instruction
-NEXT	144	
+NEXT	144	?
 instruction
-NOT	202	
+NOT	202	n=>n
 operator
-ON	180	
+ON	180	?
 instruction
-OR	210	
+OR	210	nn=>n
 operator
-PAPER	177	
+PAPER	177	n
 instruction
-PATTERN	174	
+PATTERN	174	n
 instruction
-PEEK	230	
+PEEK	230	n=>n
 function
-PI	238	
+PI	238	c
 constant
-PING	166	
+PING	166	-
 instruction
-PLAY	169	
+PLAY	169	nnnn
 instruction
-PLOT	135	
+PLOT	135	nns/nnn
 instruction
-POINT	243	
+POINT	243	nn=>n
 function
-POKE	185	
+POKE	185	nn
 instruction
-POP	134	
+POP	134	?
 instruction
-POS	219	
+POS	219	-=>n
 function
-PRINT	186	
+PRINT	186	?
 instruction
-PULL	136	
+PULL	136	?
 instruction
-READ	149	
+READ	149	?
 instruction
-RECALL	131	
+RECALL	131	?
 instruction
-RELEASE	160	
+RELEASE	160	?
 instruction
-REM	157	
+REM	157	?
 instruction
-REPEAT	139	
+REPEAT	139	?
 instruction
-RESTORE	154	
+RESTORE	154	-
 instruction
-RETURN	156	
+RETURN	156	?
 instruction
-RIGHT$	245	
+RIGHT$	245	sn=>s
 function
-RND	223	
+RND	223	-
 function
-RUN	152	
+RUN	152	?
 instruction
-SCRN	242	
+SCRN	242	nn=>n
 function
-SGN	214	
+SGN	214	n=>n
 function
-SHOOT	163	
+SHOOT	163	-
 instruction
-SIN	227	
+SIN	227	n=>n
 function
-SOUND	167	
+SOUND	167	nnn
 instruction
-SPC	197	
+SPC	197	n=>s
 function
-SQR	222	
+SQR	222	n=>n
 function
-STEP	203	
+STEP	203	?
 instruction
-STOP	179	
+STOP	179	-
 instruction
-STORE	130	
+STORE	130	?
 instruction
-STR$	334	
+STR$	234	n=>s
 function
-TAB	194	
+TAB	194	??
 function
-TAN	228	
+TAN	228	n=>n
 function
-TEXT	161	
+TEXT	161	-
 instruction
-THEN	201	
+THEN	201	?
 instruction
-TO	195	
+TO	195	?
 instruction
-TROFF	133	
+TROFF	133	-
 instruction
-TRON	132	
+TRON	132	-
 instruction
-TRUE	239	
+TRUE	239	c
 constant
-UNTIL	140	
+UNTIL	140	?
 instruction
-USR	217	
+USR	217	n=>n
 function
-VAL	235	
+VAL	235	s=>n
 function
-WAIT	181	
+WAIT	181	n
 instruction
-ZAP	165	
+ZAP	165	-
 instruction
-`.replace(/(\S+)\t(\d+)\t\n(\S+)/g,
-	  (_, word, code, what)=>
-	  cb(word, code, what));
+`.replace(/(\S+)\t(\d+)\t(\S+)\n(\S+)/g,
+	  (_, word, code, params, what)=>
+	  cb(word, code, what, params));
   }
 
   OricKeywords.name2code = {};
   OricKeywords.code2name = {};
   OricKeywords.type = {};
+  OricKeywords.params = {};
 
   OricKeywords.defined = [];
   OricKeywords.status = {};
   OricKeywords.missing = [];
   OricKeywords.innovated = [];
   
-  OricKeywords((name, code, type)=>{
+  OricKeywords((name, code, type, params)=>{
     OricKeywords.name2code[name] = code;
     OricKeywords.code2name[code] = name;
     OricKeywords.type[name] = type;
     OricKeywords.type[code] = type;
+    OricKeywords.params[name] = params;
+    OricKeywords.params[code] = params;
   });
 
   // deduce shit
@@ -5878,6 +6020,62 @@ instruction
       '\nInnovated: '+OricKeywords.innovated.length+
       '\n----------------',
       'p');
+
+  if (1) // temporary generate some basic code!
+  {
+    let c2k = OricKeywords.code2name;
+    let kwp = OricKeywords.params;
+    let kwt = OricKeywords.type;
+    let o = 49000;
+    let notdefined = 8;
+    for(let c=0x80; c<=0xff-8; c++) {
+      let k = c2k[c];
+      if (!k) alert('no keycode on code: '+c);
+      let params = kwp[k];
+      let t = kwt[k];
+	
+      // prepare parameters
+      let [p,ass,r] = rget(
+	params, /^([snc]*)(|=>([sn]))$/);
+      if (params === 'c') r = 'n';
+      if (params === '-') p = '';
+      p = p || ''; r = r || '';
+
+      // opt: max 1 string param! LOL
+      par = (t,i)=>(t=='s') ?
+	'P$' : `P(${i+1})`;
+      p = p.split('').map(par);
+      // only one return value
+      r = 'R'+(r=='s'?'$':'');
+
+      // generate line
+      let line = `${o+c} ${k} ERROR`;
+      if (t === 'instruction')
+	line = `${o+c} ${k} ${p}`;
+      if (t === 'function') 
+	line = `${o+c} ${r}=${k}(${p})`;
+      if (t === 'operator') 
+	line = `${o+c} ${r}=P(1)${k}P(2)`;
+      if (t === 'constant')
+	line = `${o+c} ${r}=${k}`;
+      if (params.match('\\?'))
+	; //actually, it'll give syntax error!
+
+      // out
+      if (k === 'PLOT') {
+	line = `${o+c} IF (P$!="") PLOT P(1),P(2,P$ ELSE PLOT P(1),P2(2),P(3)`;
+      } else if (k === 'GET') {
+	line = `${o+c} GET R$`;
+      } else if (k === 'INPUT') {
+	line = `${o+c} GOTO READ ' INPUT`;
+      } else if (k === 'KEY$') {
+	line = `${o+c} R$=KEY$`;
+      }
+      // PRINT? => princ princ1 print terpri
+
+      dom('info', line+' : RETURN', 'a');
+    }
+  }
 
   // create the missing funcs to throw error
   OricKeywords.missing.forEach(
