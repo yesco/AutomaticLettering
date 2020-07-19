@@ -1671,8 +1671,10 @@ CODE CHARACTER Control Code
   //   LET IF=2 => ?Syntax...
   //   LET THE=3 => ok
   //   LET THENN=4 => ?Syntax...
-  function LET(n) {
+  function LET() {
     let v = this;
+    let [n] = rget(v, /^\s*LET\s*(\S+)\s*/);
+    if (!n) throw 'LET: no variable!';
     v = v.replace(/^\s*LET\s*\S+\s*=\s*/, '');
     if (trace) print('LET: ' + v);
     let r = EVAL(v);
@@ -2118,7 +2120,7 @@ This command works exactly the same as a PRINT statement except that it is used 
 	return t;
       },
       num() { return this.type('number') },
-      string() { return this.type('string') },
+      str() { return this.type('string') },
       keyword() { return this.type('keyword') },
       op() { return this.type('op') },
       name() { return this.type('name') },
@@ -2449,7 +2451,7 @@ This command works exactly the same as a PRINT statement except that it is used 
     statements(p);
   }
 
-  function pPRINT(p) {
+  function no_pPRINT(p) {
     let exp = getExp(p);
     print(exp);
     return true;
@@ -2504,12 +2506,11 @@ This command works exactly the same as a PRINT statement except that it is used 
 	  f.call(p, p); // redundant!
 	  if (trace) print('3CALL.done> ' + p.rest());
 	} else {
-	  print('STMT.isNormal> ' + name);
+	  if (trace) print('STMT.isNormal> ' + name);
 	  let line = p.rest();
 	  if (trace) print('LINE= '+line);
 
-	  //return run(line);
-	  // TODO
+	  p.next();
 	  let args = evalArgs(p);
 	  if (trace) print('ARGS= ' + JSON.stringify(args));
 	  f.apply(line, args);
@@ -2540,8 +2541,29 @@ This command works exactly the same as a PRINT statement except that it is used 
     }
   }
 
+  function func(p, kw) {
+    let f = window[kw];
+    if (!f) throw 'Function for missing: ' + kw;
+    if (!p.skip('(')) syntax_error('NO (');
+    let a = evalArgs(p);
+    if (trace) print('ARGS: ' + a);
+    if (!p.skip(')')) syntax_error('NO )');
+    return f.apply(p, a);
+  }
+
+  function concat(p, str) {
+    // a str can only be followed by '+'
+    if (!p.skip('+')) return str;
+    let e = expression(p);
+    if (typeof e !== 'string')
+      type_error();
+    return str + e;
+    
+  }
+
   function op(p, val) {
     let o = p.get('op');
+    if (!o) return val;
     let e = expression(p);
     if (e === undefined) throw "op: operand missing!";
     switch(o) {
@@ -2609,9 +2631,11 @@ This command works exactly the same as a PRINT statement except that it is used 
     let a = [];
     let e;
     while (((e = expression(p)) !== undefined)) {
+      if (trace) print('valArgs.one: ' + e);
       a.push(e);
       if (!p.skip(',')) break;
     }
+    if (trace) print('valArgs.ret: ' + JSON.stringify(a));
     return a;
   }
 
@@ -4040,7 +4064,7 @@ errorObj : ${errorObj}
   }
 
   function prompt(noprompt) {
-    if (!noprompt) {
+    if (!noprompt && !running()) {
       // why was added? because break?
       //if (col > 2)
       print();
@@ -4055,8 +4079,8 @@ errorObj : ${errorObj}
   function run(line) {
     let p = parser(line);
     let r = statement(p);
-    print('statement=> ' + r);
-    return;
+    prompt();
+    return r;
 
     try {
       return xrun(line);
