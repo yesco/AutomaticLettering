@@ -3996,6 +3996,14 @@ errorObj : ${errorObj}
   // END return false
   function run(line) {
     if (!line) return;
+
+    // special commands
+    if (line.match(/^\S+\.\S/))
+      return urlView(line);
+    // TODO: [button]?
+    // TODO: NAME [.COM] (any file...)
+    // TODO: !EXTNAME [.COM] (new funcs)
+
     run.count++;
 
     // NN PRINT ... new line?
@@ -4015,115 +4023,6 @@ errorObj : ${errorObj}
     } catch(e) {
       run_error('run', e);
     }
-  }
-  
-  function xrun(line) {
-    // special commands
-    if (line.match(/^\S+\.\S/))
-      return urlView(line);
-    // TODO: [button]?
-    // TODO: NAME [.COM] (any file...)
-    // TODO: !EXTNAME [.COM] (new funcs)
-
-    let toks = tokenizer(line, ORIC_TOKENZ);
-    if (trace) {
-      princ('TOKENS:');
-      print(JSON.stringify(toks, null, 2));
-    }
-    
-    line = line.trim();
-
-    // remove leading ':' (used for indent!)
-    line = line.replace(/^[\s:]*/, '');
-
-    // TODO: remove ll cursorShow from here...
-    
-    // fast comments
-    // TODO: inncorrect REM is a statement...
-    //   PRINT 33 : REM foo
-    //   PRINT 33 ' foo
-    if (line.match(/^(REM|')/))
-      return (cursorShow(), 'REM');
-	
-    if (!line || line === '')
-      return (cursorShow(), '');
-
-    // NN PRINT ... new line?
-    // New: retains initial spacing! lola
-    let linedef = line.match(/^\s*(\d+)(.*)$/);
-    if (linedef) {
-      saveline(+linedef[1], linedef[2]);
-      return (cursorShow(), 'EDIT');
-    }
-
-    line = line.trim();
-    let orig = line;
-
-    // ok, we have command  to execute
-    line = quoteStrings(line);
-
-    // TODO: incorrect as F!
-    // if (1) THEN ?3:?4 ELSE ?5 : ?6 : ?7
-    //   ORIC => 3 4 6 7
-    if (trace) print('LINE: ' + line);
-    if (0) {
-      let many = line.split(':');
-      if (trace) print('MANY: ' + many.length);
-      // TODO: incorrect, and can't CTRL-C!
-      if (many.length > 1) {
-	let r= many.map(unquoteStrings)
-	    .some(x=>!run_h(x));
-	return r;
-      }
-    }
-
-    let cmd = run_h(line, orig);
-    
-    // if it's not running in background
-    if (!running()) prompt(cmd === 'EDIT');
-    return true;
-  }
-  // internal: takes quotedStrings param
-  function run_h(line, orig) {
-    run.count++
-
-    // rough parameter extraction
-    let a = line.split(/[\s;=\(\),]+\s*/g);
-    if (trace) print('------' + a.join(' | '));
-    a = a.map(unquoteStrings);
-    if (trace) print('------' + a.join(' | '));
-
-    // hehe - crap!
-    if (!orig.match(/^(LIST|LLIST|LPRINT|PRINT|LET|INPUT|FOR|HELP|DIM|CLOAD|CSAVE|REM|IF|REPEAT|WHILE|UNTIL|NEXT|GET)/)) {
-      if (trace) print('---EVAL---' + a.join(' | '));
-      a = a.map((x,i)=>!i?x:EVAL(x));
-    }
-
-    // make numbers great again
-    a = a.map(x=>(+x==x?+x:x));
-    //if (trace) print('--num---' + a.join(' | '));
-
-    let cmd = a.shift();
-
-    // call function
-    let f = window[cmd];
-    if (trace) print('LINE: ' + line);
-    if (f) {
-      try {
-	// TODO if f.len !+ a.length => ?SYN
-	// problem is with ...args count=0
-	f.apply(orig, a);
-      } catch(e) {
-	// TOOD: make into error?
-	// simplify error handl: just throw strings!
-      }
-    } else {
-      stop(true);
-      try { syntax_error(cmd); } catch(e) {}
-      return;
-    }
-
-    return  cmd;
   }
   run.count = 0;
   
