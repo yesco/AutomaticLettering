@@ -390,21 +390,33 @@
    */
     visibility: visible;
 
-    animation: cursor_blinker 0.5s step-start infinite;
-//    background-color: black;
-//    color: inherit;
+    /* it seems invert must have colors specified, at least for background, otherwsise animation willnot animate the inverse of it! and inherit doesn't work*/
+    background: white;
+    color: black;
 
-color: white;
-background-color: black;
+//    background: black;
+//    color: white;
+//    background: inherit;
+//    color: inherit;
+    
+    animation: cursor_blinker 0.5s step-start infinite;
     /* this is confusing, it only inverts background when set! */
 
 }
 
 @keyframes cursor_blinker {
+    0% {
+	//color: white;
+	//filter: invert(0%);
+	//background: inherit;
+	//background: black;
+    }
     50% {
 	filter: invert(100%);
-	background-color: inherit;
-	color: white;
+	//background: inherit;
+	//color: inherit;
+	//background: white;
+	//color: black;
     }
 }
 
