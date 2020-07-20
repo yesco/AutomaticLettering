@@ -6098,8 +6098,10 @@ instruction
   // TODO: move? maybe move symbols out to oric-exp?
   // for now ignore ops and special chars: only use \w+
   var ORIC_TOKENZ = ',' +
-      Object.keys(OricKeywords.name2code).map(
-	k=>k.match(/^\w+$/)).join(',') + ',';
+      Object.keys(OricKeywords.name2code).filter(
+	k=>k.match(/^[\w\$]+$/))
+      .map(k=>k.replace(/\$/g, '\\$'))
+      .join(',') + ',';
 </script>
 
 <!--
