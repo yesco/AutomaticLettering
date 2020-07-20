@@ -1671,47 +1671,47 @@ CODE CHARACTER Control Code
   //   LET IF=2 => ?Syntax...
   //   LET THE=3 => ok
   //   LET THENN=4 => ?Syntax...
-  function LET() {
-    let v = this;
-    let [n] = rget(v, /^\s*LET\s*(\S+)\s*/);
-    if (!n) throw 'LET: no variable!';
-    v = v.replace(/^\s*LET\s*\S+\s*=\s*/, '');
-    if (trace) print('LET: ' + v);
-    let r = EVAL(v);
-    if (r === undefined) return;
+  function LET(p) {
+    // DOC: Set variable to value
+    // New: It autodims
 
-    // make sure type fit
-    if (n.endsWith('%')) {
+    // if called from statement, already have
+    let name = p.get('name');
+    if (!name) syntax_error('NO VAR');
+
+    let arr_i = index(p) || [];
+
+    if (!p.skip('=')) syntax_error('NO =');
+
+    let r = expression(p);
+    if (r === undefined)
+      syntax_error('NO VALUE');
+
+    if (trace) print('LET: ' + name + ' <= ' + r);
+
+    // type match?
+    if (name.endsWith('%')) {
       tInt(r);
       r = INT(r);
     }
-    if (n.endsWith('$')) r = ''+r;
-
-    // indexing (interpolate using fixpoint!)
-    let lastn = n;
-    while (lastn != (n = n.replace(
-      /\[([^\[\]]*)\]/g, (_,i)=>'['+EVAL(i)+']'))) {
-      if (trace) print('IX: ' + n);
-      lastn = n;
-    }
-
-    // okay, have value, try to set it
-    if (trace) print('SET: ' + n);
+    if (name.endsWith('$')) tStr(r);
 
     // array A(3,4)=77 complicates things...
     // TOOO: make a ref('A$', val)
-    // or replace A$ with a function
-    // ARRAY_A$
-    let path = n.replace(/[\[\]]/g, ' ').trim()
-	.split(/\s+/g);
-    if (trace) print('PATH: ' + JSON.stringify(path));
+
+    // TODO: now A and array A is same
+    // rename as ARRAY_A$???
+
     let nv = vars;
     let x;
-    let lastx = path.shift();
-    while ((x = path.shift()) !== undefined) {
+    let lastx = name;
+    while ((x = arr_i.shift()) !== undefined) {
       if (trace) print('LOOP lastx: ' + lastx);
       if (trace) print('LOOP x: ' + x);
+      // autodim (no checking!)
+      if (!nv[lastx]) nv[lastx] = {};
       nv = nv[lastx];
+      if (trace) print('LOOP nv: ' + nv);
       lastx = x;
     }
     if (trace) print('SET: ' + (nv == vars) + ' ' + lastx);
@@ -1846,8 +1846,9 @@ CODE CHARACTER Control Code
     if (typeof pos === 'string')
       pos = -INT(SCREEN_COLS/(+pos));
     let width = (pos < 0) ? -pos : 8;
-    while((col-column) % width !== 0)
+    do {
       putc(32);
+    } while((col-column) % width !== 0);
     
     // return '' as I think it's used in PRINT
     return '';
@@ -1890,99 +1891,26 @@ CODE CHARACTER Control Code
   //  20 PRINT @X,10;·• WHIZZ2"
 
   // TODO: print ctrl-codes perform action!
-  function PRINT() {
-    let line = this;
-    line = line.replace(/^L*PRINT\s*/, '');
-    line = line.trim();
+  function PRINT(p) {
+    let newline;
 
-    let exp = '', mode = 'normal', par = '';
-    let nonewline = false;
-    for(let i=0; i<line.length; i++) {
-      let c = line[i];
-      //if (trace) print('PRINT.c: ' + c);
-
-      function finish(ev) {
-	if (exp.length && !exp.match(/^\s*$/))
-	  princ(ev?EVAL(exp):exp);
-	exp = '';
-	if (c === ',') TAB();
+    while (!p.end()) {
+      // only effective last
+      newline = true;
+      if (p.skip(';'))
+	newline = false;
+      else if (p.skip(',')) {
+	TAB();
+	newline = false;
+      } else {
+	// no delimiter needed between exps!
+	let e = expression(p);
+	// if not expression = nothing more
+	if (e === undefined) return;
+	princ(e);
       }
-      
-      switch(mode) {
-      case 'normal': {
-	switch(c) {
-	case ',':
-	case ';': 
-	case ' ': finish(true); break;
-	case '\\': return unexpected_error('\\');
-	case '"': finish(true); mode = 'string'; par += '"'; break;
-	case '(': exp += c; mode = 'expr'; par += ')'; break;
-	case '[': exp += c; mode = 'expr'; par += ']'; break;
-	default: exp += c;
-	}
-	break;
-      }
-      case 'string': {
-	if (c=='"') {
-	  if (exp.length)
-	    princ(exp)
-	  exp = '';
-	  mode = 'normal';
-	} else {
-	  exp += c;
-	}
-	break;
-      }
-	// TOOD: too simple
-      case 'expr': {
-	if (par)
-	  if (')]"'.indexOf(c) >= 0) {
-	    let e = par[par.length-1];
-	    if (e !== c)
-	      return unmatched_paren_error(e, c);
-	    else
-	      par = par.substring(0, par.length-1);
-	  }
-	
-	switch(c) {
-	case '\\': return unexpected_error('\\');
-  
-	case '(': par += ')'; break;
-	case '[': par += ']'; break;
-	case '"': par += '"'; break;
-	  
-	case ';':
-	  if (par) return unexpected_error(';');
-	  // else! fallthrough
- 	case ',':
-	case ' ': {
-	  if (exp.length && !par.length) {
-	    princ(EVAL(exp))
-	    exp = ''
-	    mode = 'normal';
-	  }
-	  if (c === ',') TAB();
-	  break;
-	}
-	default: exp += c;
-	}
-	break;
-      }
-      }
-      if (c !== ' ') nonewline = false;
-      if (c === ';') nonewline = true;
     }
-
-    // cleanup
-    if (exp.length) {
-      // TODO: missing " ?
-      if (mode === 'string')
-	princ(exp);
-      else
-	princ(EVAL(exp));
-    }
-    if (!nonewline)
-      putc(10);
+    if (newline) putc(10);
   }
 
   HELP.related.push('LIST LLIST EDIT CLOAD CSAVE');
@@ -2422,40 +2350,13 @@ This command works exactly the same as a PRINT statement except that it is used 
   // IF "A" THEN ?1 ELSE ?2 => 1
   // IF ("A") THEN ?1 ELSE ?2 => 1
 
-  
-  function IF() {
-    let p = parser(this);
-    p.next();
-    pIF(p);
-  }
-
-  // TODO: BAD ONE....
-  function getExp(p) {
-    let x = '';
-    // TODO:  This is probably too 'promiscous'!
-    // Compared to ORIC it just will give less errors
-    while(p.val() != 'THEN' && p.val() != ':' && p.val() != 'ELSE') {
-      x += p.val();
-      if (!p.next()) break;
-    }
-    if (trace) print('EVAL.exp= ' + x);
-    return EVAL(x);
-    // TODO: make it return a closure()?
-  }
-
-  function pIF(p) {
-    let exp = getExp(p);
+  function IF(p) {
+    let exp = expression(p);
     p.skip('THEN') || syntax_error();
     if (!exp && !p.seek('ELSE')) return;
     if (p.num()) return GOTO(p.getnum());
     statements(p);
   }
-
-  function no_pPRINT(p) {
-    let exp = getExp(p);
-    print(exp);
-    return true;
-  };
 
   function statements(p) {
     do {
@@ -2482,6 +2383,7 @@ This command works exactly the same as a PRINT statement except that it is used 
   }
 
   function statement(p) {
+    if (p.end()) return;
     if (trace) print('STMT> ' + p.rest());
     // comments
     if (p.skip('REM') || p.skip("'")) {
@@ -2495,8 +2397,12 @@ This command works exactly the same as a PRINT statement except that it is used 
       // first try parser version
       // (for now pNAME is preferred over NAME)
       let f = window['p'+name] || window[name];
-      if (!f) syntax_error(name);
-
+      if (!f) {
+	// try LET ?
+	return LET(p);
+	// if it's not LET we'll get syntax error
+      }
+      
       if (trace) print('STMT.func> ' + f.name);
       try {
 	if (isParser(f)) {
@@ -2521,19 +2427,26 @@ This command works exactly the same as a PRINT statement except that it is used 
       }
       return true;
     }
-
-    // if it's not statement then LET!
-    return LET(p);
   }
 
   // each function "return;" when can't go on
   function expression(p) {
     if (p.num()) return op(p, p.getnum());
     if (p.str()) return concat(p, p.getstr());
-    if (p.skip('-')) return exp(p)
-    if (p.skip('+')) return exp(p);
-    if (p.keyword()) return func(p, p.get('keyword'));
-    if (p.name()) return varr(p, p.get('name'));
+    // TODO: test...
+    if (p.skip('-')) {
+      let e = expression(p);
+      if (e === undefined) syntax_error('-');
+      return -e;
+    }
+    if (p.skip('+')) return expression(p);
+    if (p.keyword()) {
+      if (p.val()==='ELSE' || p.val()==='THEN')
+	return;
+      return op(p, func(p, p.get('keyword')));
+    }
+    if (p.name())
+      return op(p, varr(p, p.get('name')));
     if (p.skip('(')) {
       let e = expression(p);
       p.skip(')') || syntax_error('NO ")"');
@@ -2597,18 +2510,23 @@ This command works exactly the same as a PRINT statement except that it is used 
     }
 
     let arr_i = p.val('(') && index(p);
-    let v = vars[name];
-    if (!arr_i) return retval(v);
+    if (!arr_i) return retval(vars[name]);
 
     // autodim? DIM name(10)
-    if (typeof v !== 'object' || !Array.isArray(v))
-      v = vars[name] = {};
+    //if (typeof v !== 'object' || !Array.isArray(v))
+    //v = vars[name] = {};
 
     // iterate through indices
     let i;
-    while (i = arr_i.pop()) {
-      if (typeof v !== 'object' || !Array.isArray(v))
-	subscript_error();
+
+    arr_i.unshift(name);
+    let v = vars;
+    while (i = arr_i.shift()) {
+      if (trace) print('varr.i: ' + i);
+      if (trace) print('varr.v: ' + JSON.stringify(v));
+      if (trace) print('varr.type: ' + typeof v);
+      if (typeof v !== 'object' && !Array.isArray(v))
+	subscript_error(i);
       v = v[i];
     }
     return retval(v);
@@ -4089,15 +4007,16 @@ errorObj : ${errorObj}
     }
 
     // commands to execute
-    let p = parser(line);
-    let r = statement(p);
-    prompt();
-    return r;
-
     try {
-      return xrun(line);
-    } catch(e) {alert('run: ' + e + '\n' + e.stack)}
+      let p = parser(line);
+      let r = statements(p);
+      prompt();
+      return r;
+    } catch(e) {
+      run_error('run', e);
+    }
   }
+  
   function xrun(line) {
     // special commands
     if (line.match(/^\S+\.\S/))

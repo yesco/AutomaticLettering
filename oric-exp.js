@@ -280,7 +280,7 @@ function tokenizer(line, keywordz='') {
   }
   function step() {
     if (c) t += c;
-    console.log('STEP:', c);
+    //console.log('STEP:', c);
     skip();
     c = line[i];
     return !!c;
@@ -359,7 +359,7 @@ function tokenizer(line, keywordz='') {
     }
   }
   
-  console.log('--TOKENS-------LINE:', line);
+  //console.log('--TOKENS-------LINE:', line);
   skip();
   while(token());
   return ret;
