@@ -195,9 +195,13 @@ timestamp.decode = tid=>parseInt(tid.substring(1), 16);
 timestamp.is = tid=>tid.length==17 && tid[0]=='t';
 
 // easy access localStorage
+// lsput(n, v) if v == undefined: n removed
 function lsput(n, v) {
   try {
-    localStorage.setItem(n, v);
+    if (v === undefined)
+      return localStorage.removeItem(n);
+    else
+      localStorage.setItem(n, v);
     return true;
   } catch(e) {
     console.log('lsput: ', e);

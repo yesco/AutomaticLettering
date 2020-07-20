@@ -124,19 +124,24 @@
     if (lineno) { princ(' IN LINE'); princ(lineno); }
 
     stop(true);
-    throw msg;
+    let e = Error(msg);
+    e.oric = 1;
+    throw e;
   }
 
   // NEW
   function run_error(name, e) {
     // TODO: print stacktrace?
+    if (e && e.oric) return;
     let msg = '?'+name+' BROKE: ';
     let emsg = ''+(e && e.msg || '');
     console.log(msg, emsg);
-    let st = ''+e.stack;
-    st = st.replace(/\s*at\s(\S+)\s*\(.*?([^\/]+?:\d+).*?\)/g, '\n$2-$1');
-    console.log(st);
-    print(st);
+    if (e) {
+      let st = ''+e.stack;
+      st = st.replace(/\s*at\s(\S+)\s*\(.*?([^\/]+?:\d+).*?\)/g, '\n$2-$1');
+      console.log(st);
+      print(st);
+    }
     error(msg, emsg);
   }
 
@@ -186,7 +191,7 @@
   }
   
   function next_error() {
-    error('?NEXT WITHOUT GOSUB ERROR');
+    error('?NEXT WITHOUT FOR ERROR');
   }
   
   function data_error() {
@@ -659,6 +664,7 @@ INFO:<br><span id='info'></span>
       col = column,
       paper = 7,
       ink = 0,
+      waittill = 0,
 
       // 0=TEXT=LORES0, 1=LORES1, -1=HIRES
       gedit = false,
@@ -1675,17 +1681,13 @@ CODE CHARACTER Control Code
     // DOC: Set variable to value
     // New: It autodims
 
-    // if called from statement, already have
+    if (p.keyword()) syntax_error('KEYWORD');
+
     let name = p.get('name');
     if (!name) syntax_error('NO VAR');
 
     let arr_i = index(p) || [];
-
-    if (!p.skip('=')) syntax_error('NO =');
-
-    let r = expression(p);
-    if (r === undefined)
-      syntax_error('NO VALUE');
+    let r = ensureExp(p, '=');
 
     if (trace) print('LET: ' + name + ' <= ' + r);
 
@@ -2091,7 +2093,7 @@ This command works exactly the same as a PRINT statement except that it is used 
 	  (s.match(/^"(.*)"$/) || ['',alt])[1];
       },
       seek(es) {
-	while(p.val() != es) {
+	while(!p.val(es)) {
 	  if (p.end()) return;
 	  if (trace) print('SEEK.skip> ' + p.val());
 	  p.next();
@@ -2178,11 +2180,13 @@ This command works exactly the same as a PRINT statement except that it is used 
     // New: Line keeps spaces!
     lno = lno || lineno;
     let line = lines[lno]
-    // TODO: error?
     if (!line) return;
 
+    print();
     print(lno + ' ' + line);
-    cursorMove('u');
+    print();
+    row -= 2;
+    throw 'SILENT';
   }
   
   function TRON() {
@@ -2232,7 +2236,9 @@ This command works exactly the same as a PRINT statement except that it is used 
     if (running()) return;
     
     RUN.interval = setInterval(_=>{
+      // these two are not most efficient...
       if (scstop) return;
+      if (Date.now() < waittill) return;
 
       cont.intervalcount++;
       let start = Date.now();
@@ -2246,7 +2252,7 @@ This command works exactly the same as a PRINT statement except that it is used 
 	if (!run(line)) stop();
 	millis = Date.now() - start;
 
-	forceUpdate = (n++ > forceUpdateLimit);
+	forceUpdate = forceUpdate || (n++ > forceUpdateLimit);
       } while (!forceUpdate && millis  < TIMESLICE);
       cont.millis += millis;
     }, 1);
@@ -2269,7 +2275,8 @@ This command works exactly the same as a PRINT statement except that it is used 
 
   function GOSUB(lno) {
     stack.push(['RETURN', lineno, line]);
-    lineno = lno-1;
+    // TODO: save tokens
+    GOTO(lno);
     line = '';
   }
   function RETURN() {
@@ -2280,56 +2287,59 @@ This command works exactly the same as a PRINT statement except that it is used 
     [ret, lineno, line] = ret;
   }    
 
-  // use same stack as GOSUB as they need to be matched! (you can't GOSUB and there NEXT)
-  function FOR() {
-    let line = this;
-    let [_, init, to, __, step] =
-	line.match(/^FOR\s*(.*?)\s*TO\s*(.*?)\s*(STEP\s*(.*)|)\s*$/);
-    print('FOR.init: ' + init);
-    print('FOR.to: ' + to);
-    print('FOR.step: ' + step);
+  function ensureExp(p, tok, err) {
+    if (tok)
+      p.skip(tok) || syntax_error('NO ' + tok);
+    let e = expression(p);
+    if (e === undefined)
+      syntax_error(err || ('NO '+ (tok?tok:' ')+'EXP'));
+    return e;
+  }
+  
+  function FOR(p) {
+    let name = p.get('name');
+    name ||syntax_error('NO VAR');
 
-    let v = init.match(/^(\w+)\s*=/);
-    if (!v) syntax_error('');
-    ('LET ' + init).LET();
-
-    // TODO: this is when I realize
-    // that doing it on the fly isn't going
-    // to work very well,
-    // HMMM,why was that again? lol
-    // FOR-NEXT, GOSUB-RETURN and
-    // and something about
-    // FIE : FOR : BAR
-    // FUM : NEXT : FOO
-    //
-    // FIE : STOP : BAR
-    //
-    // PRINT 11 : STOP : PRINT 22 : END
-    // CONT -> 22
-    // CONT ater END ok! haha
-    //
-    // notice: the loop is run at least once!
-    //   and it'll do one step...
-    // ?NEXT WITHOUT FOR ERROR IN LINE...
+    let start = ensureExp(p, '=');
+    let to = ensureExp(p, 'TO');
+    let step = (p.val('STEP') && ensureExp(p, 'STEP')) || 1;
+    
+    // set var
+    vars[name] = start;
+    
+    // save state
+    stack.push([
+      'FOR', name, to, step,
+      lineno, p.rest()]);
   }
 
-  function TO() {
-    let line = this;
-    let [_, init, to, __, step] =
-	line.match(/^FOR\s*(.*?)\s*TO\s*(.*?)\s*(STEP\s*(.*)|)\s*$/);
-    print('TO.to: ' + to);
-    print('TO.step: ' + step);
+  function NEXT(p) {
+    let st = stack.length && stack.pop();
 
-    to = EVAL(to); // once or every time?
-    step = EVAL(step); // once or every time?
-    if (variable <= to)
-      stack.push([lineno, `TO ${to} STEP ${step}`]);
-  }
+    // name is optional
+    // but if given have to match
+    let name = p.get('name');
+    if (name) {
+      // and we'll pop others until same name
+      while (st && st[1] !== name)
+	st = stack.length && stack.pop();
+      // TODO: this will happily skip UNTIL/GOSUB
+    }
 
-  function NEXT() {
-    // TODO: ...
-    // cheat for now
-    return RETURN(); 
+    if (!st) next_error();
+    let [tok, nme, to, step, lno, ln] = st;
+
+    let v = vars[nme] += step;
+    if (step > 0 && v > to) return true;
+    if (step < 0 && v < to) return true;
+
+    // if not finished or step == 0 !
+    stack.push(st);
+
+    // jump back!
+    lineno = lno;
+    line = ln;
+    run(line);
   }
 
   // TEST:
@@ -2351,7 +2361,7 @@ This command works exactly the same as a PRINT statement except that it is used 
   // IF ("A") THEN ?1 ELSE ?2 => 1
 
   function IF(p) {
-    let exp = expression(p);
+    let exp = ensureExp(p);
     p.skip('THEN') || syntax_error();
     if (!exp && !p.seek('ELSE')) return;
     if (p.num()) return GOTO(p.getnum());
@@ -2411,21 +2421,25 @@ This command works exactly the same as a PRINT statement except that it is used 
 	  p.next();
 	  f.call(p, p); // redundant!
 	  if (trace) print('3CALL.done> ' + p.rest());
+	  return true;
 	} else {
 	  if (trace) print('STMT.isNormal> ' + name);
 	  let line = p.rest();
 	  if (trace) print('LINE= '+line);
 
 	  p.next();
+	  // this doesn't care how many args!
 	  let args = evalArgs(p);
 	  if (trace) print('ARGS= ' + JSON.stringify(args));
 	  f.apply(line, args);
 	  //f.apply(p.rest(), evalArgs(p));
+	  return true;
 	}
       } catch(e) {
+	if (e && e.oric) return;
+	if (e == 'SILENT') throw e;
 	run_error(name, e);
       }
-      return true;
     }
   }
 
@@ -2441,7 +2455,7 @@ This command works exactly the same as a PRINT statement except that it is used 
     }
     if (p.skip('+')) return expression(p);
     if (p.keyword()) {
-      if (p.val()==='ELSE' || p.val()==='THEN')
+      if (p.val('ELSE') || p.val('THEN'))
 	return;
       return op(p, func(p, p.get('keyword')));
     }
@@ -2457,7 +2471,7 @@ This command works exactly the same as a PRINT statement except that it is used 
   function func(p, kw) {
     let f = window[kw];
     if (!f) throw 'Function for missing: ' + kw;
-    if (!p.skip('(')) syntax_error('NO (');
+    if (!p.skip('(')) syntax_error();
     let a = evalArgs(p);
     if (trace) print('ARGS: ' + a);
     if (!p.skip(')')) syntax_error('NO )');
@@ -2570,6 +2584,7 @@ This command works exactly the same as a PRINT statement except that it is used 
       if (!noprompt) prompt();
     }
     line = '';
+    lineno = 0;
     return wasrunning;
   }
   
@@ -2612,7 +2627,7 @@ This command works exactly the same as a PRINT statement except that it is used 
     let l = line;
     if (stop('noprompt')) {
       if (col>2) print();
-      princ(' BREAK IN   '+lineno);
+      princ(' BREAK IN   '+lno);
       CONT.lineno = lno;
       CONT.line = l;
       prompt();
@@ -2622,6 +2637,10 @@ This command works exactly the same as a PRINT statement except that it is used 
   
   // WAIT 100 = 1s
   function WAIT(decaseconds) {
+    // tell cont to immediately exit
+    forceUpdate = true;
+    // scedule time to continue
+    waittill = Date.now() + decaseconds * 10;
   }
   
   function example_VAT() {
@@ -2670,13 +2689,9 @@ to metres
 
   function example_FOR() {
     return `
-10 FOR L=l TO 5:PRINT L*L:NEXT L 
-
-10 FOR L=10 TO 5 STEP-l:PRINT L*L:NEXT 
-
 10 CLS 
 20 FOR LOOP=0 TO 25 
-30 PRINT CHR$(65+LOOP)+CHRS(97+LOOP); 
+30 PRINT CHR$(65+LOOP)+CHR$(97+LOOP); 
 40 NEXT LOOP 
 `;
   }
@@ -3258,14 +3273,25 @@ $276,$277 Spare counter — also used by WAIT (and printer in V1.0).
   //
   // FILLCIRC  .HRS   34     FOOBBAR    .COM 33
 
-  function CLOAD(name, info) {
+  function CLOAD(p) {
     // DOC: Loads a file "NAME"
     // CLOAD "" will open the file dialogue
     // New: Without arguments lists examples
     // New: With 'CLOAD D' shows names with 'D'
-    if (!name) name = '';
-    
-    let origline = this;
+
+    let name = p.get('name');
+    if (p.str()) {
+      name = '"' + ensureExp(p) + '"';
+    } else if (name) {
+      if (name.endsWith('$'))
+	name = ensureExp();
+      else
+	; // literal - do matching
+    } else {
+      name = '';
+    }
+      
+    let origline = name;
     function load(src) {
       if (!src) return;
       NEW();
@@ -3515,7 +3541,6 @@ channel combination
 	sounds(PLAY['c'+c] || '');
       else
 	sounds(`${c} v0`);
-      i++;
     }
   }
 
@@ -3535,27 +3560,11 @@ l REM ***PLAY***
 
   // on Xiaomi A4 note+ it plays 3s
   // original oric about 6s
-  example_CHROMANG = `
-10 REM CHROMATIC (WITHOUT FOR)
-20 LET I=0
-25 PLAY 1,0,0,0
-30 LET O=INT(I/12)
-35 IF O-6 THEN 40 ELSE GOTO 100
-40 LET N=INT(I-O*12)+1
-45 MUSIC 1,O,N,2
-50 PRINT O, N
-60 LET I=I+1
-70 GOTO 30
-100 PLAY 0,0,0,0
-  `;
-  
   example_CHROMATIC = `
-l REM *** CHROMATIC SCALE *** 
-5 CLS 
-10 PAPER 5 
-20 FOR 0=0 TO 6 
-30 FOR N=l TO 12 
-40 MUSIC 1,0,N,10 
+l0 REM *** CHROMATIC SCALE *** 
+20 FOR O=0 TO 6 
+30 FOR N=1 TO 12 
+40 MUSIC 1,O,N,10 
 50 WAIT 30 
 60 NEXT N 
 70 NEXT 0 
@@ -3987,8 +3996,8 @@ errorObj : ${errorObj}
       //if (col > 2)
       print();
       print('Ready');
+      cursorShow();
     }
-    cursorShow();
   }
 
   // interprets and runs one line
@@ -4011,17 +4020,21 @@ errorObj : ${errorObj}
     let linedef = line.match(/^\s*(\d+)(.*)$/);
     if (linedef) {
       saveline(+linedef[1], linedef[2]);
-      return (cursorShow(), 'EDIT');
+      cursorShow();
+      return;
     }
 
     // commands to execute
+    let p = parser(line);
     try {
-      let p = parser(line);
       let r = statements(p);
-      prompt();
+      if (r) prompt();
       return r;
     } catch(e) {
-      run_error('run', e);
+      if (e === 'SILENT' || e && e.oric)
+	cursorShow();
+      else 
+	run_error(e);
     }
   }
   run.count = 0;
