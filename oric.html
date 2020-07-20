@@ -436,20 +436,6 @@ g
     }
 }
 
-#printer {
-    color: blue;
-    padding-left: 2rem;
-    padding-right: 2rem;
-    background: beige;
-}
-
-/* TODO: doesn't work on "lines"
-#printer:nth-child(2n+0) {
-    background: beige;
-}
-#printer:nth-child(2n+1) {
-    color: lightskyblue;
-*/
 </style>
   
 <script src='oric-exp.js'>
@@ -464,22 +450,132 @@ g
 </head>
 
 <body style='background-color: black; color: white;'>
-<div style='width:100%'>
-  <img width='20%' src='oric-logo-black-export.svg'/>
-  <div class='oric' style='float:right; top:0; width:80%; text-align:center; font-decoration:bold; text-justify:inter-word; font-size:2rem; letter-spacing:3px; '>WEB - BASIC
-<sup><a tabindex='-1' class='oric' target='oricman' style='text-decoration:none; font-size:1.1rem; padding:0.1rem; padding-bottom:-0.1rem; color:black; background:white; font-weight:bold; letter-spacing:0px;' href='http://www.defence-force.org/computing/oric/library/lib_manual_oric/files/manual_atmos.pdf'>PDF</a></sup>
-<div style='font-size:1rem;'>&copy;jsk@yesco.org</div>
+
+<!--------------- SCREEN ------------------->
+<style>
+@media (orientation: landscape) {
+  Xdiv { border: 2px solid green; }
+  #bigone {
+    flex-direction: row;
+  }
+  #smallone {
+    flex-direction: column;
+  }
+  #screen {
+    width: 60%
+    float: right;
+  }
+}
+
+@media (orientation: portrait) {
+  Xdiv { border: 2px solid red; }
+  #bigone {
+    flex-direction: column;
+    
+  }
+  #smallone {
+    flex-direction: row;
+    align-content: space-between;
+    text-align: center;
+  }
+  #screen {
+    /* curious thing, this makes it resize right in onresize */
+    position: absolute;
+    text-align: center;
+  }
+}
+</style>
+
+<div id='bigone' style='display:flex;'>
+  <div id='smallone' style='display:flex; flex:1;'>
+    <input id='exp' autocomplete='off' autofocus style='background:black; color:lightgreen; border:none; max-width:1px; max-height:1px; position:absolute;'>
+
+    <!--- show logo: ORIC BASIC --->
+    <div>
+      <img width='120px' src='oric-logo-black-export.svg'/><br>
+      <div class='oric' style='width:100%; position:relative; left:7px; top:-9px; letter-spacing:15px; border: 0;'><b>BASIC</b></div>
+    </div>
+
+    <!--- WEB-BASEIC^PDF-link, jsk, email --->
+    <div style='flex:2;'>
+
+      <div class='oric' style='font-decoration:bold;font-size:2rem; letter-spacing:3px;'>
+        WEB - BASIC<sup><a tabindex='-1' class='oric' target='oricman' style='text-decoration:none; font-size:1.1rem; padding:0.0rem; padding-bottom:-0.1rem; color:black; background:white; font-weight:bold; letter-spacing:0px;' href='http://www.defence-force.org/computing/oric/library/lib_manual_oric/files/manual_atmos.pdf'>PDF</a></sup>
+      </div>
+
+      <div style='font-size:1rem;'>
+	by Jonas S Karlsson
+      </div>
+
+      <div style='font-size:1rem; display:inline-block;'>
+	&copy; 2020 jsk@yesco.org
+      </div>
+
+    </div>
   </div>
-<span class='oric' style='position:relative; left:3px; top:-7px; letter-spacing:6px; transform-origin:left; transform:scale(1.17, 1);'><b>BASIC</b></span>
+
+  <!--- ORIC SCREEN --->
+  <div style='xalign-self: right;'>
+    <div id='screen' class='text' >
+    </div>
+  </div>
+
 </div>
 
-<br>
+<div>
+<!--------------- FULLSCREEN ------------------->
+<script>
+{
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'F11') {
+      if (document.fullscreenElement)
+	document.exitFullscreen();
+      else
+	dom('bigone').requestFullscreen();
+    }
+  });
+}
+</script>
+<!--------------- FOCUS ------------------->
+<script>
+  {
+    let s = dom('screen').style;
+    let e = dom('exp');
 
-<!-- seemingly useless span, but need for getting correct width of 'screen'-->
-<center><span id='foo'>
-<div id='screen' class='text'>
-</div>
-</span></center>
+    // not good idea as it scrolls down...
+    //dom('screen').onclick =
+    //()=>e.focus();
+
+    // click on screen to "get focus" haha
+    dom('screen').onclick = function() {
+      e.focus();
+    }
+    
+
+    let sfilter;
+    e.onblur = function() {
+      sfilter = s.filter;
+      // not working?
+      s.filter = 'blur(2px)';
+    }
+    e.onfocus = function() {
+      //s.background = '';
+      s.filter = sfilter;
+    }
+
+    e.onblur();
+    // can't force on opera :-(
+    // and it's not default
+    e.focus();
+  }
+  
+</script>
+
+<!-- compensation for screen pos absolute 
+     this will also "hide" the rest of outpute --->
+
+<div id='dummy' style='position:relative; top:0; height:100%;'></div>
+<!--------------- KEYBOARD ------------------->
 
 <style>
 .oricl, .oricr {
@@ -515,8 +611,6 @@ g
   <div class='oricl'>&lt;</div>
 </div>
 
-
-
 <script>
   window.onresize = function(){
     let s = dom('screen');
@@ -524,45 +618,19 @@ g
     let w = s.offsetWidth;
     let h = s.offsetHeight;
 
+    //let ww = window.innerWidth;
     let ww = window.outerWidth;
     let wh = window.innerHeight;
 
-    s.style.zoom = Math.min(ww/w, wh/h);
+    /* @media #screen {
+       curious thing, this makes it resize right in onresize */
+    s.style.zoom = Math.min(ww/w, wh/h) * 0.99;
   };
   // call an initial time after first render
   setTimeout(x=>window.onresize(), 1000);
 </script>
-<!-- id=exp is magical for jsconsole - it returns focus there -->
-<div style='display:flex; width:100%;'>
-  <input id='exp' autofocus style='flex:1; background:black; color:lightgreen; border:none; width:100; float:right;'>
-</div>
-<script>
-  {
-    let s = dom('screen').style;
-    let e = dom('exp');
 
-    // not good idea as it scrolls down...
-    //dom('screen').onclick =
-    //()=>e.focus();
-
-    let sfilter;
-    e.onblur = function() {
-      sfilter = s.filter;
-      // not working?
-      s.filter = 'blur(2px)';
-    }
-    e.onfocus = function() {
-      //s.background = '';
-      s.filter = sfilter;
-    }
-
-    e.onblur();
-    // can't force on opera :-(
-    // and it's not default
-    e.focus();
-  }
-  
-</script>
+<!--------------- FILE INPUT ------------------->
 
 <!-- hidden: activate by fileInput.click()! -->
 <input id='file' type='file' accept='.bas,.tap,.bac,.txt' style='display:none'/>
@@ -610,8 +678,56 @@ try {
 
 </script>
 
+<!--------------- STATS/VARS ------------------->
+<br>
+<b>Stats + Variables</b>
+<div>
+ROW: <span id='row'></span>
+COL: <span id='col'></span><br>
+LINE: <span id='line'></span><br>
+STATS: <span id='stats'></span><br>
+ERROR: <span id='error' style='color:red;'></span><br>
+VARS: <span id='vars'></span><br>
+INFO:<br><span id='info'></span><br>
+<br>
+</div>
+
+<!--------------- PRINTER ------------------->
+<br>
+<br>
 <center><b style='color:beige;'>PRINTER (toggle on/off with CTRL-P)</b></center>
-<pre id='printer'></pre>
+<style>
+
+#printerpaper {
+  line-height: 1rem;
+  font-size: 1.2rem;
+  letter-spacing: -3px;
+  font-family: monospace;
+  background: linear-gradient(rgb(200,215,220) 1%, white 1%, white 50%, rgb(200,215,220) 50%, rgb(210,230,240) 52%);
+  color: rgb(20,20,50);
+  background-size: 100% 2rem;
+  padding: 2rem;
+}
+
+/* TODO: this should give printer holes? Doesn't work */
+#printerpaper::before, #printerpaper::after {
+    top: 0;
+    width: 2em;
+    height: inherit;
+    background: salmon;
+    background: radial-gradient(transparent 24%, black 24%) 0 0);
+    background-size: 2em 2em;
+}
+
+#printer {
+    transform: translateY(-2px); /* for class='oric' */
+}
+
+</style>
+
+
+<pre id='printerpaper' style='min-height:100px;'><pre class='oric' id='printer'></pre></pre>
+
 <script>
   {
     let p = dom('printer');
@@ -626,27 +742,16 @@ try {
   }
 </script>
 
-<br>
-ROW: <span id='row'></span>
-COL: <span id='col'></span>
-<br>
-LINE: <span id='line'></span>
-<br>
-STATS: <span id='stats'></span>
-<br>
-ERROR: <span id='error' style='color:red;'></span>
-<br>
-VARS: <span id='vars'></span>
-<br>
-INFO:<br><span id='info'></span>
-<br>
-<br>
+<!--------------- MISC ------------------->
+
 <script src='jsconsole.js'>
   //loadScript('jsconsole.js');
 </script>
 <script>
   DBG('logerr', true);
 </script>
+
+<!--------------- ORIC CONFIG ------------------->
 
 <script>
   // Configuration
@@ -684,9 +789,6 @@ INFO:<br><span id='info'></span>
       curx = 0,
       cury = 0;
 
-
-
-
   // --- slow down!
   // TODO: set if too much screen updates?
   // hack to make it slower
@@ -698,6 +800,7 @@ INFO:<br><span id='info'></span>
       forceUpdateLimit = 1024*1024;
 
   const ESC = 27;
+
 
   function boot() {
     stop('noprompt');
@@ -1699,6 +1802,7 @@ CODE CHARACTER Control Code
     if (!name) syntax_error('NO VAR');
 
     let arr_i = index(p) || [];
+    if (!p.val('=')) syntax_error();
     let r = ensureExp(p, '=');
 
     if (trace) print('LET: ' + name + ' <= ' + r);
@@ -1852,7 +1956,11 @@ CODE CHARACTER Control Code
     
     // positive number
     if (+pos===pos && +pos > 0) {
-      while(col < pos)putc(32);
+      if (pos+2 > SCREEN_COLS) {
+	putc(32);
+	return '';
+      }
+      while(col < pos) putc(32);
       return '';
     }
 
@@ -2837,7 +2945,8 @@ already,then skip
 
   function LEN(s) {
     tStr(s);
-    return s.length; }
+    return s.length;
+  }
 
   function LEFT$(s, len) {
     // DOC: From S return LEN first chars.
@@ -5528,10 +5637,10 @@ still italic</i>back to bold</b>back to default<p>
     if (k=='f') click = !click;
     if (k=='q') cursorToggle();
     if (k=='p') showStatus(printerToggle());
-    if (k=='t') showStatus(caps = !caps);
+    if (k=='t') { showStatus(caps = !caps); e.preventDefault(); }
     if (k=='o') showStatus(scoff=scoff?0:1);
     if (k=='s') showStatus(scstop=!scstop);
-    if (k=='d') showStatus(double=!double);
+    if (k=='d') { showStatus(double=!double); e.preventDefault(); }
 
     if (k=='j') showStatus(column=2-column);
 
@@ -5913,7 +6022,7 @@ instruction
 
       if (s == '') s = 'UNKNOWN';
       
-      dom('info', `== ${k} - - ${s}`, 'a');
+      if (0) dom('info', `== ${k} - - ${s}`, 'a');
       OricKeywords.status[k] = s;
     } else{
       //dom('info', `!! ${k}`, 'a');
@@ -5922,16 +6031,18 @@ instruction
   // make array out of set!
   OricKeywords.missing = [...OricKeywords.missing];
 
-  dom('info',
-      'INNOVATED - '+OricKeywords.innovated.join('\nINNOVATED - '),
-      'a');
-  dom('info',
-      'MISSING - '+OricKeywords.missing.join('\nMISSING - '),
-      'a');
-  dom('info',
-      Object.keys(OricKeywords.status).map(
-	k=>`STATUS - - ${k} - - ${OricKeywords.status[k]}\n`).join(''),
-      'a');
+  if (0) {
+    dom('info',
+	'INNOVATED - '+OricKeywords.innovated.join('\nINNOVATED - '),
+	'a');
+    dom('info',
+	'MISSING - '+OricKeywords.missing.join('\nMISSING - '),
+	'a');
+    dom('info',
+	Object.keys(OricKeywords.status).map(
+	  k=>`STATUS - - ${k} - - ${OricKeywords.status[k]}\n`).join(''),
+	'a');
+  }
 
   function OKK(s) {
     return Object.keys(OricKeywords.status)
@@ -5941,6 +6052,7 @@ instruction
   function OKC(s) {
     return OKK(s).length;
   }
+
   dom('info',
       '\nORIC ATMOS BASIC SIMULATOR STATUS'+
       '\n================================='+
@@ -5953,7 +6065,7 @@ instruction
       '\n----------------',
       'p');
 
-  if (1) // temporary generate some basic code!
+  if (0) // temporary generate some basic code!
   {
     let c2k = OricKeywords.code2name;
     let kwp = OricKeywords.params;
@@ -6005,7 +6117,7 @@ instruction
       }
       // PRINT? => princ princ1 print terpri
 
-      dom('info', line+' : RETURN', 'a');
+      if (0) dom('info', line+' : RETURN', 'a');
     }
   }
 
@@ -6021,6 +6133,7 @@ instruction
 
   // TODO: move? maybe move symbols out to oric-exp?
   // for now ignore ops and special chars: only use \w+
+  // Usaed by parser/tokenizer
   var ORIC_TOKENZ = ',' +
       Object.keys(OricKeywords.name2code).filter(
 	k=>k.match(/^[\w\$]+$/))
