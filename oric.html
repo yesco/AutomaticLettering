@@ -365,6 +365,7 @@
     font-weight: bold;
     /* this shows white on white! */
     filter: invert(30%);
+    opacity: 100%;
 }
 
 /* INVERSE */
@@ -504,11 +505,7 @@ g
       </div>
 
       <div style='font-size:1rem;'>
-	by Jonas S Karlsson
-      </div>
-
-      <div style='font-size:1rem; display:inline-block;'>
-	&copy; 2020 jsk@yesco.org
+	&copy;2020 <a href='email:jsk@yesco.org' style='color:blue; background:yellow;'>Jonas S Karlsson</a>
       </div>
 
     </div>
@@ -5031,12 +5028,18 @@ function wget(url, cb) {
     s.remove();
     delete wget.cb[n];
   };
-  if (url == 'g.coom') {
+
+  // hardcode some chached files for debug
+  if (url == 'R.C') {
+    s.src = 'runeberg.org3';
+  } else if (url == 'G.C') {
     s.src = 'google.com.js';
   } else {
     s.src = 'http://yesco.org/wget.pl?jsonp=(wget.cb['+n+'])&'+url;
   }
+
   console.log(s.src);
+
   // TODO: cleanup on error
   s.onerror = 'alert("load err");';
   s.onload  = 'alert("load ok");';
@@ -5048,7 +5051,7 @@ wget.db = {}; // what? cache?
 wget.form = {};
 
 
-function img2teletext(tag, src, alt) {
+function img2teletext(tag, src, alt, lid, n) {
   // TODO: generalize
   if (alt === 'Google') {
     /* wow, this was difficult:
@@ -5100,7 +5103,7 @@ function img2teletext(tag, src, alt) {
     // - with spacing (depend width?)
     // - generate TELETEXT of alt-text
     // - generate lores image
-    return ` [IMG ${lid}&nbsp;\u0112\u0100${alt?alt:''}&nbsp;\u0200\u0212] `;
+    return `\u0116${n}:${alt?alt:''}\u0216`;
   }
 }
 
@@ -5119,7 +5122,7 @@ function HTML2TELETEXT(nid, h) {
   // - \u0112 set green back START
   // - \u0212 set green back END (matching)
 
-  let scandimap = {'Æ': 'AE', 'Å': "A'", 'å':"a'", 'Ä':'a"', 'ä':'a"', 'Ð':'D-', 'ð':'TH', 'Ø':':0/', 'ø':'o/', 'Ö':'O"', 'ö':'o"', 'Þ':'TH|', 'þ':'TH|'};
+  let scandimap = {'Æ': 'AE', 'Å': "A'", 'å':"a'", 'Ä':'A"', 'ä':'a"', 'Ð':'D-', 'ð':'TH', 'Ø':':0/', 'ø':'o/', 'Ö':'O"', 'ö':'o"', 'Þ':'TH|', 'þ':'TH|'};
   let scandis = RegExp('([ÆÅåÄäÐðØøÖöÞþ])', 'g');
 
   function getAttr(s, name) {
@@ -5134,17 +5137,86 @@ function HTML2TELETEXT(nid, h) {
     return val?val:'';
   }
     
+  // debug latin-1... lol
+  // .replace(/([^\x20-\x7f])/ig,
+  //   c=>c+'['+c.charCodeAt(0)+']')
+ 
+
   // TODO: replace inside out, innermost <>
   let n = 0;
   h = h
-    .replace(/&raquo;/ig, '>>')
+    .replace(/&raquo;/ig, '&gt;&gt;')
     .replace(/&copy;/ig, '\`')
 
     .replace(/\r/g, '\n')
     .replace(/[\x00-\x09\x11-\x1F]/g, '')
     .replace(/\xa0/g, '\u0320' /*nbsp*/)
-    .replace(/\ufffd/g, ' ' /*unknown*/)
+    .replace(/\ufffd/g, '(?)' /*unknown*/)
 
+    .replace(/\u00BB/ig, '&gt;&gt;')
+    .replace(/\u203a/ig, '&gt;')
+    .replace(/\u201[89ab]/ig, "'")
+    .replace(/\u201[cdef]/ig, '"')
+
+    .replace(/\u2010/ig, '-')
+    .replace(/\u2011/ig, '-')
+    .replace(/\u2012/ig, '-')
+    .replace(/\u2013/ig, '--')
+    .replace(/\u2014/ig, '---')
+    .replace(/\u2015/ig, '--')
+    .replace(/\u2016/ig, '||')
+    .replace(/\u2017/ig, '_')
+    .replace(/\u2018/ig, '_')
+    .replace(/\u2020/ig, '+')
+    .replace(/\u2021/ig, '++')
+    .replace(/\u2022/ig, '*')
+    .replace(/\u2023/ig, '|&gt;')
+    .replace(/\u2023/ig, '|&gt;')
+    .replace(/\u202[47]/ig, '.')
+    .replace(/\u2025/ig, '..')
+    .replace(/\u2026/ig, '...')
+    .replace(/\u2028/ig, '\n')
+    .replace(/\u2029/ig, '<p>')
+    .replace(/\u2030/ig, '%o')
+    .replace(/\u2031/ig, '%oo')
+    .replace(/\u203[25]/ig, "'")
+    .replace(/\u203[36]/ig, "''")
+    .replace(/\u203[47]/ig, "'''")
+
+    .replace(/\u2045/ig, '[-')
+    .replace(/\u2046/ig, '-]')
+    .replace(/\u2047/ig, '??')
+    .replace(/\u2048/ig, '?!')
+    .replace(/\u2049/ig, '!?')
+    .replace(/\u2049/ig, '!?')
+
+    .replace(/\u204c/ig, '*|')
+    .replace(/\u204d/ig, '|*')
+    .replace(/\u204[e5]/ig, '*')
+    .replace(/\u2053/ig, '~')
+
+    .replace(/\u2038/ig, '^')
+    .replace(/\u2039/ig, '&lt;')
+    .replace(/\u203a/ig, '&gt;')
+    .replace(/\u203b/ig, '***')
+    .replace(/\u203c/ig, '!!')
+    .replace(/\u203d/ig, '!?')
+    .replace(/\u2044/ig, '/')
+
+    .replace(/\u2056/ig, '.:')
+    .replace(/\u2057/ig, "''''")
+    .replace(/\u2058/ig, '.:.')
+    .replace(/\u2059/ig, ':.:')
+    .replace(/\u205a/ig, ':')
+    .replace(/\u205b/ig, '.:.')
+    .replace(/\u205c/ig, '.+.')
+    .replace(/\u205d/ig, ':::')
+
+    .replace(/\u00e0/ig, "'a")
+    .replace(/\u00e8/ig, "'e")
+    .replace(/\u00e9/ig, "e'")
+
+  
     .replace(/\u2014/g, '-'/*nobrdash*/)
     .replace(/\ufeff/g, '')
     .replace(scandis,
@@ -5162,33 +5234,67 @@ function HTML2TELETEXT(nid, h) {
 	let src = getAttr(a, 'src');
 
 	// TODO:? use diff counter for images
-	n++;
+	// use filename
+	if (!alt)
+	  [alt] = rget(src, /\/([\w\-]+)[^\/]*$/);
 
+	let have = wget.url[`${nid} ${src}`];
+	if (have)
+	  return `\u0116${have} \u0216`;
+
+	n++;
 	let lid = `${nid} ${n}`;
 	wget.url[lid] = src;
+	wget.url[`${nid} ${src}`] = n;
 
-	return img2teletext(a, src, alt);
+	return img2teletext(a, src, alt, lid, n);
       })
 
-    .replace(/<br[\s\S]*?>/g, '\n')
-    .replace(/<hr[\s\S]*?>/g, '\n--------------------\n')
+    .replace(/<br[\s\S]*?>/g, '\u030a')
+    .replace(/<hr[\s\S]*?>/g, '\u030a--------------------\u030a')
 
-    .replace(/<b>([\s\S]*?)<\/b>/g, '\u0101$1\u0201')
-    .replace(/<i>([\s\S]*?)<\/i>/g, '\u0105$1\u0205')
+    .replace(/<b>([\s\S]*?)<\/b>/ig, '\u0101$1\u0201')
+    .replace(/<i>([\s\S]*?)<\/i>/ig, '\u0105$1\u0205')
 
     .replace(
-      /\s*<a [\s\S]*?>\s*([\s\S]*?)\s*<\/a>\s*/g,
+      /\s*<a [\s\S]*?>\s*([\s\S]*?)\s*<\/a>\s*/ig,
       (a, txt)=>{
+	// TODO: runeberg.org <a><i>xx</i></a> gets to be magnenta - cannot be recogn as link.... :-(
+          //<li>Henrik Berg, <a href="/bhspansk/" ><i>Spanska sjukan och dess botande enligt den fysikaliska läkemetoden</i></a> (1918)
+	// TODO: relative links... 
+	// /foo.bar
+	// foo.bar
+	// ../foo.bar
+
 	let href = getAttr(a, 'href');
-	n++;
 	// save as '1 2'
 	// and     '1 TXT'
+	n++;
 	wget.url[`${nid} ${txt}`] = href;
 	let lid = `${nid} ${n}`;
 	wget.url[lid] = href;
 	return '\u0104' + txt + '\u0204';
       })
     .replace(/\u0204(\s+)\u0104/g, '\u0304$1')
+
+    .replace(/<iframe[\s\S]*?>/g, (a)=>{
+      let src = getAttr(a, 'src');
+      if (!src) return;
+      
+      // TODO: generalize and use for others, mayhbe can use title, alt //
+     
+      let [txt] = rget(src, /\/([\w\-\.]+)[^\/]*$/);
+
+      n++;
+      txt = 'IFRAME:' + (txt?txt:n);
+
+      // TODO: similar to <a ...
+      wget.url[`${nid} ${txt}`] = src;
+      let lid = `${nid} ${n}`;
+      wget.url[lid] = src;
+      return '\u0104' + txt + '\u0204';
+    })
+
     .replace(/<button[\s\S]*?>([\s\S]*?)<\/button>/g, '[? $1 ]')
     .replace(
       /<input[\s\S]*?>/g,
@@ -5236,11 +5342,12 @@ ${value}
       })
 
     .replace(/<(\w+)[\s\S]*?>/g, '<$1>')
+
     .replace(/<!--[\s\S]*?-->/g, '')
-    .replace(/<head[\s\S]*?\/head>/g, '')
     .replace(/<title[\s\S]*?\/title>/g, '')
     .replace(/<style[\s\S]*?\/style>/g, '')
     .replace(/<script[\s\S]*?\/script>/g, '')
+    .replace(/<head[\s\S]*?\/head>/g, '')
     .replace(
       /<pre>([\s\S]*?)<\/pre>/gi,
       (a)=>a.replace(/\n/g, '\u030a\u0320\u0320')
@@ -5260,6 +5367,15 @@ ${value}
     .replace(/<h2>([\s\S]*?)<\/h2>/g, '\n\u0112\u0100$1\n\u0212\u0200')
     .replace(/<h3>([\s\S]*?)<\/h3>/g, '\n\u0113\u0100$1\n\u0213\u0200')
     .replace(/<h4>([\s\S]*?)<\/h4>/g, '\n\u0116\u0100$1\n\u0216\u0200')
+
+    .replace(/<table>/g, '{{{' /* TODO: maybe show table as outline? */)
+    .replace(/<\/table>/g, '}}}\u030a')
+    .replace(/<tr>([\s\S]*?)<\/tr>/g, '{$1}\u030a')
+    .replace(/<\/td>\s*<td>/g, '|')
+    .replace(/(<td>|<\/td>)/g, '|')
+    .replace(/<th>([\s\S+]*?)<\/th>/g, '\u0101$1\u0201')
+    .replace(/(<th>\s*<\/th>)/g, '|')
+
     .replace(/<[\s\S]*?>/g, ' ')
 
     .replace(/ +/g, ' ')
@@ -5270,8 +5386,13 @@ ${value}
     .replace(/&nbsp;/ig, '\u0320')
     .replace(/&gt;/ig, '>')
     .replace(/&lt;/ig, '>')
-    .replace(/&amp;/ig, '&')
+    .replace(/&#8594;/ig, '->')
+    .replace(/&#8593;/ig, '^')
+    .replace(/&#8592;/ig, '<-')
+    .replace(/&#8591;/ig, 'v')
+    .replace(/&#8590;/ig, '<-')
 
+    .replace(/&amp;/ig, '&')
 
     .trim();
   return h;
@@ -5377,23 +5498,25 @@ function showPage(h, err, nid, url){
     // escape control codes
     if (ch != 10 && c != 27 && ch < 32) {
       if (lastwasspace ||
-	  (lastwasink && isink(ch)) ||
-	  (lastwaspaper && ispaper(ch))) {
+	  (lastwasink && isink(c7)) ||
+	  (lastwaspaper && ispaper(c7))) {
 	// how about more levels... lol
 	if (col > 2) col--; // BS
       }
       // update
-      if (isink(ch)) {
-	cink = ch;
+      if (isink(c7)) {
+	cink = c7;
 	lastwasink = 1;
       }
-      if (ispaper(ch)) {
-	cpaper = ch;
+      if (ispaper(c7)) {
+	cpaper = c7;
 	lastwaspaper = 1;
       }
 
+      // TODO: 107 is start white ink
+      // how about inverse?
       putc(ESC);
-      putc(ch+64);
+      putc(c7+64);
       // TODO: if write at last pos...?
       lastwasspace = true;
       // no return as this might have wrapped line and we need fall through for cols
@@ -5417,6 +5540,8 @@ function showPage(h, err, nid, url){
       //lastwasspace = false;
 
       putc(ch);
+      //putc('.'.charCodeAt(0));
+      //if (ch > 128 || ch < 32) princ('['+ch+']');
     }
 
     // at newline need continue color
@@ -5639,7 +5764,9 @@ still italic</i>back to bold</b>back to default<p>
     if (k=='p') showStatus(printerToggle());
     if (k=='t') { showStatus(caps = !caps); e.preventDefault(); }
     if (k=='o') showStatus(scoff=scoff?0:1);
+    // TODO: should save&rest. cursorpos!
     if (k=='s') showStatus(scstop=!scstop);
+
     if (k=='d') { showStatus(double=!double); e.preventDefault(); }
 
     if (k=='j') showStatus(column=2-column);
