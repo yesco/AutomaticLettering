@@ -1733,7 +1733,7 @@ CODE CHARACTER Control Code
 
     if (col >= SCREEN_COLS) {
       row++;
-      col = 2;
+      col = column;
     }
     
     if (row >= SCREEN_ROWS) {
@@ -5143,10 +5143,39 @@ function HTML2TELETEXT(nid, h) {
  
 
   // TODO: replace inside out, innermost <>
-  let n = 0;
+
+  // short number for linmks/images
+  let n = 0; 
+
+  // TODO: https://www.gsp.com/cgi-bin/man.cgi?section=1&topic=uni2ascii
+  // - http://www.ibiblio.org/pub/packages/ccic/software/unix/convert/utf7/
+  // - https://gitlab.freedesktop.org/poppler/poppler/blob/poppler-0.75.0/poppler/UTF.cc#L433  (a PDF renderer?)
+  // - https://github.com/kmike/text-unidecode
+  // - https://metacpan.org/pod/Text::Unidecode
+  // - https://github.com/avian2/unidecode
+  // - https://www.npmjs.org/package/unidecode
+  // - https://github.com/FGRibreau/node-unidecode
+  // a11y or aria acceccible,names
+  // - https://www.kirupa.com/html5/emoji.htm
+  // <p role="img" aria-label="hamburger">🍔</p>
+  // - https://github.com/iamcal/emoji-data
+  // - https://github.com/bengarrett/RetroTxt
+  // !!!!
+
   h = h
     .replace(/&raquo;/ig, '&gt;&gt;')
     .replace(/&copy;/ig, '\`')
+    .replace(/&#x(\S+);/ig,
+	     (a,h)=>String.fromCharCode(parseInt(h, 16)))
+	     
+    .replace(/&#(\d+);/ig,
+	     (a,d)=>String.fromCharCode(+d))
+
+    .replace(/\u218e/ig, '<-')
+    .replace(/\u218f/ig, 'v')
+    .replace(/\u2190/ig, '<-')
+    .replace(/\u2191/ig, '^')
+    .replace(/\u2192/ig, '->')
 
     .replace(/\r/g, '\n')
     .replace(/[\x00-\x09\x11-\x1F]/g, '')
@@ -5155,9 +5184,19 @@ function HTML2TELETEXT(nid, h) {
 
     .replace(/\u00BB/ig, '&gt;&gt;')
     .replace(/\u203a/ig, '&gt;')
-    .replace(/\u201[89ab]/ig, "'")
-    .replace(/\u201[cdef]/ig, '"')
+    .replace(/[\u2018-\u201b]/ig, "'")
+    .replace(/[\u201c-\u201f]/ig, '"')
 
+    .replace(/[\u0300\u0301\u0307\u0309\u030a\u030c-\u030e\u0310-\u0315\u031a\u0319]/g, "'")
+    .replace(/[\u030b\u030f]/g, '"')
+    .replace(/[\u0324\u032a-\u032f\u033a]/g, '__')
+    .replace(/[\u0316-\u0319\u031c-\u0323\u0334-\u0345\u0339]/g, ',')
+    .replace(/[\u0335-\u0336]/g, '-')
+    .replace(/[\u0337-\u0338]/g, '/')
+
+    .replace(/[\u0300-\u036f]/g, '^^' /* all accent crap! */)
+
+    .replace(/\u0320/ig, '-')
     .replace(/\u2010/ig, '-')
     .replace(/\u2011/ig, '-')
     .replace(/\u2012/ig, '-')
@@ -5172,16 +5211,16 @@ function HTML2TELETEXT(nid, h) {
     .replace(/\u2022/ig, '*')
     .replace(/\u2023/ig, '|&gt;')
     .replace(/\u2023/ig, '|&gt;')
-    .replace(/\u202[47]/ig, '.')
+    .replace(/[\u2024\u2027]]/ig, '.')
     .replace(/\u2025/ig, '..')
     .replace(/\u2026/ig, '...')
     .replace(/\u2028/ig, '\n')
     .replace(/\u2029/ig, '<p>')
     .replace(/\u2030/ig, '%o')
     .replace(/\u2031/ig, '%oo')
-    .replace(/\u203[25]/ig, "'")
-    .replace(/\u203[36]/ig, "''")
-    .replace(/\u203[47]/ig, "'''")
+    .replace(/[\u2032\u2035]/ig, "'")
+    .replace(/[\u2033\u2036]/ig, "''")
+    .replace(/[\u2034\u2037]/ig, "'''")
 
     .replace(/\u2045/ig, '[-')
     .replace(/\u2046/ig, '-]')
@@ -5192,7 +5231,7 @@ function HTML2TELETEXT(nid, h) {
 
     .replace(/\u204c/ig, '*|')
     .replace(/\u204d/ig, '|*')
-    .replace(/\u204[e5]/ig, '*')
+    .replace(/[\u204e\u2045]/ig, '*')
     .replace(/\u2053/ig, '~')
 
     .replace(/\u2038/ig, '^')
@@ -5216,7 +5255,6 @@ function HTML2TELETEXT(nid, h) {
     .replace(/\u00e8/ig, "'e")
     .replace(/\u00e9/ig, "e'")
 
-  
     .replace(/\u2014/g, '-'/*nobrdash*/)
     .replace(/\ufeff/g, '')
     .replace(scandis,
@@ -5259,6 +5297,8 @@ function HTML2TELETEXT(nid, h) {
     .replace(
       /\s*<a [\s\S]*?>\s*([\s\S]*?)\s*<\/a>\s*/ig,
       (a, txt)=>{
+	// https://news.ycombinator.com/ -> links errononious1
+
 	// TODO: runeberg.org <a><i>xx</i></a> gets to be magnenta - cannot be recogn as link.... :-(
           //<li>Henrik Berg, <a href="/bhspansk/" ><i>Spanska sjukan och dess botande enligt den fysikaliska läkemetoden</i></a> (1918)
 	// TODO: relative links... 
@@ -5386,13 +5426,18 @@ ${value}
     .replace(/&nbsp;/ig, '\u0320')
     .replace(/&gt;/ig, '>')
     .replace(/&lt;/ig, '>')
-    .replace(/&#8594;/ig, '->')
-    .replace(/&#8593;/ig, '^')
-    .replace(/&#8592;/ig, '<-')
-    .replace(/&#8591;/ig, 'v')
-    .replace(/&#8590;/ig, '<-')
-
+    .replace(/&quot;/ig, '"')
+    .replace(/&.squo;/ig, "'")
+    .replace(/&.dquo;/ig, '"')
+    .replace(/&lsaquo;/ig, '<')
+    .replace(/&rsaquo;/ig, '>')
+    .replace(/&ndash;/ig, '-')
+    .replace(/&mdash;/ig, '--')
+    .replace(/&circ;/ig, '^')
+    .replace(/&tilde;/ig, '~')
+    .replace(/&permil;/ig, '%o')
     .replace(/&amp;/ig, '&')
+    .replace(/&eur;/ig, 'EUR')
 
     .trim();
   return h;
