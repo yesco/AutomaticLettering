@@ -157,11 +157,6 @@
     error("?DISP MISMATCH ERROR", info);
   }
 
-  // NEW?
-  function save_error(info) {
-    error("?CAN'T SAVE", info);
-  }
-
   function syntax_error(cmd) {
     error('?SYNTAX ERROR: ', cmd);
   }
@@ -512,8 +507,8 @@ g
   </div>
 
   <!--- ORIC SCREEN --->
-  <div style='xalign-self: right;'>
-    <div id='screen' class='text' >
+  <div style=''>
+    <div id='screen' class='text' style='text-align:left;'>
     </div>
   </div>
 
@@ -754,10 +749,10 @@ INFO:<br><span id='info'></span><br>
   // Configuration
   let TIMESLICE = 20; // run about X ms
 
-  const SCREEN_COLS = 40, // ORIC: 40
-	SCREEN_ROWS = 28, // ORIC: 28
+  var SCREEN_COLS = 40, // ORIC: 40
+      SCREEN_ROWS = 28, // ORIC: 28
 	
-	LastOne = 'foo';
+      lastOne = 'foo';
 
   // Global ORIC ATMOS state
   var vars = {},
@@ -782,7 +777,7 @@ INFO:<br><span id='info'></span><br>
 
       // 0=TEXT=LORES0, 1=LORES1, -1=HIRES
       gedit = false,
-      lores = 0,
+      lores = -1, // set to HIRES to force init
       curx = 0,
       cury = 0;
 
@@ -826,7 +821,8 @@ INFO:<br><span id='info'></span><br>
     ink = 0;
 
     gedit = false;
-    lores = 0;
+    lores = -1; // set to HIRES to force init
+
     curx = 0;
     cury = 0;
     
@@ -848,8 +844,8 @@ INFO:<br><span id='info'></span><br>
     cont.millis = 0;
 
     // action
+    TEXT();
     CLS();
-    showStatus();
     print(
 `ORIC EXTENDED BASIC V1.2
 \` 1983 TANGERINE
@@ -857,11 +853,27 @@ INFO:<br><span id='info'></span><br>
  372631 BYTES FREE`);
   }
 
-  // TODO: define imgs for each character?
-  // then we can 'poke' to change them?
+  function TEXT(orows, ocols) {
+    // DOC: Goes to TEXT mode
+    // New: ROWS, COLS argument!
 
-  // TODO: calling twice messes something up
-  function TEXT() {
+    let sc;
+    if (orows && ocols) {
+      sc = screenSaved();
+
+      // change screen size!
+      SCREEN_ROWS = INT(orows);
+      SCREEN_COLS = INT(ocols/2+1)*2; // even
+    } else if (hires()) {
+      // HIRES!
+      // make it TEXT
+    } else {
+      // we're already in TEXT mode
+      // keep screen
+      return;
+    }
+
+    dom('screen').innerHTML = '';
     for(let row=0; row<SCREEN_ROWS; row++) {
       let r = '';
       // lol, let's create one extra as the last character is kind of hidden...
@@ -873,8 +885,20 @@ INFO:<br><span id='info'></span><br>
       }
       dom('screen', r+'</br>', 'ah');
     }
-
     domc.cache = {};
+    CLS();
+    if (sc) screenDraw(sc);
+
+    if (orows && ocols) {
+      // let it redraw, and schedule resize!
+      setTimeout(window.onresize, 1000);
+    }
+
+    lores = 0;
+    if (col >= SCREEN_COLS)
+      col = SCREEN_COLS - 1;
+    if (row >= SCREEN_ROWS)
+      row = SCREEN_ROWS - 1;
   }
   
   // mode: 0 or 1
@@ -1243,8 +1267,9 @@ So far the subject of writing
     if (printer) printer(s);
 
     for(let i=0; i<s.length; i++) {
+      if (y >= SCREEN_ROWS) break;
       screen(y, x, s.charCodeAt(i));
-      if (++x >= 40) {
+      if (++x >= SCREEN_COLS) {
 	x = 0; y++;
       }
     }
@@ -1267,7 +1292,7 @@ So far the subject of writing
   
   function ROW() {
     // DOC: New: Row number
-    return row;
+    return row-1;
   }
   
   // return text for one line,
@@ -1500,11 +1525,12 @@ So far the subject of writing
     g.ink = sc.gedit.ink || ink;
     g.paper = sc.gedit.paper || paper; 
 
-    let rows = Math.min(SCREEN_ROWS, sc.rows);
-    let cols = Math.min(SCREEN_COLS, sc.cols);
-    for(let r=0; r<rows; r++) {
+    // loop over recorded size, clip if need
+    for(let r=0; r<sc.rows; r++) {
+      if (r >= SCREEN_ROWS-1) break;
       let h = sc[r];
-      for(let c=0; c<cols; c++) {
+      for(let c=0; c<sc.cols; c++) {
+	if (c >= SCREEN_COLS-1) break;
 	let ch = parseInt(h.substr(c*2, 2), 16);
 	screen(r, c, ch);
       }
@@ -1911,7 +1937,7 @@ CODE CHARACTER Control Code
   function CLS() {
     let start = Date.now();
     fill(0, 0, SCREEN_ROWS, SCREEN_COLS, 32);
-    row = 1; col = 2; raw = false;
+    row = 1; col = column; raw = false;
     PAPER(paper);
     INK(ink);
     //dom('error', 'CLS time ' + (Date.now()-start));
@@ -2915,7 +2941,7 @@ already,then skip
 
   function ASC(s) {
     // DOC: get ascii number from string
-    tString(s, s === '');
+    tStr(s, s === '');
     return s.charCodeAt(0);
   }
 
@@ -3250,8 +3276,8 @@ $276,$277 Spare counter — also used by WAIT (and printer in V1.0).
 
     const HIRES = 0xA000;
     const HIRES_LEN = 8000;
-    const HIRES_TEXT = 0xBF68;
-    const HIRES_TEXT_LEN = 120;
+    const HIRES_TEXT = 0xBF68; // 25x40=1000 chars, i.e. 26th line!
+    const HIRES_TEXT_LEN = 120; // 3 lines
 
     // TODO: charset moves?
     const HIRES_CHARS = 0x9800;
@@ -3510,33 +3536,132 @@ $276,$277 Spare counter — also used by WAIT (and printer in V1.0).
   }
   
   // For the HIRES screen: 
-  // CSAVE"filename",A40960,E48000 (48K)
-  // CSAVE"filename",A8192,EIS232 (16K)
+  // CSAVE"filename",A40960,E48000 (48K) // a000 % 16K = 2000
+  // CSAVE"filename",A8192,EIS232 (16K)  // 2000
   //
   // For the TEXT and LORES screens: 
-  // CSAVE"filename",A48000,E49119 (48K)
-  // CSAVE"filename",Al5232,El635l (16K)
+  // CSAVE"filename",A48000,E49119 (48K) // bb80 % 16K = 3b80
+  // CSAVE"filename",Al5232,El635l (16K) // 3b80
   //
-  function CSAVE(name, opt) {
+  function CSAVE(p) {
     // DOC: Save program lines
     // foo - in localStorage
     // TODO: Implement AUTO
     // TODO: "foo.tap" - download
     // TOOD: load/save memory (screens)
-    if (!name) name = '';
-    if (opt) return save_error('USING '+opt);
+
+    let name;
+    if (p.val().endswith('$'))
+      name = expression(p);
+    else 
+      name = p.get('name');
+    if (!name) syntax_error('NO NAME');
+
     name = name.replace(/"/g, '');
-    if (name.match(/^\w+/)) {
-      let src = Object.keys(lines)
-	  .map(lno=>`${lno} ${lines[lno]}\n`)
-	  .join('');
-      let lns = src.match(/\n/g).length;
-      if (trace) print(src);
-      lsput('CSAVE:' + name, src);
-      princ(lns); 
-      print('lines saved in ' + name);
+    
+    let A, E, type;
+    if (p.skip(',')) {
+      if (p.skip('TEXT')) {
+	A = 48000; E = 49119;
+      } else if (p.skip('HIRES')) {
+	A = 40960; E = 480000;
+      } else if (p.skip('A')) {
+	A = p.getnum();
+	p.skip(',') || syntax_error(',');
+	p.skip('E') || syntax_error('E');
+	E = p.getnum();
+      } else {
+	syntax_error();
+      }
     } else {
-      save_error('BAD NAME: '+name);
+      type = 'BASIC';
+    }
+
+    // identify (TODO: how about 16K? - no care? it's modulo 16K!))
+    if (A == 48000 && E== 49119) type = 'TEXT';
+    if (A == 40960 && E== 48000) type = 'HIRES';
+
+    if (A === undefined) {
+      if (name.match(/"/)) {
+	// save program in .tap-file
+	impl_error("CSAVE: can't save tap file yet!");
+	// TODO: we can't just save memory as we don't encode programs in tokens...
+      } else {
+	// save program in localStorage
+	let src = Object.keys(lines)
+	    .map(lno=>`${lno} ${lines[lno]}\n`)
+	    .join('');
+	let lns = src.match(/\n/g).length;
+	if (trace) print(src);
+	lsput('CSAVE:' + name, src);
+	princ(lns); 
+	print('lines saved in ' + name);
+      }
+    } else {
+      // save "memory"
+      // https://wiki.defence-force.org/doku.php?id=oric:hardware:tape_encoding
+      // File Encoding:
+      //
+      // 0-3: 4 sync: (four++ ok) #16
+      // 4-4: 1 end sync #24
+      // 5-6: 2 reserved bytes (ffff=mem/00ff=bas)
+      // 7-8: type (#00=basic/data, #80=code)
+      // 9-10: run (#80=basic,#c7=code, not)
+      // 11-12: 2 byte bigendian E
+      // 13-14: 2 byte bigendian A
+      // 15-15: 1 reserved byte
+      // 16-: max16 chars, 0-terminated name
+      // --: (E-A+1) bytes body
+/* example: cauldron-hires.tap (8057 bytes, two programs, one loader)
+
+00000000  16 16 16 16 24 ff ff 00  c7 05 13 05 01 ff 00 11  |....$...........|
+          sync------- end ???? bas cd end-- start ?? \0 
+00000010  05 0a 00 b1 30 3a b2 37  3a a2 3a b6 22 22 00 00  |....0:.7:.:.""..|
+                                         HIRES?      endp
+00000020  00 00 \                                           |..
+          16 16 16 16 24 00 ff 80  00 bf 3f a0 00 00        ....$.....?...|
+00000030  63 61 75 6c 64 72 6f 6e  00 40 40 40 40 40 40 40  |cauldron.@@@@@@@|
+00000040  40 40 40 40 40 40 40 40  40 40 40 40 40 40 40 40  |@@@@@@@@@@@@@@@@|
+
+   example: orickong.tap (basic, single program)
+
+00000000  16 16 16 24 00 ff 00 00  31 b4 05 01 00 4f 52 49  |...$....1....ORI|
+          sync 3!- end ???? bas nt E---- A---- rn filename
+00000010  43 4b 4f 4e 47 00 24 05  01 00 58 d4 39 3a 59 d4  |CKONG.$...X.9:Y.|
+          ---filename--- \0 aa---  10--- X  =  9  :  Y  =
+...
+00002ca0  30 00 a3 31 8b c4 91 20  22 47 41 4c 49 42 45 52  |0..1... "GALIBER|
+00002cb0  54 22 2c 31 30 30 30 00  b2 31 8c c4 91 20 54 49  |T",1000..1... TI|
+          T  "  ,  1  0  0  0  end nexta linno DATA' 'T I
+00002cc0  4c 54 2c 31 30 30 00 00  00 58                    |LT,100...X|
+                            endp----- X (variable!)
+
+   Example; google.tap (hires, two files!)
+
+00000000  16 16 16 16 24 ff ff 00  c7 05 13 05 01 ff 00 11  |....$...........|
+00000010  05 0a 00 b1 30 3a b2 37  3a a2 3a b6 22 22 00 00  |....0:.7:.:.""..|
+00000020  00 00 \
+          16 16 16 16 24 00 ff 80  00 bf 3f a0 00 00  |......$.....?...|
+          sync------- end ???? cde not end- start ?? 
+00000030  67 6f 6f 67 6c 65 00 40  40 40 40 40 40 40 40 40  |google.@@@@@@@@@|
+          name------------- \0 data---------------------->
+00000040  40 40 40 40 40 40 40 40  40 40 40 40 40 40 40 40  |@@@@@@@@@@@@@@@@|
+*/
+      let header = [
+	0x16, 0x16, 0x16, 0x16, // 0-3: 4 sync: (3+ ok!) #16
+	0x24, // 4-4: 1 end sync #24
+	0x00, 0xff, // 5-6: 2 reserved bytes (ffff=mem/00ff=bas?)
+	basic ? 0x00 : 0x80, // 7-8: type (#00=basic/data, #80=code)
+	run ? (basic ? 0x80 : 0xc7) : 00, // 9-10: run (#80=basic,#c7=code, not)
+	E % 256, INT(E / 256), // 11-12: 2 byte bigendian E
+	A % 256, INT(A / 256), // 13-14: 2 byte bigendian A
+	0xff, // 15-15: 1 reserved byte
+      ].concat(name.split(''), 0x00); // 16-: max16 chars, 0-terminated name
+	  
+      let bytes = new Uint8Array(E-A+1 + header.length); // (E-A+1) bytes body
+      bytes.fill(0);
+      
+
     }
   }
 
@@ -3786,8 +3911,6 @@ l80 REM*** WAUES ***
     return Math.floor(Math.random()*n);
   }
   
-  TEXT();
-
   boot(); //run('boot'); prints prommpt
   prompt();
 
@@ -3873,6 +3996,7 @@ errorObj : ${errorObj}
     else
       c = c.toLowerCase();
     line += c;
+    if (line.length == 79) PING();
     putc(c.charCodeAt(0)); // lol
 
     cursorShow();
@@ -4913,18 +5037,24 @@ Z zoom? Zoom?
     cursorShow();
   }
 
-  function clearline(r, optCol) {
-    optCol = optCol || 0;
+  function clearline(optRow, optCol) {
+    //return;
+    // clears current line (or given)
+    // (optional from col)
+    optCol = (optCol===undefined) ? column : optCol;
+    optRow = (optRow===undefined) ? row : optRow;
     iplot(
-      optCol,
-      typeof r==='number'?r:row,
-      SPC(40-optCol));
+      optCol, optRow,
+      SPC(SCREEN_COLS-optCol));
   }
 
   function showStatus() {
     function update(col, status, msg) {
-
       if (col < 0) col += SCREEN_COLS;
+      let endcol = col + msg.length;
+      if (0 && endcol >= SCREEN_COLS)
+	msg = msg.substr(
+	  0, msg.length - (endcol-SCREEN_COLS));
       iplot(col, 0,
 	   status ? msg : SPC(msg.length));
     }
@@ -4943,7 +5073,7 @@ Z zoom? Zoom?
     update(-4, caps, 'CAPS');
 
     // CTRL-P: toggle printer
-    update(-4 -2 -7, printer, 'PRINTER');
+    update(-4 -1 -7, printer, 'PRINTER');
     
     // CTRL-O: toggle screen (centered)
     update(Math.floor(SCREEN_COLS-10)/2,
@@ -4998,7 +5128,7 @@ Z zoom? Zoom?
 	iplot(0, 0, dispid);
 
 	let index = ' ' + q.length;
-	iplot(40-index.length, 0, index);
+	iplot(SCREEN_COLS-index.length, 0, index);
       }
     } else {
       clearline(0); iplot(0,0,'\1FAIL: '+id);
@@ -5468,7 +5598,7 @@ function urlView(url) {
 function showPage(h, err, nid, url){
   let txt = HTML2TELETEXT(nid, h);
   let i = 0;
-  let step = 40;;
+  let step = SCREEN_COLS; // !
 
   // colors
   let isink = c7=>(c7 <= 7);

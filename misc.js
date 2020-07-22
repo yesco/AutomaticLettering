@@ -294,7 +294,9 @@ function lsdump(a, b) {
 function dom(id, optData, opt, optStyle) {
   let d = (typeof id == 'string') ?
       document.getElementById(id) : id;
-  if (!d) alert('dom(): no such dom id='+id);
+  if (!d)
+    alert('dom(): no such dom id='+id+'\n'+
+	 Error('here').stack);
   if (optData === undefined) return d;
   let prefix = '';
   if (dom.log || opt && opt.indexOf('l') >= 0) {
