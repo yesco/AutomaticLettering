@@ -18,7 +18,7 @@ function htmlParse(h) {
   function end(tag) {
     if (indent <= 0) throw Error('end: not matched: '+tag);
     let p;
-    while(indent && typeof(p=path.pop()) !== undefined) {
+    while(indent && (p=path.pop()) !== undefined) {
       indent--;
       //console.log(indent, tag, p);
       print('</'+p+'>');

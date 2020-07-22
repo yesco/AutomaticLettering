@@ -373,7 +373,7 @@
     opacity: 100%;
 }
 
-/* INVERSE */
+/* INVERT */
 /* TODO: not correct as it only blinks specified colors? */
 .inverse {
     filter: invert(100%);
@@ -772,6 +772,7 @@ INFO:<br><span id='info'></span><br>
       lineno = 0,
       caps = true,
       click = true,
+      inputMode = undefined;
       column = 2, // protected columns
       scoff = 0, // screen off if > 0 (count!)
       scstop = 0, // screen pause
@@ -815,6 +816,7 @@ INFO:<br><span id='info'></span><br>
     lineToDo = [];
     caps = true;
     click = true;
+    inputMode = undefined;
     column = 2;
     scoff = 0;
     scstop = 0;
@@ -1747,7 +1749,7 @@ CODE CHARACTER Control Code
       if (c < 128) {
 	c = ch & 0x1f;
       } else {
-	// jsk; extension - allows INVERSE!
+	// jsk; extension - allows INVERT!
 	// ORIC: gives space :-(
 	c = ch;
       }
@@ -1834,6 +1836,13 @@ CODE CHARACTER Control Code
     vars[n] = gen(...dims);
   }
 
+  function variable(p) {
+    let name = p.get('name');
+    if (!name) syntax_error('NO VAR');
+    let idx = index(p) || [];
+    return [name, idx];
+  }
+  
   // TEST:
   //   LET IF=2 => ?Syntax...
   //   LET THE=3 => ok
@@ -1844,21 +1853,27 @@ CODE CHARACTER Control Code
 
     if (p.keyword()) syntax_error('KEYWORD');
 
-    let name = p.get('name');
-    if (!name) syntax_error('NO VAR');
-
-    let arr_i = index(p) || [];
+    let [name, idx] = variable(p);
     if (!p.val('=')) syntax_error();
     let r = ensureExp(p, '=');
 
     if (trace) print('LET: ' + name + ' <= ' + r);
 
+    setvar(name, idx, r);
+  }
+  
+  // name[$][(indices) = val
+  //   indices = [] or [1,2,3] A$(1,2,3)
+  function setvar(name, idx, val) {
     // type match?
     if (name.endsWith('%')) {
-      tInt(r);
-      r = INT(r);
+      tInt(val);
+      val = INT(val);
+    } else if (name.endsWith('$')) {
+      tStr(val);
+    } else {
+      tNum(val);
     }
-    if (name.endsWith('$')) tStr(r);
 
     // array A(3,4)=77 complicates things...
     // TOOO: make a ref('A$', val)
@@ -1869,7 +1884,7 @@ CODE CHARACTER Control Code
     let nv = vars;
     let x;
     let lastx = name;
-    while ((x = arr_i.shift()) !== undefined) {
+    while ((x = idx.shift()) !== undefined) {
       if (trace) print('LOOP lastx: ' + lastx);
       if (trace) print('LOOP x: ' + x);
       // autodim (no checking!)
@@ -1878,11 +1893,13 @@ CODE CHARACTER Control Code
       if (trace) print('LOOP nv: ' + nv);
       lastx = x;
     }
+
     if (trace) print('SET: ' + (nv == vars) + ' ' + lastx);
-    nv[lastx] = r;
+    nv[lastx] = val;
   }
 
-  function EVAL(x) {
+  // TODO: enforce the same limit at expression! (see oldEVAL)
+  function oldEVAL(x) {
     try {
       if (trace) print('VARS: ' + JSON.stringify(vars));
       // pow!
@@ -1965,10 +1982,6 @@ CODE CHARACTER Control Code
     INK(ink);
     //dom('error', 'CLS time ' + (Date.now()-start));
     showStatus();
-  }
-
-  // 20 INPUT"ENTER SALE PRICE";SELL
-  function INPUT(prompt, v) {
   }
 
   function princ(txt) {
@@ -2610,8 +2623,14 @@ This command works exactly the same as a PRINT statement except that it is used 
   }
 
   // each function "return;" when can't go on
+  // TODO: enforce the same limit at expression! (see oldEVAL)
   function expression(p) {
     if (p.num()) return op(p, p.getnum());
+    if (p.type('hex')) {
+      // ORIC limited to #ffff but...
+      let h = p.get('hex').replace('#', '0x0');
+      return op(p, parseInt(h));
+    }
     if (p.str()) return concat(p, p.getstr());
     // TODO: test...
     if (p.skip('-')) {
@@ -2626,7 +2645,7 @@ This command works exactly the same as a PRINT statement except that it is used 
       return op(p, func(p, p.get('keyword')));
     }
     if (p.name())
-      return op(p, varr(p, p.get('name')));
+      return op(p, varr(p));
     if (p.skip('(')) {
       let e = expression(p);
       p.skip(')') || syntax_error('NO ")"');
@@ -2637,11 +2656,9 @@ This command works exactly the same as a PRINT statement except that it is used 
   function func(p, kw) {
     let f = window[kw];
     if (!f) throw 'Function for missing: ' + kw;
-    if (!p.skip('(')) syntax_error();
-    let a = evalArgs(p);
-    if (trace) print('ARGS: ' + a);
-    if (!p.skip(')')) syntax_error('NO )');
-    return f.apply(p, a);
+    let idx = index(p) || [];
+    if (trace) print('ARGS: ' + idx);
+    return f.apply(p, idx);
   }
 
   function concat(p, str) {
@@ -2677,7 +2694,7 @@ This command works exactly the same as a PRINT statement except that it is used 
     }
   }
 
-  function varr(p, name) {
+  function varr(p) {
 
     function retval(v) {
       if (v !== undefined) return v;
@@ -2689,8 +2706,8 @@ This command works exactly the same as a PRINT statement except that it is used 
       }
     }
 
-    let arr_i = p.val('(') && index(p);
-    if (!arr_i) return retval(vars[name]);
+    let [name, idx] = variable(p);
+    if (!idx) return retval(vars[name]);
 
     // autodim? DIM name(10)
     //if (typeof v !== 'object' || !Array.isArray(v))
@@ -2699,9 +2716,9 @@ This command works exactly the same as a PRINT statement except that it is used 
     // iterate through indices
     let i;
 
-    arr_i.unshift(name);
+    idx.unshift(name);
     let v = vars;
-    while (i = arr_i.shift()) {
+    while (i = idx.shift()) {
       if (trace) print('varr.i: ' + i);
       if (trace) print('varr.v: ' + JSON.stringify(v));
       if (trace) print('varr.type: ' + typeof v);
@@ -2956,11 +2973,72 @@ already,then skip
   function READ() {}
   function DATA() {}
   function RESTORE() {}
-  
-  // GET K$
-  function GET() {}
-  function READ() {}
-  function DATA() {}
+
+  function KEY$(p) {
+    // DOC: K$=KEY$ get key pressed, no wait
+    // If no key => ''
+    // New: Capture FUNC-key (== ALT!)
+    // ALT-A gives CHR$(128+65)
+    // CTRL-FUNC-A gives CHR$(128+1)
+    let r = lastKey;
+    lastKey = -1;
+    return lastKey < 0 ? '' :
+      String.fromCharCode(lastKey);
+  }
+
+  function processKey(k, name, idx) {
+    if (k < 0) return;
+
+    // clear it
+    lastKey = -1;
+
+    // continue running
+    inputMode = undefined;
+
+    // test value
+    let val;
+    if (name.endsWith('$')) {
+      // string
+      val = String.fromCharCode(lastKey);
+    } else {
+      // digit
+      val = k - 40; // ASC("0")
+      if (k < 0 || k > 9)
+	type_error();
+    }
+      
+    // set it
+    setvar(name, idx, val);
+
+    // consume key
+    return true;
+  }
+
+  function GET(p) {
+    // DOC: GET K$ - wait for a any key
+    // DOC: GET K - wait for a digit, or give type error
+
+    let [name, idx] = variable(p);
+    if (!name) syntax_error();
+
+    print('GET.name: '+name);
+    // no need to wait?
+    if (lastKey > 0) {
+      processKey(lastKey, name, idx);
+    } else {
+      // make it exit now (no more run)
+      forceUpdate = true;
+
+      // hookup (
+      inputMode = function(k) {
+	processKey(k, name, idx);
+      };
+    }
+  }
+
+  // 20 INPUT"ENTER SALE PRICE";SELL
+  function INPUT(prompt, v) {
+  }
 
   function ASC(s) {
     // DOC: get ascii number from string
@@ -3016,12 +3094,67 @@ already,then skip
     return ' '.repeat(n);
   }
   
-    
   function VAL(s) {
-    // Oric: doesn't even need to terminate "string in PRINT, but in VAL("FOO   have to...
-    
+    // DOC: VAL("35FOO") => 35
+    // If no number => 0
+    tStr(s);
+    s = s.replace(/\s/g, '');
+
+    // handle hex
+    if (s[0] === '#')
+      s = '0x0' + s;
+
+    parseInt(s) || 0;
   }    
   
+  function NVL(s) {
+    // DOC: New: Evaluate a number expression
+    // NVL("3+5*10") => 53
+    // Otherwise, gives ?SYNTAX or ?TYPE ERRO
+    let v = XVL$(s);
+    let n = parseInt(v);
+    if (Number.isNaN(n))
+      syntax_error(s);
+    if (typeof n !== 'number')
+      type_error(n);
+    return n;
+  }
+
+  function SVL$(s) {
+    // DOC: New: Evaluate a string expression
+    // SVL$("\"foo\"+\"bar\") +=> "foobar"
+    // Otherwise, gives ?SYNTAX or ?TYPE ERROR
+    let r = XVL$(s);
+    if (r === 'ERROR')
+      syntax_error(s);
+    let [v] = rget(/^"(.*)"$/);
+    if (v === undefined)
+      type_error();
+    return v;
+  }
+
+  function XVL$(s) {
+    // DOC: New: Evaluate an expression
+    // XVAL$("3+5*10") => "53"
+    // XVAL$("\"3+5*10\"+\"4\"") => "\"3+5*104'\"
+    // On error, return "ERROR"
+    tStr(s);
+    let p = parser(s);
+    try {
+      let r = expression(p);
+      if (typeof r === 'number')
+	return '' + r;
+      if (typeof r === 'string')
+	return '"' + r + '"';
+      type_error(r);
+    } catch(e) {
+      return 'ERROR';
+    }
+  }    
+  
+  //let p = parser(s);
+  //if 
+
   // REM comment
   // ' commment
   function REM() {}
@@ -4024,11 +4157,11 @@ errorObj : ${errorObj}
     cursorShow();
   }    
 
-  function INVERSE(...args) {
-    // DOC: New: Inverst part of the screen
-    // INVERSE row, col, len
-    // INVERSE "STR"
-    // INVERSE ' - turns off all
+  function INVERT(...args) {
+    // DOC: New: Invert part of the screen
+    // INVERT row, col, len
+    // INVERT "STR"
+    // INVERT ' - turns off all
 
     let lochar = c=>String.fromCharCode(c.charCodeAt(0)&0x7f);
       
@@ -4053,7 +4186,7 @@ errorObj : ${errorObj}
       for(let r=1; r<SCREEN_ROWS; r++) {
 	getScreenLine(r).replace(
 	  RegExp(s, 'g'), (a,i)=>
-	    INVERSE(r, i, len));
+	    INVERT(r, i, len));
       }
     }
   }
@@ -4092,7 +4225,7 @@ errorObj : ${errorObj}
     try {
 
       // TODO: use alt inverse so we don't deastroy inverse on the screen by user
-      INVERSE();
+      INVERT();
       let r = xfindAction();
       if (r) {
 	if (r.linktext) {
@@ -4138,7 +4271,7 @@ errorObj : ${errorObj}
 	clearline(0);
 	iplot(0, 0, txt.substr(0, SCREEN_COLS));
 
-	INVERSE(r.hilite);
+	INVERT(r.hilite);
       }
       return r;
 
@@ -5819,6 +5952,7 @@ function showPage(h, err, nid, url){
     }, 0); // set interval
 } // 
 
+  let lastKey;
 
   dom('exp').addEventListener('keydown', function(e) {
     let c=e.ctrlKey,a=e.altKey,s=e.shiftKey;
@@ -5826,7 +5960,36 @@ function showPage(h, err, nid, url){
     let ch = e.code;
     let kc = e.keyCode; // legacy
 
-    //console.log("KEY k='+k+' kc="+kc+" c="+c+" a="+a+" s="+s);
+    // we seem to get this all the time!?
+
+    if (k === 'camerafocus') return;
+
+    // keycodes
+    // CTRL-A == 1
+    // A      ==> 65 (with CAPS)
+    // a      ==> 97
+    // ALT-A  ==>
+    if (kc > 32) {
+      lastKey = kc;
+
+      if (c)
+	lastKey -= 64;
+      else if (!caps) {
+	if (!s) lastKey += 32;
+      }
+
+      if (a)
+	lastKey += 128;
+    }
+
+    // if set, call it
+    // if return true capture, otherwise...
+    if (inputMode) {
+      if (inputMode(lastKey)) return;
+    }
+
+    console.log(`KEY lastkey=${lastKey} k='${k}' kc=${kc} ch='${ch}' c=${c} a=${a} s=${a}`);
+
 
     // magicall show attributes!
     if (c && a)
@@ -5978,6 +6141,7 @@ still italic</i>back to bold</b>back to default<p>
     let kc = e.keyCode; // legacy
     let legc = e.charCode;
 
+    
     // override all chars in gedit mode!
     if (gedit && k.length==1)
       return GEDIT(k, kc, a, s, c, e);
@@ -6448,7 +6612,7 @@ instruction
     n=>window[n]=()=>implemented_error(n));
 
   // REMOVE non-basic names... not extensions
-  'STEP,REM,\'*,&,!,+,-,/,^,<,=,>,DBG,OKK,OKC,TEMPORARY,PERSISTENT,EVAL,HTML,STORE,GEDIT,THEN,TO,SCREEN_COLS,SCREEN_ROWS,HTML2TELETEXT,ORIC_TOKENZ,ELSE'.split(',').map(
+  'STEP,REM,*,&,!,+,-,/,^,<,=,>,DBG,OKK,OKC,TEMPORARY,PERSISTENT,HTML,STORE,GEDIT,THEN,TO,SCREEN_COLS,SCREEN_ROWS,HTML2TELETEXT,ORIC_TOKENZ,ELSE'.split(',').map(
     n=>{
       delete OricKeywords.status[n];
     });
@@ -6464,6 +6628,11 @@ instruction
 
   // ADD new words (Needs to be added!)
   ORIC_TOKENZ += 'HELP,';
+  // can't have keywords with same SUFFIX!
+  ORIC_TOKENZ += 'NVL,';
+  ORIC_TOKENZ += 'SVL$,';
+  ORIC_TOKENZ += 'XVL$,';
+
 </script>
 
 <!--

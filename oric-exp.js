@@ -322,6 +322,7 @@ function tokenizer(line, keywordz='') {
   }
 
   function letter() {
+    // TODO: capture current
     if (nextiskeyword()) return;
     return r(/[A-Z]/);
   }
