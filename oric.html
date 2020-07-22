@@ -2599,7 +2599,7 @@ This command works exactly the same as a PRINT statement except that it is used 
 	  // call with parser
 	  p.next();
 	  f.call(p, p); // redundant!
-	  if (trace) print('3CALL.done> ' + p.rest());
+	  if (trace) print('CALL.done> ' + p.rest());
 	  return true;
 	} else {
 	  if (trace) print('STMT.isNormal> ' + name);
@@ -2657,8 +2657,10 @@ This command works exactly the same as a PRINT statement except that it is used 
     let f = window[kw];
     if (!f) throw 'Function for missing: ' + kw;
     let idx = index(p) || [];
-    if (trace) print('ARGS: ' + idx);
-    return f.apply(p, idx);
+    if (trace) print('FUNC.call ' + kw + ' on '+idx);
+    let r = f.apply(p, idx);
+    if (trace) print('==> ' + r);
+    return r;
   }
 
   function concat(p, str) {
@@ -3102,9 +3104,9 @@ already,then skip
 
     // handle hex
     if (s[0] === '#')
-      s = '0x0' + s;
+      s = '0x0' + s.substr(1);
 
-    parseInt(s) || 0;
+    return parseInt(s) || 0;
   }    
   
   function NVL(s) {
