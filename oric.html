@@ -17,7 +17,14 @@
 </script>
 
 <script id='help'>
-  function HELP(cmd) {
+  function HELP(p) {
+    // DOC: New: HELP to list all words
+    // HELP CURSET
+    // HELP D   ' list words with 'D'
+    
+    let cmd = p.val();
+    cmd = cmd && cmd.replace(/"/g, '');
+    p.next();
     if (cmd) {
       // extract DOC string from function!
       let f = window[cmd];
@@ -2007,9 +2014,9 @@ CODE CHARACTER Control Code
     if (typeof pos === 'string')
       pos = -INT(SCREEN_COLS/(+pos));
     let width = (pos < 0) ? -pos : 8;
-    do {
+    while((col-column) % width !== 0) {
       putc(32);
-    } while((col-column) % width !== 0);
+    }
     
     // return '' as I think it's used in PRINT
     return '';
@@ -3096,8 +3103,7 @@ already,then skip
   // TODO: find original algrithm
   function RND(n) {
     // DOC: RND(0) - random number [0, 1[
-    // TOOD:
-    // RND(-N) always starts same sequence
+    // TOOD: RND(-N) always starts same sequence
     tNum(n);
     if (n < 0)
       error('?RND(-SEED) not implemented');
@@ -4019,10 +4025,10 @@ errorObj : ${errorObj}
   }    
 
   function INVERSE(...args) {
-    // DOC: New: Inverse part of the screen
-    // New: INVERSE row, col, len
-    // New: INVERSE "STR"
-    // New: INVERSE ' - turns off all
+    // DOC: New: Inverst part of the screen
+    // INVERSE row, col, len
+    // INVERSE "STR"
+    // INVERSE ' - turns off all
 
     let lochar = c=>String.fromCharCode(c.charCodeAt(0)&0x7f);
       
@@ -6124,8 +6130,6 @@ FRE	218	n=>n
 function
 GET	190	?s
 function
-GONONOTTHERE	247	?
-instruction
 GOSUB	155	n
 instruction
 GOTO	151	n
@@ -6443,8 +6447,8 @@ instruction
   OricKeywords.missing.forEach(
     n=>window[n]=()=>implemented_error(n));
 
-  // remove non-basic names... not extensions
-  'DBG,OKK,OKC,TEMPORARY,PERSISTENT,EVAL,HTML,STORE,GEDIT'.split(',').map(
+  // REMOVE non-basic names... not extensions
+  'STEP,REM,\'*,&,!,+,-,/,^,<,=,>,DBG,OKK,OKC,TEMPORARY,PERSISTENT,EVAL,HTML,STORE,GEDIT,THEN,TO,SCREEN_COLS,SCREEN_ROWS,HTML2TELETEXT,ORIC_TOKENZ,ELSE'.split(',').map(
     n=>{
       delete OricKeywords.status[n];
     });
@@ -6457,6 +6461,9 @@ instruction
 	k=>k.match(/^[\w\$]+$/))
       .map(k=>k.replace(/\$/g, '\\$'))
       .join(',') + ',';
+
+  // ADD new words (Needs to be added!)
+  ORIC_TOKENZ += 'HELP,';
 </script>
 
 <!--
