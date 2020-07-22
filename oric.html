@@ -1125,6 +1125,19 @@ keep on going until we're finished
     cury = cury + dy;
   }
 
+function example_CIRCLES() {
+    return`
+10 LORES 1
+20 CURSET 4,0,1
+30 DRAW 79,75,1
+40 CURSET 40,37,1
+41 LET I=1
+45 LET I=I+2
+50 CIRCLE I,2
+60 GOTO 45
+`;
+}
+
   function CIRCLE(r, m) {
     // DOC: Draws a circle of RADIUS
     // New: draw outside of screen!
