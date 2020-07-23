@@ -2076,6 +2076,7 @@ CODE CHARACTER Control Code
     let newline = true;
 
     while (!p.end()) {
+      if (p.val("'")) break;
       // only effective last
       if (p.skip(';'))
 	newline = false;
@@ -2092,7 +2093,7 @@ CODE CHARACTER Control Code
       }
     }
     if (newline) putc(10);
-    if (p.end() || p.val(':')) return true;
+    if (p.end() || p.val(':') | p.end("'")) return true;
     syntax_error(p.val());
   }
 
@@ -2252,7 +2253,7 @@ This command works exactly the same as a PRINT statement except that it is used 
 	if (c) return true;
       },
       skip(es) {
-	if (s === es) {
+	if (s === es || es === undefined) {
 	  p.next();
 	  return was;
 	}
@@ -2628,90 +2629,185 @@ This command works exactly the same as a PRINT statement except that it is used 
   //
 
   const priorities = {
-    'func': 130,
-    '(': 100,
-    '^': 90,
-    '-': 80, // unary (how to code?)
-    '+': 75, // unary     - " -
+    // 'func': 130,
+    // '(': 100,
+    '^': 100,
+    '!NOT': 100, // unary
+    '!-': 100, // unary
     '/': 70, 
     '*': 60,
     '-': 55,
     '+': 50,
     '<':40,'>':40,'=':40,'>=':40,'<=':40,'<>':40,
-    'NOT': 30,
-    'AND': 20,
+    'AND': 30,
+    'OR': 20,
     'NOT': 10,
-    'nil': 0, // used to force eval at end
+    // NOTE: don't use 0!
+    'nil': -1, // used to force eval at end
   };
     
-  function exp(p) {
+  function expression(p) {
     var ops = [];
     var vals = [];
 
-    let isop = ()=>(
-      p.type('op') ||
-	p.val('NOT') || p.val('AND') || p.val('OR') ||
-	p.val('<') || p.val('='));
-	
-    let isvalue = ()=>(
-      p.num() || p.str() || p.name() ||
-	p.keyword()
-    );
+    function prio(tok) {
+      let p  = priorities[tok];
+      if (!p) throw Error('NO prio of ' + tok);
+      return p;
+     }
 
-    // hext string number op keyworeds name
+    function calc(op, v) {
+      // unary ops
+      if (op === '!-') return -v;
+      if (op === 'NOT') return NOT(v);
+      if (op === '!NOT') return NOT(v);
+      
+      let obol = (v)=>(v ? -1 : 0);
+
+      // binary ops
+      let e = ensure(vals.pop());
+      switch(op) {
+      case '^': return Math.pow(e, v);
+      case '/': return e / v;
+      case '*': return e * v;
+      case '-': return e - v;
+      case '+': return e + v;
+	// bit valued (like NOT)
+      case 'AND': return AND(e, v);
+      case 'OR': return OR(e, v);
+	// cmp returns -1==true 0 false
+      case '<': return obol(e < v);
+      case '>': return obol(e > v);
+      case '=': return obol(e == v);
+      case '>=': return obol(e >= v);
+      case '<=': return obol(e <= v);
+      case '<>': return obol(e != v);
+      }
+      
+      throw Error('calc: unknown op ' + op);
+    }
 
     function pushop(op) {
-      if (op === undefined || op === false)
+      if (op === undefined || op === false || op === null)
 	return 0;
+      if (trace) print('pushop: ' + op);
+
       if (ops.length) {
 	// reduce ?
 
 	let top = ops.pop();
-	while (prio(top) >= prio(op)) {
+	while (top && prio(top) > prio(op)) {
+	  if (trace) print('REDUCE: ' + top);
+
 	  // reduce
 	  if (!vals.length) syntax_error(top);
 
 	  // it may pop some more...
 	  let r = calc(top, vals.pop());
+	  if  (r === undefined)
+	    throw Error('calc: ' + top + ' returned undefined!');
 
 	  vals.push(r);
 
 	  // next
 	  top = ops.pop();
+	  if (trace) print('  ops:  ' + ops);
+	  if (trace) print(' vals:  ' + vals);
 	}
 	// put back last
-	ops.push(top);
+	if (top) 
+	  ops.push(top);
       }
 
-      ops.push(op);
+      if (prio(op) > 0)
+	ops.push(op);
       return 1;
     }
 
     function pushval(v) {
       if (v === undefined || v === false)
 	return 0;
+      if (trace) print('pushval: ' + v);
 
       vals.push(v);
       return 1;
     }
 
     // process tokens till no more val/ops
-    let did = true;
+    let did = true, lastwasop = true;
     while (did && !p.end()) {
-      did = pushval( parsevalue(p) ) + 
-	pushop( parseoperator(p) );
+      did = 0;
+      // uni operator (following other operator)
+      if (lastwasop) {
+	if (p.skip('-')) { did+=pushop('!-'); continue; }
+	if (p.skip('+')) { did++; continue; }
+	if (p.skip('NOT')) { did+=pushop('!NOT'); continue; }
+      }
+
+      // lol
+      if (p.skip('_')) { did++; lastwasop=true;}
+
+      if (lastwasop) {
+	if (pushval( parsevalue(p) )) {
+	  did++;
+	  lastwasop = false;
+	}
+      }
+
+      // lol
+      if (p.skip('_')) { did++; lastwasop=true;}
+      if (pushop( parseoperator(p) )) {
+	did++;
+	lastwasop = true;
+      }
+
+      if (trace) print('  ops:  ' + ops);
+      if (trace) print(' vals:  ' + vals);
     }
 
     // pop the stack all the way
     pushop( 'nil' ); // lowest
 
-    let test = ops.pop();
-    if (test !== 'nil' || ops.length)
-      throw Error('exp: operators remaining! ' + ops);
+    if (ops.length)
+      throw Error('exp: ' + ops.length + ' operators remaining! ' + JSON.stringify(ops));
+
+    if (!vals.length) return;
+
     if (vals.length !== 1)
-      throw Error('exp: remaining values not 1: ' + vals);
+      throw Error('exp: ' + vals.length + ' remaining values: ' + JSON.stringify(vals));
     
     return vals.pop();
+  }
+
+  function parsevalue(p) {
+    if (p.num()) return p.getnum();
+    if (p.type('hex')) return VAL(p.get('hex'));
+    if (p.str()) return p.getstr();
+    if (p.keyword()) return func(p);
+    if (p.name()) return varr(p);
+    if (p.skip('(')) {
+      let e = expression(p);
+      p.skip(')') || syntax_error('NO ")"');
+      return e;
+    }
+  }
+
+  function parseoperator(p) {
+    let o = p.val();
+
+    if (o === 'AND' || o === 'OR') 
+      return p.skip();
+
+    if (o === '<' || o === '>') {
+      p.next();
+      if (p.val('=') || (o === '<' && p.val('>')) )
+	o += p.skip();
+      return o;
+    }
+
+    if (OricKeywords.type[o] === 'operator') {
+      return p.skip();
+    }
   }
 
   // 3+4*5+2*2
@@ -2739,7 +2835,7 @@ This command works exactly the same as a PRINT statement except that it is used 
   //    +		4 23
   //    		27
 
-  function expression(p) {
+  function Xexpression(p) {
     if (p.num()) return op(p, p.getnum());
     if (p.type('hex'))
       return op(p, VAL(p.get('hex')));
@@ -2760,10 +2856,14 @@ This command works exactly the same as a PRINT statement except that it is used 
     // keywords that end statement
     if (p.val('ELSE') || p.val('THEN'))
       return;
+    if (OricKeywords.type[p.val()] === 'operator')
+      return;
 
     let kw = p.get('keyword');
     let f = window[kw];
-    if (!f) throw 'Function for missing: ' + kw;
+    if (f == undefined)
+      throw Error('Function for missing: ' + kw);
+    if (typeof f !== 'function') return f;
     let idx = index(p) || [];
     if (trace) print('FUNC.call ' + kw + ' on '+idx);
     let r = f.apply(p, idx);
@@ -2790,7 +2890,7 @@ This command works exactly the same as a PRINT statement except that it is used 
 60 PRINT -2^+3*-3, 24
 70 PRINT -1=3=3, 0
 80 PRINT 3=3-1, -1
-90 PRINT NOT TRUE AN FALSE, '=', 0,0,0
+90 PRINT NOT TRUE AN FALSE, "=", 0;0;0
 100 PRINT NOT TRUE AND FALSE, 0
 110 PRINT 1024/-2^4*10
 
@@ -2867,6 +2967,9 @@ This command works exactly the same as a PRINT statement except that it is used 
     let r = opapply(p, o, val);
     if (r !== undefined) return op(p, r);
 
+    let e = expression(p);
+    if (e === undefined) throw "op: operand missing!";
+    
     switch(o) {
     case '=': return (val === e) ? -1 : 0;
     case '<': return (val < e) ? -1 : 0;
@@ -2877,8 +2980,6 @@ This command works exactly the same as a PRINT statement except that it is used 
     default: syntax_error(o);
     }
 
-    let e = expression(p);
-    if (e === undefined) throw "op: operand missing!";
     if (typeof e !== 'number')
       type_error();
   }
@@ -3411,7 +3512,7 @@ already,then skip
       // Related: AND OR NOT TRUE FALSE
       return a | b;
     }
-    function NOT() {
+    function NOT(a) {
       // DOC: Not and expression
       // negate all bits (0 <=> -1)
       // Related: AND OR NOT TRUE FALSE
@@ -4381,7 +4482,7 @@ errorObj : ${errorObj}
   }
 
   function doAction(action) {
-    INVERSE();
+    INVERT();
 
     // go one down line
     print();
@@ -4598,6 +4699,18 @@ errorObj : ${errorObj}
     // TODO: [button]?
     // TODO: NAME [.COM] (any file...)
     // TODO: !EXTNAME [.COM] (new funcs)
+    if (line.match(/^.{2,}\?$/)) {
+      return urlView(
+	'http://html.duckduckgo.com/html/?q=' +
+	  line.replace(/\?/, ''));
+    }
+    if (line.match(/^wiki (\w+)$/i)) {
+      return urlView(
+	('HTTP://EN.M.WIKIPEDIA.ORG/WIKI/' + 
+	  line.replace(/^wiki\s*/i, ''))
+	 .toLowerCase());
+    }
+
 
     run.count++;
 
@@ -5390,6 +5503,11 @@ Z zoom? Zoom?
     iplot(
       optCol, optRow,
       SPC(SCREEN_COLS-optCol));
+    // reset colors
+    if (optCol === column) {
+      iplot(0, optRow, paper+16)
+      iplot(1, optRow, ink);
+    }
   }
 
   function showStatus() {
@@ -5927,6 +6045,7 @@ ${value}
 // TODO: Wired.com break something
 // TODO: ibm.com too much empty lines
 function urlView(url) {
+  CLS();
   clearline(0);
   iplot(0, 0, 'Loading '+url+' ...');
   wget(
@@ -5942,7 +6061,13 @@ function urlView(url) {
 function showPage(h, err, nid, url){
   let txt = HTML2TELETEXT(nid, h);
   let i = 0;
-  let step = SCREEN_COLS; // !
+
+  // This controls how many chars to print
+  // per tick.
+  //  1 = 300 baud (feels like it, readble)
+  //  4 = 1200 baud
+  //  SCREEN_COLS = about 1 page / second
+  let step = SCREEN_COLS; //SCREEN_COLS; // !
 
   // colors
   let isink = c7=>(c7 <= 7);
@@ -5966,6 +6091,27 @@ function showPage(h, err, nid, url){
     column = 2;
   }
   
+  function putc(ch) {
+    let lastrow = row;
+    let r = window.putc(ch);
+    if (row != lastrow) {
+
+      // clear some rows
+      let r = row;
+      for(let c=5; c>=0; c--) {
+	if (++r > SCREEN_ROWS-1)
+	  r = 1;
+	if (c < 2)
+	  clearline(r);
+      }
+      
+      if (row > SCREEN_ROWS-2) {
+	row = 1;
+      }
+    }
+    return r;
+  };
+
   function myputc(ch) {
     if (row != lastrow) {
       rowcounter++;
@@ -6128,7 +6274,6 @@ function showPage(h, err, nid, url){
 	  myputc(ch);
 	}
 	
-	// top when screen full
 	if (0 && !(rowcounter % (SCREEN_ROWS-2))) {
 	  // this doesn't work CTRL-S becomes 'b'??? wtf???
 
