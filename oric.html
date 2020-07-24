@@ -3980,6 +3980,42 @@ $276,$277 Spare counter — also used by WAIT (and printer in V1.0).
     print();
   }
   
+  function LOGIN(user, pass) {
+    if (!pass) {
+      // prompt
+    }
+    if (!pass) syntax_error();
+    // TODO: encrypt private area with hash of pass + user
+    
+  }
+
+  function LOGOUT() {
+  }
+
+  // U: short for USER:
+  // DIR U:   DIR U:JSK
+  //
+  function DIR(spec) {
+  }
+
+  function USER(spec) {
+    // DOC: List users, or go user directory.
+  }
+  
+  function CD(path) {
+  }
+
+  function COPY(from, to) {
+  }
+
+  function DELETE(spec) {
+  }
+
+  function TYPE(file) {
+  }
+
+  HELP.related.push('CSAVE CLOAD LOGIN LOGOUT USER CD COPY DELETE TYPE');
+
   // For the HIRES screen: 
   // CSAVE"filename",A40960,E48000 (48K) // a000 % 16K = 2000
   // CSAVE"filename",A8192,EIS232 (16K)  // 2000
