@@ -236,7 +236,7 @@
     error("?UNDEF'D LINE ERROR");
   }
   
-  function line_error() {
+  function func_error() {
     error("?UNDEF'D FUNCTION");
   }
   
@@ -3839,6 +3839,112 @@ $276,$277 Spare counter — also used by WAIT (and printer in V1.0).
     lines = {};
   }
   
+  function parsePathOrExpression(p) {
+    // ugly code to allow for:
+    // "FOO" => '"FOO"'
+    // FOO => 'FOO'
+    // "" => '""'
+    // => ''
+    let name = p.get('name');
+    if (p.str()) {
+      // if it's a quoted string
+      name = '"' + ensureExp(p) + '"';
+    } else if (name) {
+      // if name ends with $ => variable...
+      if (name.endsWith('$'))
+	name = '"' + ensureExp() + '"';
+      else {
+	// haha ambiguity in grammar!
+	if (p.skip(':')) {
+	  name += ':';
+	  while (!p.end() && p.val() != ':') {
+	    name += p.skip();
+	  }
+	}
+      }
+    } else {
+      name = '';
+    }
+    return name;
+  }      
+
+  // gives list of matching file names
+  function dir(name) {
+    print('dir.name='+name);
+    name = name || '';
+    print('dir.name='+name);
+    print('dir.name.type='+typeof name);
+    let names = [];
+
+    // get names from window object
+    if (name.match('E:'))
+      names = names.concat(
+	Object.keys(window)
+	  .filter(n=>n.startsWith('example_'))
+	  .map(n=>n.replace(/^example_+/, 'E:')));
+
+    // add names from localstorage
+    if (name.match('L:'))
+      names = names.concat(
+	lssearch('CSAVE:').map(
+	  n=>n.replace(/^CSAVE:/, 'L:')));
+
+    // filter matches
+    if (name) {
+      if (name.match(/^".*"/))
+	names = names.filter(
+	  n=>n.match(RegExp(
+	    `^CSAVE:${name.replace(/"/g,'')}\$`)));
+      else
+	names = names.filter(n=>n.match(name));
+    }
+
+      
+    return names;
+  }
+
+  function pDIR(p) {
+    let name = parsePathOrExpression(p);
+    return DIR(name);
+  }
+
+  // DIR(p) called by parser
+  // DIR('name', ['foo','bar'])
+  function DIR(name, names) {
+    if (!names || !names.length) 
+      names = dir(name);
+    
+    if (trace) { print("NAMES:"); print(names); }
+
+    // list'em
+    print();
+    print('Directory of ' + name);
+    print();
+    // ------------------------------------40xx
+    //                       1234567890123456
+    // Directory of H:
+    //                    
+    // 
+    // 20200807 2137  65,356 FILE5678.BAS
+    // 20200807 2237      35 SHORT   .BAS
+    // 20200807 2137  65,356 FILE5678LONG.BAS
+    // 20200807 2137  65,356 FILE5678TOOOLONGL
+    // ONG.BAS
+    // 20200305 0114 <DIR>   SAVED
+    // 
+    // or two cols:
+    // 1234567890123456789
+    // <-----------------><----------------->
+    // FILE6578.BAS       SHORT   .BAS
+    // FILES5678LONG.BAS  FILE5678TOOOLONGLON
+    // GLONG.BAS
+    names
+      .forEach(n=>(princ(n), TAB(-19)));
+    print();
+  }
+  
+
+
   // TODO: load basic from any URL!
   // CLOAD "filename" [,S] 
   // CLOAD "" [,S] - search/list
@@ -3862,30 +3968,22 @@ $276,$277 Spare counter — also used by WAIT (and printer in V1.0).
   //
   // FILLCIRC  .HRS   34     FOOBBAR    .COM 33
 
+  // TODO: CLOAD "FOO.TXT" numbers the lines!
+  // (CSAVE removes them)
   function CLOAD(p) {
-    // DOC: Loads a file "NAME"
+    // DOC: Loads a file "E:NAME"
     // CLOAD "" will open the file dialogue
+    // Tip: use DIR to list files
     // New: Without arguments lists examples
     // New: With 'CLOAD D' shows names with 'D'
 
-    let name = p.get('name');
-    if (p.str()) {
-      name = '"' + ensureExp(p) + '"';
-    } else if (name) {
-      if (name.endsWith('$'))
-	name = ensureExp();
-      else
-	; // literal - do matching
-    } else {
-      name = '';
-    }
-      
-    let origline = name;
-    function load(src) {
+    let auto;
+
+    function load(name, src) {
       if (!src) return;
       NEW();
-      name = beautyname(name);
       print('Program ' + name + ' loading...');
+      // TODO: make noise?
       let n = 0;
       ('\n'+src).replace(
 	/\n\s*(\d+)(.*)/g,
@@ -3895,12 +3993,20 @@ $276,$277 Spare counter — also used by WAIT (and printer in V1.0).
 	  n++;
 	});
       princ(n); print('lines loaded');
-      if (origline.match(/,\s*AUTO/)) RUN();
+      if (auto) RUN();
       return true;
     }
     
-    // if CLOAD "" click on filedialogue
+    let name = parsePathOrExpression(p);
+    auto = p.skip(',') && p.skip('AUTO');
+
+    name = name.replace(/"/g, '');
+
+    let origname = name;
+
+    // if CLOAD "" click on file dialogue
     if (name === '""') {
+      // TODO: continue on current tap file?
       loadFile((nme, type, size, txt, bytes)=>{
 	if (trace) {
 	  princ('nme: '); print(nme);
@@ -3912,72 +4018,58 @@ $276,$277 Spare counter — also used by WAIT (and printer in V1.0).
 	name = nme;
 	if (name.match(/\.tap/))
 	  return alert('CLOAD: .tap file loading not implemented yet!');
-	load(txt);
+	
+	// premature return, should we "wait"
+	load(name, txt);
       })
       // it'll happen in background, so, hmmm, ready will be printed first!
       return;
     }
 
-    // get names from window object
-    let names = Object.keys(window)
-	.filter(n=>n.startsWith('example'));
-    // add names from localstorage
-    names = names.concat(lssearch('CSAVE:'));
+    let names = dir(name);
 
-    // filter matches
-    if (name) {
-      if (name.match(/^".*"/))
-	names = names.filter(
-	  n=>n.match(RegExp(
-	    `^CSAVE:${name.replace(/"/g,'')}\$`)));
+    // if first match (prefix) is name...
+    if (names[0] === name)
+      names = [name];
+
+    if (names.length !== 1) {
+      if (name) 
+	print('?CLOAD NAME ERRROR');
+
+      print();
+      if (names.length) 
+	DIR(name, names);
       else
-	names = names.filter(n=>n.match(name));
+	DIR(name);
+
+      return;
     }
 
-    // names are now "ugly" use this to show
-    function beautyname(n) {
-      return n
-	.replace(/^example_+/, '')
-	.replace(/^CSAVE:(.*)/, '"$1"');
-    }
-      
-    // to load (instead of list, require match  to be proper prefix)
-    if (trace) { print("NAMES:"); print(names); }
-    
-    name = name.replace(/"/g,'');
+    name = names[0];
 
-    if (names.length == 1 &&
-      names[0].match(RegExp(`^(?:example_*|CSAVE:)${name}`))) {
-      name = names[0];
-      let src;
-      
-      // try load from examplesNAME...
-      src = window[name];
+    // examples_NAME...
+    if (name.startsWith('E:')) {
+      let src = window[name.replace(/^E:/, 'example_')];
       if (src) {
-	// ok, it's not a string?
+	// ok, it's a function? run?
 	if (typeof src === 'function') try {
 	  src = src();
 	} catch(e) {}
       }
 
-      // try localStorage
-      if (!src)
-	src = lsget(name);
-
-      if (load(src)) return;
+      if (load(name, src)) return;
     }
 
-    // all else (and no return is:)
-    if (name)
-      print('?CLOAD NAME ERRROR');
-
-    // list'em
-    print("Matching names:");
-    print();
-    names
-      .map(beautyname)
-      .forEach(n=>(princ(n), TAB("3")));
-    print();
+    // local storage
+    if (name.startsWith('L:')) {
+      let src = lsget(name.replace(/^L:/, 'CSAVE:'));
+      if (load(name, src)) return;
+    }
+    
+    
+    // error?
+    // TODO: continue searching "tap"?
+    error("?CLOAD FILE ERROR", origname);
   }
   
   function LOGIN(user, pass) {
@@ -3992,16 +4084,30 @@ $276,$277 Spare counter — also used by WAIT (and printer in V1.0).
   function LOGOUT() {
   }
 
-  // U: short for USER:
-  // DIR U:   DIR U:JSK
-  //
-  function DIR(spec) {
+  // DRIVE
+  // A: insert disk
+  // B: insert disk
+  // E: examples
+  // F: current tap file
+  // L: local storage (default if not quoted)
+  // H: home (loogged in user)
+  // U: users
+  // G: games
+  // D: demos
+  // X: extensions
+  // W: web page of user
+  // 
+  // U:JSK@YESCO.ORG
+  // U:JSK
+  function DRIVE() {
   }
 
   function USER(spec) {
     // DOC: List users, or go user directory.
   }
   
+  // Change current path pwd
+  // CD ' - PRINT CURRENT PATH
   function CD(path) {
   }
 
@@ -4032,7 +4138,7 @@ $276,$277 Spare counter — also used by WAIT (and printer in V1.0).
     // TOOD: load/save memory (screens)
 
     let name;
-    if (p.val().endswith('$'))
+    if (p.val().endsWith('$'))
       name = expression(p);
     else 
       name = p.get('name');
@@ -4062,13 +4168,15 @@ $276,$277 Spare counter — also used by WAIT (and printer in V1.0).
     if (A == 48000 && E== 49119) type = 'TEXT';
     if (A == 40960 && E== 48000) type = 'HIRES';
 
-    if (A === undefined) {
+    if (A === undefined) { // basic
+
       if (name.match(/"/)) {
 	// save program in .tap-file
 	impl_error("CSAVE: can't save tap file yet!");
 	// TODO: we can't just save memory as we don't encode programs in tokens...
       } else {
 	// save program in localStorage
+	name = name.replace(/^L:/, '');
 	let src = Object.keys(lines)
 	    .map(lno=>`${lno} ${lines[lno]}\n`)
 	    .join('');
@@ -4077,6 +4185,7 @@ $276,$277 Spare counter — also used by WAIT (and printer in V1.0).
 	lsput('CSAVE:' + name, src);
 	princ(lns); 
 	print('lines saved in ' + name);
+	return;
       }
     } else {
       // save "memory"
@@ -7002,6 +7111,8 @@ instruction
   ORIC_TOKENZ += 'NVL,';
   ORIC_TOKENZ += 'SVL\\$,';
   ORIC_TOKENZ += 'XVL\\$,';
+
+  ORIC_TOKENZ += 'DIR,CD,TYPE,DRIVE,';
 
 </script>
 
