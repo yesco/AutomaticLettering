@@ -790,7 +790,11 @@ INFO:<br><span id='info'></span><br>
       gedit = false,
       lores = -1, // set to HIRES to force init
       curx = 0,
-      cury = 0;
+      cury = 0,
+  
+      pwd = 'L:',
+
+      lastDum = 'foo';
 
   // --- slow down!
   // TODO: set if too much screen updates?
@@ -838,6 +842,8 @@ INFO:<br><span id='info'></span><br>
     curx = 0;
     cury = 0;
     
+    pwd = 'L:';
+
     // at start only one channel enabled!
     PLAY['con1'] = 1;
     PLAY['con2'] = 0;
@@ -2312,7 +2318,11 @@ This command works exactly the same as a PRINT statement except that it is used 
     print();
     
     RUN.interval = setInterval(_=>{
+      // TOOD: generalize these runners
+      // for LIST, RUN, CLOAD, WWW
       if (scstop) return;
+      if (Date.now() < waittill) return;
+      if (inputMode) return;
 
       for(let i=3; i>=0; i--) {
 	nextline();
@@ -2418,9 +2428,11 @@ This command works exactly the same as a PRINT statement except that it is used 
     if (running()) return;
     
     RUN.interval = setInterval(_=>{
-      // these two are not most efficient...
+      // TOOD: generalize these runners
+      // for LIST, RUN, CLOAD, WWW
       if (scstop) return;
       if (Date.now() < waittill) return;
+      if (inputMode) return;
 
       cont.intervalcount++;
       let start = Date.now();
@@ -3272,8 +3284,8 @@ already,then skip
     // CTRL-FUNC-A gives CHR$(128+1)
     let r = lastKey;
     lastKey = -1;
-    return lastKey < 0 ? '' :
-      String.fromCharCode(lastKey);
+    return r < 0 ? '' :
+      String.fromCharCode(r);
   }
 
   function processKey(k, name, idx) {
@@ -3282,21 +3294,25 @@ already,then skip
     // clear it
     lastKey = -1;
 
-    // continue running
-    inputMode = undefined;
-
     // test value
     let val;
     if (name.endsWith('$')) {
       // string
-      val = String.fromCharCode(lastKey);
+      val = String.fromCharCode(k);
     } else {
       // digit
-      val = k - 40; // ASC("0")
-      if (k < 0 || k > 9)
-	type_error();
+      val = k - 48; // ASC("0")
+      // ORIC: gives error and jumps out
+      // New: just forgive!
+      if (val < 0 || val > 9) {
+	//type_error(k);
+	return false; 
+      }
     }
       
+    // continue running
+    inputMode = undefined;
+
     // set it
     setvar(name, idx, val);
 
@@ -3306,17 +3322,17 @@ already,then skip
 
   function GET(p) {
     // DOC: GET K$ - wait for a any key
-    // DOC: GET K - wait for a digit, or give type error
+    // GET K - wait for a digit
+    // New: if no digit, ORIC gave error, we don't, just wait for korrect key!
 
     let [name, idx] = variable(p);
     if (!name) syntax_error();
 
-    print('GET.name: '+name);
     // no need to wait?
     if (lastKey > 0) {
       processKey(lastKey, name, idx);
     } else {
-      // make it exit now (no more run)
+      // make it exit now (delay like wait)
       forceUpdate = true;
 
       // hookup (
@@ -3870,10 +3886,7 @@ $276,$277 Spare counter — also used by WAIT (and printer in V1.0).
 
   // gives list of matching file names
   function dir(name) {
-    print('dir.name='+name);
     name = name || '';
-    print('dir.name='+name);
-    print('dir.name.type='+typeof name);
     let names = [];
 
     // get names from window object
@@ -4086,16 +4099,29 @@ $276,$277 Spare counter — also used by WAIT (and printer in V1.0).
 
   // DRIVE
   // A: insert disk
-  // B: insert disk
+  // B: Bookmarks? (per user)
+  // C: commands (shared .COM)
+  // D: demos
   // E: examples
   // F: current tap file
-  // L: local storage (default if not quoted)
-  // H: home (loogged in user)
-  // U: users
   // G: games
-  // D: demos
-  // X: extensions
-  // W: web page of user
+  // H: home (loogged in user)
+  // I: -
+  // J: -
+  // K: -
+  // L: local storage (default if not quoted)
+  // M: ?Man pages
+  // N: ?News
+  // O: -
+  // P: Programming tools
+  // Q: -
+  // R: -
+  // S: Screenshots .SCR .HRS
+  // T: ?Textfiles
+  // U: users
+  // V: 
+  // W: Wiki!
+  // X: eXtensions
   // 
   // U:JSK@YESCO.ORG
   // U:JSK
@@ -4106,9 +4132,12 @@ $276,$277 Spare counter — also used by WAIT (and printer in V1.0).
     // DOC: List users, or go user directory.
   }
   
-  // Change current path pwd
+  // DOC: New: Change current path
   // CD ' - PRINT CURRENT PATH
-  function CD(path) {
+  function CD(p) {
+    let path = getPathOrExpression(p);
+    if (!path) return PRINT(pwd);
+    pwd = path;
   }
 
   function COPY(from, to) {
@@ -4137,11 +4166,7 @@ $276,$277 Spare counter — also used by WAIT (and printer in V1.0).
     // TODO: "foo.tap" - download
     // TOOD: load/save memory (screens)
 
-    let name;
-    if (p.val().endsWith('$'))
-      name = expression(p);
-    else 
-      name = p.get('name');
+    let name = parsePathOrExpression(p);
     if (!name) syntax_error('NO NAME');
 
     name = name.replace(/"/g, '');
@@ -4175,8 +4200,12 @@ $276,$277 Spare counter — also used by WAIT (and printer in V1.0).
 	impl_error("CSAVE: can't save tap file yet!");
 	// TODO: we can't just save memory as we don't encode programs in tokens...
       } else {
+	// TODO: (no!)
+	name = name.replace(/^E:/, '');
+
 	// save program in localStorage
 	name = name.replace(/^L:/, '');
+
 	let src = Object.keys(lines)
 	    .map(lno=>`${lno} ${lines[lno]}\n`)
 	    .join('');
@@ -4578,6 +4607,10 @@ errorObj : ${errorObj}
 
   function editChar(ch) {
     clickSound();
+    if (running()) return;
+
+    lastKey = -1;
+
     cursorHide();
     let c = String.fromCharCode(ch);
     // ignore keyboard setting
@@ -6366,8 +6399,11 @@ function showPage(h, err, nid, url){
 
   RUN.interval = setInterval(
     function printSlow() {
-      // TODO: handle pageing?
+      // TOOD: generalize these runners
+      // for LIST, RUN, CLOAD, WWW
       if (scstop) return;
+      if (Date.now() < waittill) return;
+      if (inputMode) return;
 
       let end = i + step;
       for(; i<end; i++) {
