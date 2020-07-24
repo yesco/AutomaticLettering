@@ -338,7 +338,7 @@ function tokenizer(line, keywordz='') {
       while(digit() || r(/[A-F]/));
       return emit('hex');
     } else if (ch('"')) {
-      while(step() && c != '"');
+      while(c && c != '"') step();
       ch('"');
       return  emit('string');
     } else if (digit()) {
