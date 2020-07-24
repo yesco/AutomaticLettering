@@ -792,6 +792,8 @@ INFO:<br><span id='info'></span><br>
       curx = 0,
       cury = 0,
   
+      readdata = undefined,
+
       pwd = 'L:',
 
       lastDum = 'foo';
@@ -842,6 +844,8 @@ INFO:<br><span id='info'></span><br>
     curx = 0;
     cury = 0;
     
+    readdata = undefined,
+
     pwd = 'L:';
 
     // at start only one channel enabled!
@@ -1311,8 +1315,8 @@ So far the subject of writing
       
   function SCRN(x, y) {
     // DOC: Return char/attr at X, Y
-    tPos(x, x < SCREEN_COLS);
-    tPos(y, y < SCREEN_ROWS-1);
+    tPos(x, x >= SCREEN_COLS);
+    tPos(y, y >= SCREEN_ROWS);
     return screen(y+1, x);
   }
   
@@ -1843,6 +1847,8 @@ CODE CHARACTER Control Code
   }
 
   function variable(p) {
+    if (p.keyword()) syntax_error('KEYWORD');
+
     let name = p.get('name');
     if (!name) syntax_error('NO VAR');
     let idx = index(p) || [];
@@ -1857,28 +1863,35 @@ CODE CHARACTER Control Code
     // DOC: Set variable to value
     // New: It autodims
 
-    if (p.keyword()) syntax_error('KEYWORD');
-
     let [name, idx] = variable(p);
     if (!p.val('=')) syntax_error();
     let r = ensureExp(p, '=');
 
-    if (trace) print('LET: ' + name + ' <= ' + r);
+    if (trace)
+      print('LET: ' + name + ' = ' +
+	    (typeof r==='number'?r:'"'+r+'"'));
 
     setvar(name, idx, r);
   }
   
   // name[$][(indices) = val
   //   indices = [] or [1,2,3] A$(1,2,3)
-  function setvar(name, idx, val) {
+  function setvar(name, idx, val, optConvert) {
     // type match?
-    if (name.endsWith('%')) {
-      tInt(val);
-      val = INT(val);
-    } else if (name.endsWith('$')) {
+    if (name.endsWith('$')) {
+      // S$
       tStr(val);
     } else {
-      tNum(val);
+      // N or N%
+      if (optConvert && typeof val === 'string')
+	val = VAL(val);
+
+      if (name.endsWith('%')) {
+	tInt(val);
+	val = INT(val);
+      } else {
+	tNum(val);
+      }
     }
 
     // array A(3,4)=77 complicates things...
@@ -1891,16 +1904,16 @@ CODE CHARACTER Control Code
     let x;
     let lastx = name;
     while ((x = idx.shift()) !== undefined) {
-      if (trace) print('LOOP lastx: ' + lastx);
-      if (trace) print('LOOP x: ' + x);
+      if (trace) print('SET.lastx: ' + lastx);
+      if (trace) print('SET.x: ' + x);
       // autodim (no checking!)
       if (!nv[lastx]) nv[lastx] = {};
       nv = nv[lastx];
-      if (trace) print('LOOP nv: ' + nv);
+      if (trace) print('SET.nv: ' + nv);
       lastx = x;
     }
 
-    if (trace) print('SET: ' + (nv == vars) + ' ' + lastx);
+    if (trace) print('SET.lastx ' + lastx);
     nv[lastx] = val;
   }
 
@@ -2370,7 +2383,7 @@ This command works exactly the same as a PRINT statement except that it is used 
     // DOC: Print, move cursor to LINENO
     // New: Just EDIT if STOP:ped
     // New: Line keeps spaces!
-    lno = lno || lineno;
+    lno = lno || CONT.lineno || lineno;
     let line = lines[lno]
     if (!line) return;
 
@@ -2396,6 +2409,7 @@ This command works exactly the same as a PRINT statement except that it is used 
     stack = [];
     lineTodo = [];
     vars = {}
+    readdata = undefined;
   }
 
   function RUN(lno) {
@@ -2570,11 +2584,14 @@ This command works exactly the same as a PRINT statement except that it is used 
     return true;
   }
 
+  // basically if it's COMMAND(p)
+  // then it is a "parser"
   function isParser(f) {
     let p = f.isParser;
     if (p) return p;
     let n = f.isNormal;
     if (n) return false;
+
     // we don't know - investigate
     let code = f.toString();
     p = code.match(/^function \w+\(p\)/);
@@ -2582,12 +2599,12 @@ This command works exactly the same as a PRINT statement except that it is used 
       f.isParser = true;
     else
       f.isNormal = true;
-    // tail it
-    return isParser(f);
+    return f.isParser;
   }
 
   function statement(p) {
     if (p.end()) return;
+    if (trace) print(''+lineno+'---------------');
     if (trace) print('STMT> ' + p.rest());
     // comments
     if (p.skip('REM') || p.skip("'")) {
@@ -2597,35 +2614,37 @@ This command works exactly the same as a PRINT statement except that it is used 
 
     if (p.keyword() || p.name()) {
       let name = p.val();
-      if (trace) print('STMT.name> ' + name);
       // first try parser version
       // (for now pNAME is preferred over NAME)
       let f = window['p'+name] || window[name];
       if (!f) {
 	// try LET ?
-	return LET(p);
+	LET(p);
+	if (trace) print('LEFT> ' + p.rest());
+	return true;
 	// if it's not LET we'll get syntax error
       }
       
-      if (trace) print('STMT.func> ' + f.name);
       try {
 	if (isParser(f)) {
 	  if (trace) print('STMT.isParser> ' + name);
 	  // call with parser
 	  p.next();
-	  f.call(p, p); // redundant!
-	  if (trace) print('CALL.done> ' + p.rest());
+	  f.call(p, p); // redundant passing!
+	  if (trace) print('LEFT> ' + p.rest());
 	  return true;
 	} else {
 	  if (trace) print('STMT.isNormal> ' + name);
-	  let line = p.rest();
-	  if (trace) print('LINE= '+line);
+	  let savedline = p.rest();
 
-	  p.next();
+	  p.next(); // skips func name
+
 	  // this doesn't care how many args!
 	  let args = evalArgs(p);
 	  if (trace) print('ARGS= ' + JSON.stringify(args));
-	  f.apply(line, args);
+	  if (trace) print('LEFT> ' + p.rest());
+
+	  f.apply(savedline, args);
 	  //f.apply(p.rest(), evalArgs(p));
 	  return true;
 	}
@@ -2879,7 +2898,7 @@ This command works exactly the same as a PRINT statement except that it is used 
     let idx = index(p) || [];
     if (trace) print('FUNC.call ' + kw + ' on '+idx);
     let r = f.apply(p, idx);
-    if (trace) print('==> ' + r);
+    if (trace) print('==> ' + r + '('+(typeof r)+')');
     return r;
   }
 
@@ -3272,9 +3291,70 @@ already,then skip
   // activate a jump to the address now on the top of the pile. The stack can only 
   // hold 10 addresses, and more than 10 loops will give an ?OUT OF MEMOR
   
-  function READ() {}
-  function DATA() {}
-  function RESTORE() {}
+  HELP.related.push('READ DATA RESTORE'); {
+
+    function READ(p) {
+      // init (only first time, later it's []
+      if (!readdata) RESTORE();
+
+      while (!p.end() && !p.val(':') && !p.val('THEN') && !p.val('ELSE')) {
+	v = readdata.shift();
+	if (v === undefined)
+	  data_error();
+
+	let [name, idx] = variable(p);
+	setvar(name, idx, v, 'convert');
+	if (!p.skip(',')) return;
+      }
+    }
+
+    function DATA(p) {
+      // No computed data I guess!
+      // (we don't bother check syntax here)
+      // (actually it can't use normal parsing)
+      while(!p.end() && !p.val(':') && !p.keyword())
+	p.skip();
+    }
+
+    function RESTORE() {
+      // DOC: Restore DATA pointer for READ
+      // TODO: RESTORE LINENO
+
+      readdata = [];
+
+      Object.keys(lines).forEach(lno=>{
+	let ln = lines[lno];
+
+	// ORIC requires all DATA first on line
+	if (!ln.match(/^\s*DATA\s*/)) return;
+	ln = ln.replace(/^\s*DATA\s*/, '')
+	
+	let d = '', quoted = false;
+	for (let i=0; i<ln.length; i++) {
+	  let c = ln[i];
+	  
+	  if (c === ' ' && d === '' && !quoted) {
+	    // skip leading spaces only
+	  } else if (c === ',' && !quoted) {
+	    // end of value
+	    readdata.push(d);
+	    d = '';
+	  } else if (c === '"') {
+	    quoted = (d === '');
+	    if (!quoted) {
+	      readdata.push(d);
+	      d = '';
+	    }
+	  } else {
+	    // store it
+	    d += c;
+	  }
+	}
+	readdata.push(d);
+      });
+    }
+
+  } // END: READ DATA RESTORE
 
   function KEY$(p) {
     // DOC: K$=KEY$ get key pressed, no wait
@@ -3389,9 +3469,9 @@ already,then skip
     return  s.substr(-len);
   }
 
-  function MID$(s, pos, len) {
+  function MID$(s, from, len) {
     // DOC: From S from POS get LEN chars
-    tStr(s); tPos(pos); tPos(len);
+    tStr(s); tPos(from); tPos(len);
     return s.substr(s, from, len);
   }
 
@@ -3728,27 +3808,33 @@ $276,$277 Spare counter — also used by WAIT (and printer in V1.0).
     // LOCAL VARS USED FOR PEEK/DEEK etc 
 
     const SCREEN = 0x0BB80;
-    const SCREEN_LEN = SCREEN_ROWS * SCREEN_COLS;
+    // No LEN as it changes with TEXT r,c
     //const SCREEN_LEN = 1120;
-    const CHARS = 0xB400;
+    //const SCREEN_LEN = SCREEN_ROWS * SCREEN_COLS;
+    const CHARS = 0xB400; // 46080
     const CHARS_LEN = 1024;
-    const ALTS = 0xB800;
+    const ALTS = 0xB800; // 47104
     const ALTS_LEN = 896;
 
     const HIRES = 0xA000;
+    // TODO: "calculate" dynamically
     const HIRES_LEN = 8000;
+
     const HIRES_TEXT = 0xBF68; // 25x40=1000 chars, i.e. 26th line!
     const HIRES_TEXT_LEN = 120; // 3 lines
+    // HIRES_END = 0xDEA8;
 
-    // TODO: charset moves?
-    const HIRES_CHARS = 0x9800;
+    // TODO: charset moves in HIRES? :-(
+    const HIRES_CHARS = 0x9800;	// 38912
     const HIRES_CHARS_LEN = 1024;
-    const HIRES_ALTS = 0x9C00;
+
+    const HIRES_ALTS = 0x9C00; // 39936
     const HIRES_ALTS_LEN = 1024;    
     
     function PEEK(a, v) { // LOL
       tPos(a);
-      print(`PEEK ${a} ${v} ${HEX$(a)}`);
+
+      if (a === 0x20c) return (caps?255:0);
 
       if (a === 0x276) return DEEK(0x276) % 256;
       if (a === 0x277) return INT(DEEK(0x276) / 256);
@@ -3759,27 +3845,23 @@ $276,$277 Spare counter — also used by WAIT (and printer in V1.0).
 	error('?PEEK/POKE not defined for HIRES mode');
 	
       if (a >= SCREEN &&
-	  a <= SCREEN + SCREEN_LEN) {
+	  a <= SCREEN + SCREEN_COLS*SCREEN_ROWS) {
 	let o = a - SCREEN;
-	print(`PEEK in screen o = ${o}`);
-	// TODO: this may overlap! LOL
 	let row = INT(o / SCREEN_COLS);
-	print(`PEEK in screen row = ${row}`);
 	let col = o % SCREEN_COLS;
-	print(`PEEK: row=${row} col=${col}`);
 	let x = screen(row, col, v);
-	print(`PEEK: => ${x}`);
 	return  x;
       }
 
       // easter egg!
       return PEEK(
-	(a % SCREEN_LEN) + SCREEN, v);
+	(a % SCREEN_COLS*SCREEN_ROWS) + SCREEN, v);
 
       error('?PEEK/POKE not defined for this address');
     }
     function POKE(a, v) {
-      tPos(a); tPos(v, v < 256);
+      tPos(a); tPos(v, v >= 256);
+      if (a === 0x20c) return (caps = (v > 0), v);
 
       if (a === 0x276) return deek276 = (deek276 & 0xff00) + v;
       if (a === 0x276) return deek276 = (deek276 & 0x00ff) + v*256;
@@ -3828,6 +3910,7 @@ $276,$277 Spare counter — also used by WAIT (and printer in V1.0).
   // svg symbol: can they be redefined?
 
   example_CHARDEF = `
+9 REM *** REDEFINE LETTER 'A' ***
 10 FOR A=0 TO 7 
 20 READ B 
 30 POKE 46600+A,B 
@@ -4047,7 +4130,7 @@ $276,$277 Spare counter — also used by WAIT (and printer in V1.0).
 
     if (names.length !== 1) {
       if (name) 
-	print('?CLOAD NAME ERRROR');
+	print('?CLOAD NAME ERROR');
 
       print();
       if (names.length) 
@@ -7139,6 +7222,7 @@ instruction
       Object.keys(OricKeywords.name2code).filter(
 	k=>k.match(/^[\w\$]+$/))
       .map(k=>k.replace(/\$/g, '\\$'))
+      .reverse()
       .join(',') + ',';
 
   // ADD new words (Needs to be added!)
