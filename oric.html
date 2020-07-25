@@ -3339,12 +3339,12 @@ SDAY
   
   function example_2DIM() {
     return `
-10 DIM NXC10,3) 
+10 DIM NX(10,3) 
 20 CLS 
 30 FOR K=l TO 10 
-40 ~OR J=l TO 3 
-50 NxCK,JJ=K"J 
-60 PRINT NxCK,JJ 
+40 FOR J=l TO 3
+50 NX(K)=K*J
+60 PRINT NX(K,J)
 70 NEXT J 
 80 PRINT 
 90 NEXT K
@@ -3355,24 +3355,23 @@ SDAY
     return `
 5 REM*NUMERIC BUBBLE SORT** 
 10 CLS:LET J=15 'Number of items 
-20 DIM NUMCJJ'ATray foT numbeTs 
+20 DIM NUM(J)'Array for numbers 
 30 'Example numbers generated here" 
 40 FOR K=0 TO J 
-50 LET NUMCKJ=RNDC1J*1000 
-60 PRINT NUMCKJ 
+50 LET NUM(K)=RND(1)*1000 
+60 PRINT NUM(K) 
 70 NEXT K 
 99 ' 
 100 REM*SORT*ROUTINE* 
 101 ' 
-110 FOR M=l TO CJ-lJ 
+110 FOR M=1 TO J-1J
 120 FOR N=M TO J 
-125 REM If correct ordeT 
-already,then skip 
-130 IF NUMCMJ<NUMCNJ THEN 170 
+125 REM If correct order already,then skip 
+130 IF NUM(M)<NUM(N) THEN 170 
 135 REM Incorrect order,so swap 
-140 TEMP=NUMCMJ 
-150 NUMCMJ=NUMCNJ 
-160 NUMCNJ=TEMP 
+140 TEMP=NUM(M) 
+150 NUM(M)=NUM(N)
+160 NUM(N)=TEMP 
 170 NEXT N 
 180 NEXT M 
 189 ' 
@@ -3380,8 +3379,8 @@ already,then skip
 191 ' 
 200 REM *Print sorted list* 
 210 CLS:PRINT ''SORTED LIST:" 
-220 FOR K::::JTO J 
-230 PRINT NUMCKJ 
+220 FOR K=1 TO J 
+230 PRINT NUM(K) 
 240 NEXT K 
 `;
   }
