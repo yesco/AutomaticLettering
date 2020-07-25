@@ -4221,7 +4221,7 @@ $276,$277 Spare counter — also used by WAIT (and printer in V1.0).
     let origname = name;
 
     // if CLOAD "" click on file dialogue
-    if (name === '""') {
+    if (name === '') {
       // TODO: continue on current tap file?
       loadFile((nme, type, size, txt, bytes)=>{
 	if (trace) {
