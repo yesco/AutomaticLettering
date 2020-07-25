@@ -1910,7 +1910,7 @@ CODE CHARACTER Control Code
   // TODO: maybe let an array be a function! __Arr(3,4) evaluate to the value, or if LET an LVALUE
   // TODO: how to see in an exppression it's
   // an variable and not function call?
-  function DIM(n, ...dims) {
+  function DIM(p) {
     // DOC: Dimension an multidimensional array DIM A$(1:st dim, 2:nd dim, ...)
     // All elements set to detault value.
     // ORIC: Any array index 0..10 is 'predefined'
@@ -1918,6 +1918,11 @@ CODE CHARACTER Control Code
     // Bug: Not capture index out of bounds
     // Bug: There is no diff between array varaibles and others with same name...
     // ...and so PRINT will happily print the array
+
+    let n = ensure(p.get('name'), 'VARIABLE');
+    let dims = ensure(index(p));
+
+    // default value
     let v = 0.0;
     if (n.match(/^\w+\%/)) v = 0;
     if (n.match(/^\w+\$/)) v = '';
@@ -2183,7 +2188,7 @@ CODE CHARACTER Control Code
   function PRINT(p) {
     let newline = true;
 
-    while (!p.end()) {
+    while (!statEnd(p)) {
       if (p.val("'")) break;
       // only effective last
       if (p.skip(';'))
@@ -2201,8 +2206,13 @@ CODE CHARACTER Control Code
       }
     }
     if (newline) putc(10);
-    if (p.end() || p.val(':') | p.end("'")) return true;
+    if (statEnd(p)) return true;
+
     syntax_error(p.val());
+  }
+
+  function statEnd(p) {
+    return p.end() || p.val(':') || p.val("'") || p.val('THEN') || p.val('ELSE');
   }
 
   HELP.related.push('LIST LLIST EDIT CLOAD CSAVE');
@@ -2906,7 +2916,18 @@ This command works exactly the same as a PRINT statement except that it is used 
     if (vals.length !== 1)
       throw Error('exp: ' + vals.length + ' remaining values: ' + JSON.stringify(vals));
     
-    return vals.pop();
+    let r = vals.pop();
+    return r;
+
+    // TODO: somehow gives type error later...
+    if (typeof r === 'number') {
+      if (INT(r) == r)
+	return r;
+      else
+	return r.toPrecision(9);
+    } else {
+      return r;
+    }
   }
 
   function parsevalue(p) {
@@ -3364,21 +3385,23 @@ SDAY
 99 ' 
 100 REM*SORT*ROUTINE* 
 101 ' 
-110 FOR M=1 TO J-1J
+110 FOR M=1 TO J-1
 120 FOR N=M TO J 
 125 REM If correct order already,then skip 
 130 IF NUM(M)<NUM(N) THEN 170 
 135 REM Incorrect order,so swap 
+136 PRINT ".";
 140 TEMP=NUM(M) 
 150 NUM(M)=NUM(N)
 160 NUM(N)=TEMP 
 170 NEXT N 
 180 NEXT M 
+185 PRINT:PRINT "DONE":PRINT
 189 ' 
 190 REM**ENDSORT** 
 191 ' 
 200 REM *Print sorted list* 
-210 CLS:PRINT ''SORTED LIST:" 
+210 PRINT "SORTED LIST:" 
 220 FOR K=1 TO J 
 230 PRINT NUM(K) 
 240 NEXT K 
@@ -3395,7 +3418,7 @@ SDAY
       // init (only first time, later it's []
       if (!readdata) RESTORE();
 
-      while (!p.end() && !p.val(':') && !p.val('THEN') && !p.val('ELSE')) {
+      while (!statEnd(p)) {
 	v = readdata.shift();
 	if (v === undefined)
 	  data_error();
@@ -3410,8 +3433,7 @@ SDAY
       // No computed data I guess!
       // (we don't bother check syntax here)
       // (actually it can't use normal parsing)
-      while(!p.end() && !p.val(':') && !p.keyword())
-	p.skip();
+      while(!p.end()) p.skip();
     }
 
     function RESTORE() {
