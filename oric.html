@@ -519,6 +519,8 @@ g
   <!--- ORIC SCREEN --->
   <div style=''>
     <div id='screen' class='text' style='text-align:left;'>
+      <span id='graphics' class='hires'></span>
+      <div id='text'></div>
     </div>
   </div>
 
@@ -761,6 +763,8 @@ INFO:<br><span id='info'></span><br>
 
   var SCREEN_COLS = 40, // ORIC: 40
       SCREEN_ROWS = 28, // ORIC: 28
+      HIRES_COLS = 40,  // ORIC: 40 (240px)
+      HIRES_ROWS = 200, // ORIC: 200
 	
       lastOne = 'foo';
 
@@ -875,37 +879,56 @@ INFO:<br><span id='info'></span><br>
  372631 BYTES FREE`);
   }
 
-  function TEXT(orows, ocols) {
+  function TEXT(orows, ocols, mode) {
     // DOC: Goes to TEXT mode
     // New: ROWS, COLS argument!
 
+    mode = mode || '';
+
     let sc;
-    if (orows && ocols) {
+
+    if (hires()) {
+      // make it TEXT
+      // TODO: just hide graphics!
+      orows = HIRES_ROWS;
+      ocols = HIRES_COLS;
+    } else if (mode) {
+      // HIRES!
+    } else if (orows && ocols) {
       sc = screenSaved();
 
       // change screen size!
-      SCREEN_ROWS = INT(orows);
-      SCREEN_COLS = INT(ocols/2+1)*2; // even
-    } else if (hires()) {
-      // HIRES!
-      // make it TEXT
+      orows = SCREEN_ROWS = INT(orows);
+      ocols = SCREEN_COLS = INT(ocols/2+1)*2; // even
+
+      dom('text').innerHTML = '';
     } else {
       // we're already in TEXT mode
       // keep screen
       return;
     }
 
-    dom('screen').innerHTML = '';
-    for(let row=0; row<SCREEN_ROWS; row++) {
+    orows = orows || SCREEN_ROWS;
+    ocols = ocols || SCREEN_COLS;
+
+    //    c = '&nbsp;';
+    c = '';
+    if (mode) 
+      c = String.fromCharCode(128+64 + 9);
+
+    for(let row=0; row<orows; row++) {
       let r = '';
       // lol, let's create one extra as the last character is kind of hidden...
-      for(let col=SCREEN_COLS; col>=0; col--) {
-	c = '&nbsp;';
+      for(let col=ocols; col>=0; col--) {
 //	c = String.fromCharCode(128+32);
 	let id = `r${row}c${col}`;
-	r = `<span id='a${id}'><span class='char' id='c${id}'>${c}</span>${r}</span>`;
+	r = `<span id='${mode}a${id}'><span class='char' id='${mode}c${id}'>${c}</span>${r}</span>`;
       }
-      dom('screen', r+'</br>', 'ah');
+      r = `<span id='${mode}r${row}'>${r}</span>`;
+      if (mode)
+	dom('graphics', r+'</br>', 'ah');
+      else
+	dom('text', r+'</br>', 'ah');
     }
     domc.cache = {};
     CLS();
@@ -1005,13 +1028,13 @@ INFO:<br><span id='info'></span><br>
   // TODO: hires animation by flashhing? and invert?
   // -- https://forum.defence-force.org/viewtopic.php?f=14&t=2022&p=20409#p20409 
 
-  function HIRES(mode) {
+  function HIRES() {
     // DOC: Set hiresolution grahics mode
     // Three 3 lines at bottom is text
-    // New: N lines of text (0--3)
-    if (mode === undefined) mode = -3;
-    tPos(-mode, -mode < SCREEN_ROWS);
-    lores = mode;
+
+    TEXT(HIRES_ROWS, HIRES_COLS, 'g');
+
+    lores = -1; // must be set after TEXT()
   }
 
   HELP.related.push('HIRES CIRCLE CHAR CURMOV CURSET DRAW FILL PATTERN POINT  ');
