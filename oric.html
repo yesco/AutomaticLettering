@@ -2307,29 +2307,35 @@ This command works exactly the same as a PRINT statement except that it is used 
     return p;
   }
 
-  function LIST() {
+  function LIST(p) {
     // DOC: List program lines
     // LIST 10 | 10- | -10 | 10-20
-    // New: LIST "PRINT" - matches!
+    // New: LIST "PRINT" ' - matches
+    // New: LIST ""      ' - strings
 
-    // shouild be passed in as arg, or this?
-    let p = parser(this);
-
-    let printer = p.skip('LLIST');
-    if (!printer && !p.skip('LIST')) return;
+    //let printer = p.skip('LLIST');
+    //if (!printer && !p.skip('LIST')) return;
 
     let start = p.getnum(0);
     let end = (p.skip('-') ?
 	       p.getnum(0) : start)
 	|| 65536;
     p.skip(',');
-    let match = p.getstr('');
+
+    let match = '';
+    if (p.str()) {
+      match = p.getstr('');
+      // hack!
+      if (match === '') match = '\"';
+    }
 
     // INIT
     line = '';
     lineno = start - 1;
     print();
     
+    let n = 0; nt = 0;
+
     RUN.interval = setInterval(_=>{
       // TOOD: generalize these runners
       // for LIST, RUN, CLOAD, WWW
@@ -2342,10 +2348,14 @@ This command works exactly the same as a PRINT statement except that it is used 
 	if (!line || lineno > end) {
 	  lineno = 0;
 	  line = '';
+	  if (match)
+	    print('\n' + n + '/' + nt + ' LINES MATCHED: ' + match);
 	  stop();
 	  return;
 	} else {
+	  nt++;
 	  if (match && !line.match(match)) continue;
+	  n++;
 	  princ(lineno);
 	  print(line);
 	}
