@@ -510,8 +510,8 @@ g
         WEB - BASIC<sup><a tabindex='-1' class='oric' target='oricman' style='text-decoration:none; font-size:1.1rem; padding:0.0rem; padding-bottom:-0.1rem; color:black; background:white; font-weight:bold; letter-spacing:0px;' href='http://www.defence-force.org/computing/oric/library/lib_manual_oric/files/manual_atmos.pdf'>PDF</a></sup>
       </div>
 
-      <div style='font-size:1rem;'>
-	&copy;2020 <a href='email:jsk@yesco.org' style='color:blue; background:yellow;'>Jonas S Karlsson</a>
+      <div class='oric' style='font-weight:bold; font-size:1rem;'>
+	&copy;2020 <a href='email:jsk@yesco.org' style='color:blue; background:yellow;'>&nbsp;Jonas S Karlsson&nbsp;</a>
       </div>
 
     </div>
@@ -6022,6 +6022,8 @@ function wget(url, cb) {
   // hardcode some chached files for debug
   if (url == 'R.C') {
     s.src = 'runeberg.org3';
+  } else if (url == 'D.C') {
+    s.src = 'duckduckgo.js';
   } else if (url == 'G.C') {
     s.src = 'google.com.js';
   } else {
@@ -6097,6 +6099,56 @@ function img2teletext(tag, src, alt, lid, n) {
   }
 }
 
+  function getAttr(s, name) {
+    // quoted
+    let [q1, val] = rget(
+      s, RegExp(`${name}\\s*=\\s*(['"])(.*?)\\1`));
+    // try unquoted
+    if (!q1) {
+      [val] = rget(
+	s, RegExp(`${name}\\s*=\\s*([^\\s>]+)`, 'i'));
+    }
+    return val?val:'';
+  }
+  
+  // a11y refers to Accessability!
+  // - https://www.a11yproject.com/
+  // try to get the most text descriptive tag
+  // from attributes
+  // => '' not important element, don't show!
+  // => 'some text'
+  function getA11y(s) {
+    let t;
+
+    // <caption...  | <figaction...
+    t = s.match(/<caption[\s\S]*?>(.*)<\/caption>/);
+    if (t && t[1]) return t[1];
+    t = s.match(/<figcaption[\s\S]*?>(.*)<\/figcaption>/);
+    if (t && t[1]) return t[1];
+
+    // TODO: this may be on any sub element...
+    t = getAttr(s, 'title') || getAttr(s, 'alt');
+    if (t) return t;
+    
+    // "hidden"
+    let [directattr] = rget(s, /^([^\>]*)>/);
+    if (directattr && getAttr(directattr, 'aria-hidden'))
+      return '';
+
+    // fallback - show name or id tag!
+    t = getAttr(s, 'name') || getAttr(s, 'id');
+
+
+    // we don't give up easy, use filename!
+    t = getAttr(s, 'src') || getAttr(s, 'href');
+    if (!t) return ''; // ok, give UP!
+
+    // foo/fish OR foo/fish/ => 'fish'
+    let src = t;
+    [t] = rget(t, /([\w\-]+[^\/]*)\/{0,1}$/);
+    return t ? t : '';
+  }
+
 function HTML2TELETEXT(nid, h) {
   // TODO: base URL
   // TODO: move styling to stylemap
@@ -6115,18 +6167,6 @@ function HTML2TELETEXT(nid, h) {
   let scandimap = {'Æ': 'AE', 'Å': "A'", 'å':"a'", 'Ä':'A"', 'ä':'a"', 'Ð':'D-', 'ð':'TH', 'Ø':':0/', 'ø':'o/', 'Ö':'O"', 'ö':'o"', 'Þ':'TH|', 'þ':'TH|'};
   let scandis = RegExp('([ÆÅåÄäÐðØøÖöÞþ])', 'g');
 
-  function getAttr(s, name) {
-    // quoted
-    let [q1, val] = rget(
-      s, `${name}\s*=\s*(['"])(.*?)\\1`);
-    // try unquoted
-    if (!q1) {
-      [val] = rget(
-	s, `${name}\s*=\s*([^\s>]+?)`);
-    }
-    return val?val:'';
-  }
-    
   // debug latin-1... lol
   // .replace(/([^\x20-\x7f])/ig,
   //   c=>c+'['+c.charCodeAt(0)+']')
@@ -6253,18 +6293,25 @@ function HTML2TELETEXT(nid, h) {
       /([^\0-\x7f])/g,
       (a,c)=>`\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`)
 
+    .replace(/<(\w+)[\s\S]*?aria-hidden=.*?[s\S]*?\/\1>/ig, '')
+
     .replace(
       /<img[\s\S]*?>/g,
       (a)=>{
 	// TODO: hardcode some rendering
 	// TODO: render alt as "big font"?
-	let alt = getAttr(a, 'alt');
+
+	let alt = getA11y(a);
+	// if no useful description give up
+	if (!alt) return ''; 
+
 	let src = getAttr(a, 'src');
 
 	// TODO:? use diff counter for images
 	// use filename
+	
 	if (!alt)
-	  [alt] = rget(src, /\/([\w\-]+)[^\/]*$/);
+	  alt = getA11y(a);
 
 	let have = wget.url[`${nid} ${src}`];
 	if (have)
@@ -6299,6 +6346,12 @@ function HTML2TELETEXT(nid, h) {
 	let href = getAttr(a, 'href');
 	// save as '1 2'
 	// and     '1 TXT'
+
+	// if no text, maybe it's css... (duck..)
+	// make simple link
+	if (txt == '') 
+	  txt = getA11y(a);
+
 	n++;
 	wget.url[`${nid} ${txt}`] = href;
 	let lid = `${nid} ${n}`;
@@ -6325,44 +6378,56 @@ function HTML2TELETEXT(nid, h) {
       return '\u0104' + txt + '\u0204';
     })
 
+    .replace(/<option.*?\/option>/ig, '')
+    .replace(/<select.*?\/select>/ig, '')
+	     
     .replace(/<button[\s\S]*?>([\s\S]*?)<\/button>/g, '[? $1 ]')
     .replace(
       /<input[\s\S]*?>/g,
       (a)=>{
 	let name = getAttr(a, 'name') || 'isindex';
 	let type = (getAttr(a, 'type') || 'text').toLowerCase();
+
 	let value = getAttr(a, 'value');
+	// store values (even hidden)
 	if (name && value) {
 	  wget.form[wget.pageid][name] = value;
 	}
 	if (type === 'hidden') return '';
-	let size = getAttr(a, 'size') || 12;
-	//value = value.padEnd(size, '\u0320');
-	value = value.padEnd(size, '\u007E');
+
 	if (type === 'submit') {
-	  //return ` [SUBMIT ${nid} ${name}: \u0116${value}&nbsp;\u0216]\u030a`;
 	  // TODO: ink dissapared!
 	  //return `&nbsp;\u0104\u0116${value}\u0216\u0204&nbsp;foo\u030a`;
+	  let txt = getA11y(a);
+	  let disp = txt || value || 'SUBMIT';
+return `\u0101&nbsp;\u0116${disp}\u0216\u0201`;
 	  return `
 \u0104&nbsp;`+ // TODO: this is so it doesn't take column 01..
 // maybe this can be used as difference for block and inline-block??? haha
 `\u0113
-${value}
+${disp}
 &nbsp;
 \u0204
 &nbsp;` + // TODO: this is needed between INK+PAPER, why? otherwise cannot restore paper!
 `\u0213` + // TODO: 6_1foo (one too many _) 
 ``;
-	} else if (type === 'text') {
-	  return `\u0101\u0116${name}\u0100${value}\u0216\u0200\u0201\u030a`;
 	} else {
-	  // TODO: button
-	  // TODO: checkbox
-	  // TODO: rang
-	  // TODO: reset
-	  // TODO: radio
-	  // TODO: search
-	  return ` [INPUT ${nid} ${type} ${name}: \u0116${value}\u0216]\u030a`;
+	  let size = getAttr(a, 'size') || 12;
+	  // TODO: make sure not to read!
+	  value = value.padEnd(size, '\u007E');
+
+	  if (type === 'text') {
+
+	    return `\u0101\u0116${name}\u0100${value}\u0216\u0200\u0201\u030a`;
+	  } else {
+	    // TODO: button
+	    // TODO: checkbox
+	    // TODO: rang
+	    // TODO: reset
+	    // TODO: radio
+	    // TODO: search
+	    return ` [INPUT ${nid} ${type} ${name}: \u0116${value}\u0216]\u030a`;
+	  }
 	}
       })
     .replace(
@@ -6390,13 +6455,13 @@ ${value}
     .replace(/<p>\s*/g, '\n\u0320\u0320')
     .replace(/<\/p>\s*/g, '\n')
     .replace(/<div>/g, '\n')
-    .replace(/\/div>/g, '\n')
+    .replace(/<\/div>/g, '\n')
     .replace(/\n\n+/g, '\n\n')
 
-    .replace(/<h1>([\s\S]*?)<\/h1>/g, '\n\u0110\u0107$1\n\n\u0210\u0207')
-    .replace(/<h2>([\s\S]*?)<\/h2>/g, '\n\u0112\u0100$1\n\u0212\u0200')
-    .replace(/<h3>([\s\S]*?)<\/h3>/g, '\n\u0113\u0100$1\n\u0213\u0200')
-    .replace(/<h4>([\s\S]*?)<\/h4>/g, '\n\u0116\u0100$1\n\u0216\u0200')
+    .replace(/<h1>([\s\S]*?)<\/h1>/g, '\n\u0110\u0107$1\u030a\u0210\u0207')
+    .replace(/<h2>([\s\S]*?)<\/h2>/g, '\n\u0112\u0100$1\u030a\u0212\u0200')
+    .replace(/<h3>([\s\S]*?)<\/h3>/g, '\n\u0113\u0100$1\u030a\u0213\u0200')
+    .replace(/<h4>([\s\S]*?)<\/h4>/g, '\n\u0116\u0100$1\u030a\u0216\u0200')
 
     .replace(/<table>/g, '{{{' /* TODO: maybe show table as outline? */)
     .replace(/<\/table>/g, '}}}\u030a')
@@ -6511,13 +6576,23 @@ function showPage(h, err, nid, url){
   };
 
   function myputc(ch) {
+    // enable for debug
+    if (0) {
+      lastwasspace = false;
+      lastwasink = false;
+      lastwaspaper = false;
+    }
+
     if (row != lastrow) {
       rowcounter++;
       lastrow = row;
     }
 
-    if (cink == 7 && cpaper == 0+16 && col <= column && (lastwasink || lastwaspaper || lastwasspace))
-{      col = 0; column=0; }
+    if (cink == 7 && cpaper == 0+16 && col <= column && (lastwasink || lastwaspaper || lastwasspace)) {
+      col = 0;
+      column=0;
+    }
+
     // TODO: make it the default
     if (cink !== 7 || cpaper !== 0+16) {
       column = 2;
@@ -6543,11 +6618,13 @@ function showPage(h, err, nid, url){
       //let cont = (ch & 0x0F00 != 0x0300);
       if (isink(c7)) {
 	screen(row, 1, cink = c7);
-	lastwasink = 1;
       } else if (ispaper(c7)) {
 	screen(row, 0, cpaper = c7);
-	lastwaspaper = 1;
       }
+      // it can only be overwritten if column
+      lastwasink = false;
+      lastwaspaper = false;
+      lastwasspace = false
 
       return; // done here
     } else if (ch == 32 && lastwasspace) {
@@ -6560,7 +6637,7 @@ function showPage(h, err, nid, url){
 
     // escape control codes
     if (ch != 10 && c != 27 && ch < 32) {
-      if (lastwasspace ||
+      if ((lastwasspace && 0)||
 	  (lastwasink && isink(c7)) ||
 	  (lastwaspaper && ispaper(c7))) {
 	// how about more levels... lol
@@ -6569,11 +6646,15 @@ function showPage(h, err, nid, url){
       // update
       if (isink(c7)) {
 	cink = c7;
-	lastwasink = 1;
+	lastwasink = true;
+	lastwaspaper = false;
+	lastwasspace = false;
       }
       if (ispaper(c7)) {
 	cpaper = c7;
-	lastwaspaper = 1;
+	lastwasink = false;
+	lastwaspaper = true;
+	lastwasspace = false;
       }
 
       // TODO: 107 is start white ink
@@ -6587,7 +6668,6 @@ function showPage(h, err, nid, url){
       // finally print it!
       lastwasink = false;
       lastwaspaper = false;
-      
       lastwasspace = (ch == 32);
 
       // hard newline (pre, br)
@@ -6595,8 +6675,8 @@ function showPage(h, err, nid, url){
       // hard space (pre)
       if (ch == 0x0320) ch = 32;
 
-      // TODO: paper 0 ink 7
-      // <h1> can just move cursor to col=0!
+      // paper 0 ink 7
+      // (<h1>) can just move cursor to col=0!
       if (col == column && (lastwasink || lastwasspace || lastwaspaper) && cink == 7 && cpaper == 0+16) {
 	col = 0;
       }
@@ -6648,15 +6728,27 @@ function showPage(h, err, nid, url){
 	    // ingore unmatched
 	    //myputc(32);
 	    myputc('?'.charCodeAt(0));
-	  } else if (cpaper != t.cpaper) {
-	    // restore paper
-	    myputc(t.cpaper);
-	    //myputc('P'.charCodeAt(0));
-	  } else if (cink != t.cink) {
-	    // restore ink
-	    myputc(t.cink);
-	    //myputc('I'.charCodeAt(0));
+	    continue;
+	  }
+
+	  if (0) {
+	    // allow reverse in any order
+	    // (trust end attribute)
+	    myputc(c7);
 	  } else {
+	    // reverse in matching order
+	    // resore color
+	    if (cpaper != t.cpaper) {
+	      myputc(t.cpaper);
+	      //myputc('P'.charCodeAt(0));
+	    }
+	    if (cink != t.cink) {
+	      myputc(t.cink);
+	      //myputc('C'.charCodeAt(0));
+	    }
+	  }
+
+	  if (0) {
 	    // TODO: graphics ???
 	    myputc(32);
 	  }
@@ -6772,6 +6864,31 @@ function showPage(h, err, nid, url){
     if (c && k=='u') {
       if (1) { // for debugging
 	wget.pageid = 1;
+	wget.form[wget.pageid] = {};
+	showPage(`
+  <form action="/html/" method="post">
+    <input type="text" name="state_hidden" id="state_hidden" />
+  </form>
+  <div>
+    <div class="site-wrapper-border"></div>
+
+    <div id="header" class="header cw header--html">
+        <a title="DuckDuckGo" href="/html/" class="header__logo-wrap"></a>
+
+
+    <form name="x" class="header__form" action="/html/" method="post">
+
+      <div class="search search--header">
+          <input name="q" autocomplete="off" class="search__input" id="search_form_input_homepage" type="text" value="ARC4" />
+          <input name="b" id="search_button_homepage" class="search__button search__button--html" value="" title="Search" alt="Search" type="submit" />xyz
+      </div>
+      <input name="t" value="h_" type="hidden">
+    </form>
+
+`, undefined, wget.pageid, 'http://home.com/');
+	return;
+
+
 	showPage(`
 foobar
 <a href='works.com'>works</a> <a href='fie.org'> fie</a><a href='fum.sex'>fum </a> <a href='fish.ing'>fish</a> <a href='works.th'>works</a>
