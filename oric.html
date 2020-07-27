@@ -915,6 +915,7 @@ INFO:<br><span id='info'></span><br>
       ocols = SCREEN_COLS = INT(ocols/2+1)*2; // even
 
       dom('text').innerHTML = '';
+      dom('gtext').innerHTML = '';
     } else {
       // we're already in TEXT mode
       // keep screen
@@ -4990,7 +4991,7 @@ errorObj : ${errorObj}
     // '\4link\4link\0'
     // TODO: attr inside linktext
     let linktext = atmatch(
-      ln, /(?<=\4)\s*([^\0-\37]{2,})\s*[\0-\037]/);
+      ln, /(?<=[\4\6])\s*([^\0-\37]{2,})\s*[\0-\037]/);
     if (linktext) return {
 	type: 'linktext',
 	linktext,
@@ -4999,7 +5000,7 @@ errorObj : ${errorObj}
 
     // try till EOL
     linktext = atmatch(
-      ln, /\4\s*([^\0-\37]{2,})\s*$/g);
+      ln, /[\4\6]\s*([^\0-\37]{2,})\s*$/g);
     if (linktext) return {
       type: 'linktext',
       linktext,
@@ -6022,6 +6023,8 @@ function wget(url, cb) {
   // hardcode some chached files for debug
   if (url == 'R.C') {
     s.src = 'runeberg.org3';
+  } else if (url == 'H.C') {
+    s.src = 'html-tables.js';
   } else if (url == 'D.C') {
     s.src = 'duckduckgo.js';
   } else if (url == 'G.C') {
@@ -6074,7 +6077,7 @@ function img2teletext(tag, src, alt, lid, n) {
 \u0104g\u0204
 \u0102l\u0202
 \u0101e\u0201
-&nbsp;&nbsp;
+&nbsp;
 \u0210
 \u0217
 
@@ -6095,7 +6098,7 @@ function img2teletext(tag, src, alt, lid, n) {
     // - with spacing (depend width?)
     // - generate TELETEXT of alt-text
     // - generate lores image
-    return `\u0116${n}:${alt?alt:''}\u0216`;
+    return `\u0116${n}:${alt?alt:''} \u0216`;
   }
 }
 
@@ -6126,6 +6129,9 @@ function img2teletext(tag, src, alt, lid, n) {
     t = s.match(/<figcaption[\s\S]*?>(.*)<\/figcaption>/);
     if (t && t[1]) return t[1];
 
+    t = getAttr(s, 'aria-label');
+    if (t) return t;
+
     // TODO: this may be on any sub element...
     t = getAttr(s, 'title') || getAttr(s, 'alt');
     if (t) return t;
@@ -6138,6 +6144,8 @@ function img2teletext(tag, src, alt, lid, n) {
     // fallback - show name or id tag!
     t = getAttr(s, 'name') || getAttr(s, 'id');
 
+    // actually, give up!
+    return '';
 
     // we don't give up easy, use filename!
     t = getAttr(s, 'src') || getAttr(s, 'href');
@@ -6191,6 +6199,26 @@ function HTML2TELETEXT(nid, h) {
   // - https://github.com/iamcal/emoji-data
   // - https://github.com/bengarrett/RetroTxt
   // !!!!
+
+  // - http://html.com/tables MENU (hide)
+  // <span class='mega-toggle-label' role='button' aria-expanded='false'>
+  //   role='button' => show small/toggle view?
+  //   aria-expanded='false'
+
+  // tables:
+  // - could just show an outline
+  //   i.e., indent but without tags!
+  // - or, render as text table, lynx is bad
+  
+  // font-size:
+  // - style='font-size:'
+  // - <big>/<small> (BIG notin HTML5,but small!)
+  // - <font size=3> (1..7, +1,-1, notin HTML5!)
+  
+  // colors
+  // - <font color='red'     (not in HTML5!)
+  // - <xxx style='color:xxx;'
+  // <li class="popular_posts_bars_li popular_posts_bars_color_orange">
 
   h = h
     .replace(/&raquo;/ig, '&gt;&gt;')
@@ -6265,8 +6293,7 @@ function HTML2TELETEXT(nid, h) {
     .replace(/\u2053/ig, '~')
 
     .replace(/\u2038/ig, '^')
-    .replace(/\u2039/ig, '&lt;')
-    .replace(/\u203a/ig, '&gt;')
+    .replace(/\u2039/ig, '&lt;')    .replace(/\u203a/ig, '&gt;')
     .replace(/\u203b/ig, '***')
     .replace(/\u203c/ig, '!!')
     .replace(/\u203d/ig, '!?')
@@ -6295,10 +6322,15 @@ function HTML2TELETEXT(nid, h) {
 
     .replace(/<(\w+)[\s\S]*?aria-hidden=.*?[s\S]*?\/\1>/ig, '')
 
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/<title[\s\S]*?\/title>/g, '')
+    .replace(/<style[\s\S]*?\/style>/ig, '')
+    .replace(/<script[\s\S]*?\/script>/ig, '')
+    .replace(/<head[\s\S]*?\/head>/ig, '')
+
     .replace(
       /<img[\s\S]*?>/g,
       (a)=>{
-	// TODO: hardcode some rendering
 	// TODO: render alt as "big font"?
 
 	let alt = getA11y(a);
@@ -6307,14 +6339,11 @@ function HTML2TELETEXT(nid, h) {
 
 	let src = getAttr(a, 'src');
 
-	// TODO:? use diff counter for images
-	// use filename
-	
 	if (!alt)
 	  alt = getA11y(a);
 
 	let have = wget.url[`${nid} ${src}`];
-	if (have)
+	if (have && !alt)
 	  return `\u0116${have} \u0216`;
 
 	n++;
@@ -6400,7 +6429,7 @@ function HTML2TELETEXT(nid, h) {
 	  //return `&nbsp;\u0104\u0116${value}\u0216\u0204&nbsp;foo\u030a`;
 	  let txt = getA11y(a);
 	  let disp = txt || value || 'SUBMIT';
-return `\u0101&nbsp;\u0116${disp}\u0216\u0201`;
+return `&nbsp;&nbsp;\u0103\u0114${disp} \u0203\u0214`;
 	  return `
 \u0104&nbsp;`+ // TODO: this is so it doesn't take column 01..
 // maybe this can be used as difference for block and inline-block??? haha
@@ -6418,7 +6447,7 @@ ${disp}
 
 	  if (type === 'text') {
 
-	    return `\u0101\u0116${name}\u0100${value}\u0216\u0200\u0201\u030a`;
+	    return `&nbsp;\u0101\u0113${name}\u0100${value}\u0213\u0200\u0201\u030a`;
 	  } else {
 	    // TODO: button
 	    // TODO: checkbox
@@ -6438,15 +6467,14 @@ ${disp}
 
     .replace(/<(\w+)[\s\S]*?>/g, '<$1>')
 
-    .replace(/<!--[\s\S]*?-->/g, '')
-    .replace(/<title[\s\S]*?\/title>/g, '')
-    .replace(/<style[\s\S]*?\/style>/g, '')
-    .replace(/<script[\s\S]*?\/script>/g, '')
-    .replace(/<head[\s\S]*?\/head>/g, '')
+    .replace(
+      /<code>(.*?)<\/code>/ig,
+      '\u0102\u0110$1 \u0202\u0210')
     .replace(
       /<pre>([\s\S]*?)<\/pre>/gi,
-      (a)=>a.replace(/\n/g, '\u030a\u0320\u0320')
-	.replace(/ /g, '\u0320'))
+      (a)=>'\u030a\u0110\u0102'+a.replace(/\n/g, '\u030a')
+	.replace(/ /g, '\u0320')+
+	'\u0202\u0210')
 
     .replace(/\n/g, ' ')
     .replace(/ +/g, ' ')
@@ -6463,13 +6491,14 @@ ${disp}
     .replace(/<h3>([\s\S]*?)<\/h3>/g, '\n\u0113\u0100$1\u030a\u0213\u0200')
     .replace(/<h4>([\s\S]*?)<\/h4>/g, '\n\u0116\u0100$1\u030a\u0216\u0200')
 
-    .replace(/<table>/g, '{{{' /* TODO: maybe show table as outline? */)
-    .replace(/<\/table>/g, '}}}\u030a')
-    .replace(/<tr>([\s\S]*?)<\/tr>/g, '{$1}\u030a')
-    .replace(/<\/td>\s*<td>/g, '|')
-    .replace(/(<td>|<\/td>)/g, '|')
+    .replace(/<table>/ig, '{{{' /* TODO: maybe show table as outline? */)
+    .replace(/<\/table>/ig, '}}}\u030a')
+    .replace(/<tr>([\s\S]*?)<\/tr>/ig, '{$1}\u030a')
+    .replace(/<\/td>\s*<td>/ig, ' | ')
+    .replace(/(<td>|<\/td>)/ig, ' | ')
+    .replace(/<td>/ig, ' | <th>')
     .replace(/<th>([\s\S+]*?)<\/th>/g, '\u0101$1\u0201')
-    .replace(/(<th>\s*<\/th>)/g, '|')
+    .replace(/(<th>\s*<\/th>)/g, ' | ')
 
     .replace(/<[\s\S]*?>/g, ' ')
 
@@ -6480,7 +6509,7 @@ ${disp}
 
     .replace(/&nbsp;/ig, '\u0320')
     .replace(/&gt;/ig, '>')
-    .replace(/&lt;/ig, '>')
+    .replace(/&lt;/ig, '<')
     .replace(/&quot;/ig, '"')
     .replace(/&.squo;/ig, "'")
     .replace(/&.dquo;/ig, '"')
@@ -6760,6 +6789,11 @@ function showPage(h, err, nid, url){
 	    // same
 	    myputc(32);
 	  } else {
+	    // hack: color correction:
+	    // (<h1><a>... => blue on black :-(
+	    // change to cyan!
+	    if (cpaper == 0+16 && c7 == 4)
+	      c7 = 6;
 	    myputc(c7);
 	  }
 	  //myputc('v'.charCodeAt(0));
