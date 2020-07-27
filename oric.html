@@ -506,12 +506,12 @@ g
     <!--- WEB-BASEIC^PDF-link, jsk, email --->
     <div style='flex:2;'>
 
-      <div class='oric' style='font-decoration:bold;font-size:2rem; letter-spacing:3px;'>
+      <div class='oric' style='font-decoration:bold;font-size:2rem; letter-spacing:3px; color:yellow; background: blue;'>
         WEB - BASIC<sup><a tabindex='-1' class='oric' target='oricman' style='text-decoration:none; font-size:1.1rem; padding:0.0rem; padding-bottom:-0.1rem; color:black; background:white; font-weight:bold; letter-spacing:0px;' href='http://www.defence-force.org/computing/oric/library/lib_manual_oric/files/manual_atmos.pdf'>PDF</a></sup>
       </div>
 
-      <div class='oric' style='font-weight:bold; font-size:1rem;'>
-	&copy;2020 <a href='email:jsk@yesco.org' style='color:blue; background:yellow;'>&nbsp;Jonas S Karlsson&nbsp;</a>
+      <div class='oric' style='font-weight:bold; font-size:1.2rem; color:blue; background:yellow;'>
+	`2020 <a href='email:jsk@yesco.org' style=''>&nbsp;Jonas S Karlsson&nbsp;</a>
       </div>
 
     </div>
@@ -875,7 +875,7 @@ INFO:<br><span id='info'></span><br>
     cont.millis = 0;
 
     // action
-    TEXT();
+    TEXT(SCREEN_ROWS, SCREEN_COLS); // first time
     CLS();
     print(
 `ORIC EXTENDED BASIC V1.2
@@ -884,6 +884,7 @@ INFO:<br><span id='info'></span><br>
  372631 BYTES FREE`);
   }
 
+  // first time, at boot must call with size
   function TEXT(orows, ocols, mode) {
     // DOC: Goes to TEXT mode
     // New: ROWS, COLS argument!
@@ -892,38 +893,48 @@ INFO:<br><span id='info'></span><br>
 
     let sc;
 
-    if (hires() && !mode) {
-      // make it TEXT
+    if (orows && ocols && !mode) {
+      // first time / change size
+
+      if (TEXT.textinit)
+	sc = screenSaved();
+
+      orows = SCREEN_ROWS = INT(orows);
+      ocols = SCREEN_COLS = INT(ocols/2+1)*2; // must be even
+
+      // holds all lines except...
+      dom('text').innerHTML = '';
+      // holds last 3 lines
+      dom('gtext').innerHTML = '';
+
+      TEXT.textinit = true;
+      // ok, let's create the text screen
+    } else if (hires() && !mode) {
+      // switch to TEXT
+
       // TODO: just hide graphics!
       dom('graphics').hidden = true;
       dom('text').hidden = false;
       lores = 0;
       toprow = 1;
+      return;
+
     } else if (mode) {
-      // HIRES!
+      // switch HIRES!
+
       dom('graphics').hidden = false;
       dom('text').hidden = true;
       lores = 1;
-      toprow = SCREEN_ROWS - GTEXT_ROWS;
+      row = toprow = SCREEN_ROWS - GTEXT_ROWS;
       if (TEXT.hiresinit) return;
+
       TEXT.hiresinit = true;
-    } else if (orows && ocols) {
-      sc = screenSaved();
+      // ok, fall through will create hires
 
-      // change screen size!
-      orows = SCREEN_ROWS = INT(orows);
-      ocols = SCREEN_COLS = INT(ocols/2+1)*2; // even
-
-      dom('text').innerHTML = '';
-      dom('gtext').innerHTML = '';
     } else {
-      // we're already in TEXT mode
-      // keep screen
+      // we're already in TEXT mode dummy!
       return;
     }
-
-    orows = orows || SCREEN_ROWS;
-    ocols = ocols || SCREEN_COLS;
 
     //    c = '&nbsp;';
     c = '';
