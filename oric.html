@@ -6279,8 +6279,102 @@ function HTML2TELETEXT(nid, h) {
     .replace(/\xa0/g, '\u0320' /*nbsp*/)
     .replace(/\ufffd/g, '(?)' /*unknown*/)
 
-    .replace(/\u00BB/ig, '&gt;&gt;')
-    .replace(/\u203a/ig, '&gt;')
+    .replace(/\u00B0/g, 'o' /* degree */)
+    .replace(/\u200b/g, '' /* zwidth space */)
+
+    .replace(/\u2100/g, 'a/o')
+    .replace(/\u2101/g, 'a/s')
+    .replace(/\u2103/g, 'oC')
+    .replace(/\u2105/g, 'c/o')
+    .replace(/\u2106/g, 'c/u')
+    .replace(/\u2109/g, 'oF')
+    .replace(/\u214d/g, 'A/S')
+
+    .replace(/\u2116/g, 'No ')
+    .replace(/\u2121/g, 'TEL ')
+    .replace(/\u2122/g, 'TM')
+    .replace(/\u2126/g, 'Ohm')
+    .replace(/\u212a/g, 'K')
+    .replace(/\u212b/g, 'Angstro"m')
+    .replace(/\u213b/g, 'FAX ')
+
+    .replace(/\u2200/g, '(forall)')
+    .replace(/\u2202/g, '(partial difference)')
+    .replace(/\u2203/g, '(there exists)')
+    .replace(/\u2204/g, '(there does not exists)')
+    .replace(/\u2205/g, '(emtpy set)')
+    .replace(/\u2206/g, '(inc)')
+    .replace(/\u2207/g, '(dec)')
+    .replace(/\u2208/g, '(element of)')
+    .replace(/\u2209/g, '(not element of)')
+    .replace(/\u220b/g, '(contains)')
+    .replace(/\u220c/g, '(does not contain)')
+
+    .replace(/\u220e/g, 'QED' /* end of proof */)
+    .replace(/\u220e/g, '(".)' /* end of proof */)
+    .replace(/\u220f/g, '(N*)' /* N-ary product */)
+    .replace(/\u220g/g, '(U*)' /* U-ary coproduct */)
+    .replace(/\u220g/g, '(E+)' /* N-ary summation */)
+
+    .replace(/\u2212/g, '-')
+    .replace(/\u2213/g, '+/-')
+    .replace(/\u2215/g, '/')
+    .replace(/\u2217/g, '*')
+    .replace(/\u2218/g, 'o' /* ring operator */)
+    .replace(/\u221a/g, 'SQRT')
+    .replace(/\u221b/g, 'CUBEROOT')
+    .replace(/\u221c/g, '4ROOT')
+    .replace(/\u221e/g, '(oo)')
+    .replace(/\u221f/g, '(L)')
+    .replace(/\u2220/g, '(V)')
+    .replace(/\u2221/g, '(V-)')
+    .replace(/\u2222/g, '(<|)')
+    .replace(/\u2223/g, '(DIVIDES)')
+    .replace(/\u2224/g, '(DOES NOT DIVIDE)')
+    .replace(/\u2225/g, '||')
+    .replace(/\u2226/g, '(-||)')
+    .replace(/\u2227/g, '(^)')
+    .replace(/\u2228/g, '(v)')
+    .replace(/\u2229/g, '(&')
+    .replace(/\u222a/g, '(U)')
+    .replace(/\u222b/g, '(INTEGRAL)')
+    .replace(/\u222c/g, '(2INTEGRAL)')
+    .replace(/\u222d/g, '(3INTEGRAL)')
+    .replace(/\u2234/g, "(.'.)")
+    .replace(/\u2235/g, "('.')")
+    .replace(/\u2236/g, ':')
+    .replace(/\u2237/g, '::')
+
+    .replace(/\u2260/g, '!=')
+    .replace(/\u2261/g, '===')
+    .replace(/\u2262/g, '!==')
+    .replace(/\u2263/g, '(==)')
+    .replace(/\u2264/g, '&lt;=')
+    .replace(/\u2265/g, '&gt;=')
+    .replace(/\u226a/g, '&lt;&lt;')
+    .replace(/\u22d8/g, '&lt;&lt;&lt;')
+    .replace(/\u226b/g, '&gt;&gt;')
+    .replace(/\u22d9/g, '&gt;&gt;&gt;')
+    .replace(/\u2276/g, '&lt;&gt;')
+    .replace(/\u2277/g, '&gt;&lt;')
+
+    .replace(/\u2282/g, '(SUBSET OF)')
+    .replace(/\u2283/g, '(SUPERSET OF)')
+
+    .replace(/\u22bb/g, '(XOR)')
+    .replace(/\u22bc/g, '(NAND)')
+    .replace(/\u22bd/g, '(NOR)')
+
+    .replace(/\u22c8/g, '|><|')
+
+
+    .replace(/\u00d7/g, 'x')
+    .replace(/\u22c5/g, '(.)' /* dot operator */)
+
+    .replace(/\u2002/g, ' ' /* en-space, lol */)
+
+    .replace(/\u00BB/g, '&gt;&gt;')
+    .replace(/\u203a/g, '&gt;')
     .replace(/[\u2018-\u201b]/ig, "'")
     .replace(/[\u201c-\u201f]/ig, '"')
 
@@ -6592,6 +6686,7 @@ function urlView(url) {
 function showPage(h, err, nid, url){
   let txt = HTML2TELETEXT(nid, h);
   let i = 0;
+  let screenstartindex = 0;
 
   // This controls how many chars to print
   // per tick.
@@ -6599,6 +6694,7 @@ function showPage(h, err, nid, url){
   //  4 = 1200 baud
   //  SCREEN_COLS = about 1 page / second
   let step = SCREEN_COLS; //SCREEN_COLS; // !
+  step = SCREEN_ROWS*SCREEN_COLS/5;
 
   // colors
   let isink = c7=>(c7 <= 7);
@@ -6625,7 +6721,9 @@ function showPage(h, err, nid, url){
   function putc(ch) {
     let lastrow = row;
     let r = window.putc(ch);
-    if (row != lastrow) {
+    
+    // rolling in-place display
+    if (0 && row != lastrow) {
 
       // clear some rows
       let r = row;
@@ -6773,6 +6871,86 @@ function showPage(h, err, nid, url){
     }
   }
 
+  let startTime = Date.now();
+
+  function navigate() {
+    iplot(0,SCREEN_ROWS-1,'\x16\x00SPC < + - ESC C-U');
+    inputMode = function navigation(k) {
+      if (k < 0) return;
+
+      let c = String.fromCharCode(k).toLowerCase();
+      iplot(0,0, 'k='+k+' c='+c+'    ');
+      switch(c) {
+      case ' ': { // next page
+	inputMode = undefined;
+	screenstartindex = i;
+	CLS();
+	break; }
+      case 'q':
+      case ESC: { // quit
+	inputMode = undefined;
+	CLS();
+	stop();
+	break; }
+      case '<': { // beginning
+	inputMode = undefined;
+	//step = txt.length;
+	i = 0;
+	CLS();
+	break; }
+      case '/': { // search in page
+	inputMode = undefined;
+	screenstartindex = i = 0;
+	CLS();
+	break; }
+      case 'n': { // next match
+	inputMode = undefined;
+	screenstartindex = i = 0;
+	CLS();
+	break; }
+      case 'p': { // prev match
+	inputMode = undefined;
+	screenstartindex = i = 0;
+	CLS();
+	break; }
+      case '+': { // zoom: less rows/cols
+	inputMode = undefined;
+	// how about state? (parse from beginning?)
+	CLS();
+	screenstartindex = i = 0;
+	//step = txt.length;
+	TEXT(INT(SCREEN_ROWS/1.4+1),
+	     INT(SCREEN_COLS/1.1));
+	break; }
+      case '-': { // zoom out: more rows/cols
+	inputMode = undefined;
+	// how about state? (parse from beginning?)
+	CLS();
+	screenstartindex = i = 0;
+	//step = txt.length;
+	TEXT(INT(SCREEN_ROWS*1.4),
+	     INT(SCREEN_COLS*1.1));
+	break; }
+      default: { // pass it on (arrows etc)
+	return false;
+	break; }
+      }
+
+      // eat up keystroke
+      lastKey = -1;
+      end = i + step;
+      return true;
+    };
+
+    row = toprow;
+    col = column;
+
+    // to not get stuck later
+    //rowcounter++; 
+    rowcounter = 0;
+    return;
+  }
+
   RUN.interval = setInterval(
     function printSlow() {
       // TOOD: generalize these runners
@@ -6784,20 +6962,33 @@ function showPage(h, err, nid, url){
       let end = i + step;
       for(; i<end; i++) {
 
+	if (row >= SCREEN_ROWS-2)
+	  return navigate();
+
 	if (i > txt.length) {
 	  if (col !== column) print();
 	  print('-- ' + url);
-	  stop();
-	  return;
+	  // TODO: not accurate as involve waiting time for next page etc
+	  //print('(Rendering '+(Date.now()-startTime)+' ms)');
+	  return navigate();
 	}
 
+	let c = txt[i];
 	let ch = txt.charCodeAt(i);
 	let c7 = ch & 0x7f;
 
 	// output whole word unbroken
-	// split word if not fit?
+	// or split word according to hyphen.
 	// (this already avoids already hypnen)
-	let word = txt.substr(i).match(/^['"]{0,1}[\w]+[,\.\?:;!'"]{0,1}/);
+	// word-limit length == 25...
+	let word;
+	if (1)
+	  //if (c === '"' || c === "'" ||
+	  //(c >= 'a' && c <= 'z'))
+	{
+	  word = txt.substr(i, 25)
+	    .match(/^['"]{0,1}[\w]+[,\.\?:;!'"]{0,1}/);
+	}
 	if (word) {
 	  word = word[0];
 	  let l = word.length;
@@ -6808,7 +6999,8 @@ function showPage(h, err, nid, url){
 	    // fits!
 	    for(let j=0; j<l; j++)
 	      myputc(word.charCodeAt(j));
-	  } else {
+	    //myputc('~'.charCodeAt(0));
+	  } else if (1) { // 20% slower :-(
 	    // doesn't fit
 	    let parts = hyphen(word).split(' ');
 	    parts.forEach((p,i)=>{
@@ -6821,16 +7013,13 @@ function showPage(h, err, nid, url){
 		; // fine!
 	      } else {
 		// isn't last, or didn't fit
-		if (col + pl > SCREEN_COLS-1) {
-		  // this is more strict,
-		  // - need to make space for '-'
-		  if (i)
-		    myputc('-'.charCodeAt(0));
 
-		  // '-' could have moved us!
-		  if (col !== column)
-		    myputc(10);
-		}
+		if (i)
+		  myputc('-'.charCodeAt(0));
+
+		// '-' could have moved us!
+		if (col !== column)
+		  myputc(10);
 	      }
 	      
 	      for(let j=0; j<pl; j++)
@@ -6840,8 +7029,10 @@ function showPage(h, err, nid, url){
 	  }
 
 	  //myputc(']'.charCodeAt(0));
-	  i += l;
-	  return;
+
+	  i +=  l - 1; // cont will inc by one!
+	  //end += 2;
+	  continue;
 	}
 	
 	if (ch >= 0x0300) {
@@ -6898,18 +7089,9 @@ function showPage(h, err, nid, url){
 	  myputc(ch);
 	}
 	
-	if (0 && !(rowcounter % (SCREEN_ROWS-2))) {
-	  // this doesn't work CTRL-S becomes 'b'??? wtf???
-
-	  // doesn't move cursor
-	  iplot(2,SCREEN_ROWS-1,'-- CTRL-S TO CONT/STOP');
-	  scstop = 1;
-	  return;
-	}
       } // for
     }, 0); // set interval
 } // 
-
 
 
 /* WORD-SPLITTING
@@ -6984,6 +7166,7 @@ Here they are, in roughly decreasing order of priority:
       .replace(/(\w[aeiouy])ed/, ' $1 ed')
       .replace(/r y$/, ' ry')
       .replace(/^(\S{1,3}) /, '$1')
+      .replace(/ (\S{1,3})$/, '$1')
     ;
     return pre + w + post;
   }
@@ -6996,7 +7179,7 @@ Here they are, in roughly decreasing order of priority:
   dom('exp').addEventListener('keydown', function(e) {
     let c=e.ctrlKey,a=e.altKey,s=e.shiftKey;
     let k = e.key.toLowerCase();
-    let ch = e.code;
+    let ch = e.code; // name of key
     let kc = e.keyCode; // legacy
 
     // we seem to get this all the time!?
@@ -7008,8 +7191,8 @@ Here they are, in roughly decreasing order of priority:
     // A      ==> 65 (with CAPS)
     // a      ==> 97
     // ALT-A  ==>
-    if (kc > 32) {
-      lastKey = kc;
+    if (1 || c > 32) {
+      lastKey = k.charCodeAt(0);
 
       if (c)
 	lastKey -= 64;
@@ -7019,6 +7202,9 @@ Here they are, in roughly decreasing order of priority:
 
       if (a)
 	lastKey += 128;
+    } else if (kc < 16 || kc > 18) {
+      // not just shift/ctrl/alt
+      lastKey = kc;
     }
 
     // if set, call it
