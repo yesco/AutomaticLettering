@@ -5371,7 +5371,7 @@ errorObj : ${errorObj}
 
     // const - don't save
 
-    xmodes: 'x+/ ',
+    xmodes: '.x+/-# ',
 
     // functions as map
     // (all functions are added by name too!)
@@ -5449,6 +5449,15 @@ errorObj : ${errorObj}
       this.save('set');
       CURMOV(0, 0, 1);
       this.mark();
+    },
+    M: function modechange() {
+      // 0 - unset
+      // 1 - set (if it's no attribute)
+      // 2 - xor
+      // 3 - just move
+      // (4 - don't clobber text (LORES 1)
+      this.mode = (this.mode + 1) % 3;
+      return 'Mode = ' + this.mode;
     },
     m: function mark() {
       // don't mark twice (keep other)
@@ -5577,6 +5586,11 @@ errorObj : ${errorObj}
 
       gedit = true;
     },
+    // TODO: https://www.vt100.net/docs/vt3xx-gp/chapter1.html#S1.6
+    // - diamond
+    // - crosshair
+    // - rubber band line (show what will be drawn)
+    // - rubber band rectangle (selection?)
     x: function crossmode() {
       this.xmode = (this.xmode+1) % this.xmodes.length;
       return this.xmodes[this.xmode].repeat(10);
@@ -5588,6 +5602,7 @@ errorObj : ${errorObj}
 
       let m = this.xmodes[this.xmode];
       switch(m) {
+      case '.': CURSET(x, y, 2); break;
       case '+':   // long cross
       case 'x': { // straight cross
 	let z = m == 'x' ? 5 : 300;
@@ -5596,13 +5611,26 @@ errorObj : ${errorObj}
 	CURSET(x, y, 3); DRAW( 0,+z, 2);
 	CURSET(x, y, 3); DRAW( 0,-z, 2);
 	break; }
-      case '/': {
+      case '/': { // pen
 	let z = 5;
 	CURSET(x, y, 3); DRAW(+z+1,-z-1, 2);
 	CURSET(x+1, y-2, 3); DRAW(+z,-z, 2);
 	CURSET(x+2, y-1, 3); DRAW(+z,-z, 2);
 	// we need to draw x,y even times!
 	CURSET(x, y, 2);
+	break; }
+      case '-': { // rubber line
+	CURSET(this.ox, this.oy, 3);
+	DRAW(x-this.ox, y-this.oy, 2);
+	break; }
+      case '#': { // rubber box
+	let dx = x-this.ox;
+	let dy = y-this.oy;
+	CURSET(this.ox, this.oy, 3);
+	DRAW(dx, 0, 2);
+	DRAW(0, dy, 2);
+	DRAW(-dx, 0, 2);
+	DRAW(0, -dy, 2);
 	break; }
       default: // none;
       }
@@ -6630,7 +6658,7 @@ function showPage(h, err, nid, url){
 
     if (cink == 7 && cpaper == 0+16 && col <= column && (lastwasink || lastwaspaper || lastwasspace)) {
       col = 0;
-      column=0;
+      column = 0;
     }
 
     // TODO: make it the default
@@ -6676,12 +6704,20 @@ function showPage(h, err, nid, url){
       return;
 
     // escape control codes
-    if (ch != 10 && c != 27 && ch < 32) {
-      if ((lastwasspace && 0)||
+    if (ch != 10 && ch != 27 && ch < 32) {
+      // TODO: some bug if enable lastwassapce
+      // HTML.COM/TABLES losses some bgcol restore
+      // this is because, they may come in different order, the end attribute actually just triggers restore of cink/cpaper...
+      
+      if ((lastwasspace && 0) ||
 	  (lastwasink && isink(c7)) ||
 	  (lastwaspaper && ispaper(c7))) {
 	// how about more levels... lol
-	if (col > 2) col--; // BS
+	if (col > 2) col--; // BackSpace
+      }
+      if (lastwasspace && col > 0 &&
+	  screen(row, col-1) === ' ') {
+	col--; // BackSpace
       }
       // update
       if (isink(c7)) {
@@ -6758,6 +6794,56 @@ function showPage(h, err, nid, url){
 	let ch = txt.charCodeAt(i);
 	let c7 = ch & 0x7f;
 
+	// output whole word unbroken
+	// split word if not fit?
+	// (this already avoids already hypnen)
+	let word = txt.substr(i).match(/^['"]{0,1}[\w]+[,\.\?:;!'"]{0,1}/);
+	if (word) {
+	  word = word[0];
+	  let l = word.length;
+
+	  //myputc('['.charCodeAt(0));
+
+	  if (col + l < SCREEN_COLS) {
+	    // fits!
+	    for(let j=0; j<l; j++)
+	      myputc(word.charCodeAt(j));
+	  } else {
+	    // doesn't fit
+	    let parts = hyphen(word).split(' ');
+	    parts.forEach((p,i)=>{
+	      let islast = parts.length === i+1;
+	      let pl = p.length;
+	      // newline if not fit, and not too big
+	      if (islast &&
+		  col + pl <= SCREEN_COLS){
+		// last does fit!
+		; // fine!
+	      } else {
+		// isn't last, or didn't fit
+		if (col + pl > SCREEN_COLS-1) {
+		  // this is more strict,
+		  // - need to make space for '-'
+		  if (i)
+		    myputc('-'.charCodeAt(0));
+
+		  // '-' could have moved us!
+		  if (col !== column)
+		    myputc(10);
+		}
+	      }
+	      
+	      for(let j=0; j<pl; j++)
+		myputc(p.charCodeAt(j));
+	      //myputc('&'.charCodeAt(0));
+	    });
+	  }
+
+	  //myputc(']'.charCodeAt(0));
+	  i += l;
+	  return;
+	}
+	
 	if (ch >= 0x0300) {
 	  // continue color (delimiter)
 	  myputc(ch);
@@ -6823,6 +6909,87 @@ function showPage(h, err, nid, url){
       } // for
     }, 0); // set interval
 } // 
+
+
+
+/* WORD-SPLITTING
+ https://english.stackexchange.com/questions/385/what-are-the-rules-for-splitting-words-at-the-end-of-a-line
+
+Here they are, in roughly decreasing order of priority:
+
+- Break words at morpheme boundaries (inter-face, pearl-y, but ear-ly).
+- Break words between doubled consonants — 'sc' counts here but not 'ck'. (bat-tle, as-cent, jack-et).
+- Never separate an English digraph (e.g., th, ch, sh, ph, gh, ng, qu) when pronounced as a single unit (au-thor but out-house).
+- Never break a word before a string of consonants that cannot begin a word in English (anx-ious and not an-xious).
+- Never break a word after a short vowel in an accented syllable (rap-id but stu-pid).
+- Finally, if the above rules leave more than one acceptable break between syllables, use the Maximal Onset Principle:
+
+// RULES
+// - Never slit Names with Capitals
+//   (first word?)
+// - Don't start line w 2 letter suffix
+// - Don't hyphen word with hyphen!
+//
+
+// A simple algorithm in code on:
+// - https://stackoverflow.com/questions/405161/detecting-syllables-in-a-word 
+
+*/
+  
+  // hyphenate -> hy phen ate
+  // ignores leading/ending interpunktuations
+  //
+  // errors:
+  //   authentication -> au then tic a tion
+  //
+  // probably crap, but simple!
+  // but better than nothing!(?)
+  function hyphen(w) {
+    // don't hypenate Proper Names (or aNyFunny)
+    if (w.match(/[A-Z]/)) return w;
+    // no hypernate hypernated words!
+    if (w.match(/\-/)) return w;
+
+    // remove pre/post non characters (add later)
+    let pre = '', post = '';
+    w = w
+      .replace(/^(\W+)/, a=>(pre=a,''))
+      .replace(/(\W+)$/, a=>(post=a,''))
+
+    // exceptions
+    w = w
+      .replace(/^(pro|pre|de|un|dis|post|be|para|hy|all)/, '$1 ');
+    
+    // wovelS consonant - 
+    w = w.replace(/([aeiouy]+[bcdfgjklmnpqrstvwxz][he]{0,1})/g, '$1 ');
+
+    // undo some...
+    w = w
+      .replace(/ +/g, ' ').trim()
+      .replace(/\b ([aeiouy])([^aeiouy])([aeiouy]) /g, ' $1 $2')
+      .replace(/c k/g, 'ck ')
+      .replace(/n g/g, 'ng')
+      .replace(/t h/g, 'th')
+      .replace(/\b ([^aeiouy])\b/g, '$1')
+      .replace(/\b([^aeiouy]) \b/g, '$1')
+      .replace(/ es$/, 'es' /* silent */)
+      .replace(/ (.)ing$/, '$1 ing')
+      .replace(/(.) ion$/, ' $1ion')
+      .replace(/(.) ied$/, ' $1ied')
+      .replace(/(.) al$/, ' $1al')
+      .replace(/(.) st$/, ' $1st')
+      .replace(/(.) ry$/, ' $1ry')
+      .replace(/\Bth /, ' th')
+      .replace(/(\w[^aeiouy])ed/, '$1 ed')
+      .replace(/(\w[aeiouy])ed/, ' $1 ed')
+      .replace(/r y$/, ' ry')
+      .replace(/^(\S{1,3}) /, '$1')
+    ;
+    return pre + w + post;
+  }
+
+  // ---------------- KEYBOARD ---------------
+
 
   let lastKey;
 
