@@ -6492,6 +6492,7 @@ function HTML2TELETEXT(nid, h) {
 
     .replace(/<b>([\s\S]*?)<\/b>/ig, '\u0101$1\u0201')
     .replace(/<i>([\s\S]*?)<\/i>/ig, '\u0105$1\u0205')
+    .replace(/<em>([\s\S]*?)<\/em>/ig, '\u0107\u0110$1&nbsp;\u0207\u0200')
 
     .replace(
       /\s*<a [\s\S]*?>\s*([\s\S]*?)\s*<\/a>\s*/ig,
@@ -6613,6 +6614,7 @@ ${disp}
     .replace(/ +/g, ' ')
 
     .replace(/<li>\s*/g, '\n\u0101*\u0201')
+    .replace(/<xxul>\s*/g, '\n&nbsp;&nbsp;' /* TODO: indent? */)
     .replace(/<p>\s*/g, '\n\u0320\u0320')
     .replace(/<\/p>\s*/g, '\n')
     .replace(/<div>/g, '\n')
@@ -6623,6 +6625,9 @@ ${disp}
     .replace(/<h2>([\s\S]*?)<\/h2>/g, '\n\u0112\u0100$1\u030a\u0212\u0200')
     .replace(/<h3>([\s\S]*?)<\/h3>/g, '\n\u0113\u0100$1\u030a\u0213\u0200')
     .replace(/<h4>([\s\S]*?)<\/h4>/g, '\n\u0116\u0100$1\u030a\u0216\u0200')
+    .replace(/<h5>([\s\S]*?)<\/h5>/g, '\n\u0116\u0101$1\u030a\u0216\u0201')
+    .replace(/<h6>([\s\S]*?)<\/h6>/g, '\n\u0116\u0105$1\u030a\u0215\u0200')
+
 
     .replace(/<table>/ig, '{{{' /* TODO: maybe show table as outline? */)
     .replace(/<\/table>/ig, '}}}\u030a')
@@ -6673,45 +6678,92 @@ function urlView(url) {
   CLS();
   clearline(0);
   iplot(0, 0, 'Loading '+url+' ...');
+  let start = Date.now();
   wget(
     url,
     function(h, err, nid, url) {
-      CLS();
-      let u = url;
-      iplot(0, 0, u.substring(0, SCREEN_COLS));
-      showPage(h, err, nid, url);
+      showPage(h, err, nid, url,
+	       Date.now()-start);
     });
 }
 
-function showPage(h, err, nid, url){
+function showPage(h, err, nid, url, loadms){
+  clearline(0);
+  iplot(0, 0, 'load='+loadms);
+
+  let parsems = Date.now();
   let txt = HTML2TELETEXT(nid, h);
-  let i = 0;
-  let screenstartindex = 0;
+  parsems = Date.now() - parsems;
 
-  // This controls how many chars to print
-  // per tick.
-  //  1 = 300 baud (feels like it, readble)
-  //  4 = 1200 baud
-  //  SCREEN_COLS = about 1 page / second
-  let step = SCREEN_COLS; //SCREEN_COLS; // !
-  step = SCREEN_ROWS*SCREEN_COLS/5;
-
-  // colors
   let isink = c7=>(c7 <= 7);
   let ispaper = c7=>(16 <= c7 && c7 <= 24);
 
-  // charcodes of current inc/paper
-  let cink = ink;
-  let cpaper = paper + 16;
+  // fast go pages back
+  let pageindex = [];
+  let lastcleanindex = 0;
 
-  let cstack = [];
+  // state
+  let i, screenstartindex, step,
+      cink, cpaper, cstack,
+      lastwasink, lastwaspaper, lastwasspace,
+      rowcounter, lastrow,
+      startTime,
 
-  let lastwasink = false;
-  let lastwaspaper = false;
-  let lastwasspace = (ch == 32);
+      forwardms, renderms,
 
-  let rowcounter = 0;
-  let lastrow = 0;
+      lastDummy;
+
+  i = 0;
+
+  function reset(atindex=-1) {
+    // This controls how many chars to print
+    // per tick.
+    //  1 = 300 baud (feels like it, readble)
+    //  4 = 1200 baud
+    //  SCREEN_COLS = about 1 page / second
+    step = SCREEN_ROWS*SCREEN_COLS/5;
+    step = SCREEN_COLS; //SCREEN_COLS; // !
+
+    // set-up screen
+    CLS();
+    iplot(0, 0, url.substring(0, SCREEN_COLS));
+    startTime = Date.now();
+
+    screenstartindex = atindex;
+
+    forwardms = -Date.now();
+
+    if (i <= atindex) {
+      // we're good, were already on the way
+      
+      // enable the runner
+      inputMode = undefined;
+    } else {
+
+      // we're starting from beginning!
+      i = 0;
+      if (atindex >= lastcleanindex) {
+	i = lastcleanindex;
+      }
+
+      screenstartindex = atindex>=0 ? atindex : 0;
+      // charcodes of current inc/paper
+      cink = ink;
+      cpaper = paper + 16;
+
+      // color stack
+      cstack = [];
+    
+      lastwasink = false;
+      lastwaspaper = false;
+      lastwasspace = (ch == 32);
+
+      rowcounter = 0;
+      lastrow = 0;
+    }
+  }
+  
+  reset();
 
   // TODO: make it the default
   if (cink !== 7 || cpaper !== 0+16) {
@@ -6720,25 +6772,21 @@ function showPage(h, err, nid, url){
   
   function putc(ch) {
     let lastrow = row;
-    let r = window.putc(ch);
-    
-    // rolling in-place display
-    if (0 && row != lastrow) {
-
-      // clear some rows
-      let r = row;
-      for(let c=5; c>=0; c--) {
-	if (++r > SCREEN_ROWS-1)
-	  r = 1;
-	if (c < 2)
-	  clearline(r);
+    window.putc(ch);
+    // if not time to show, just care about the attributes
+    if (i <= screenstartindex) {
+      // TODO: we just keep (over) writing it at the same row!
+      if (row > 1) {
+	row = 1;
+	screen(1, 0, paper+16);
+	screen(1, 1, ink);
       }
-      
-      if (row > SCREEN_ROWS-2) {
-	row = toprow;
-      }
+    } else {
+      if (forwardms < 0) {
+	forwardms = Date.now() + forwardms;
+	renderms = -Date.now();
+      } 
     }
-    return r;
   };
 
   function myputc(ch) {
@@ -6871,53 +6919,68 @@ function showPage(h, err, nid, url){
     }
   }
 
-  let startTime = Date.now();
-
   function navigate() {
-    iplot(0,SCREEN_ROWS-1,'\x16\x00SPC < + - ESC C-U');
+    renderms = Date.now() + renderms;
+    // stats line
+    clearline(0);
+    iplot(0,0,'l'+loadms+' f'+forwardms+' r'+renderms+' c'+lastcleanindex+' i'+i+'/'+txt.length+' h'+h.length);
+    renderms = -Date.now();
+    // help line
+    iplot(0, SCREEN_ROWS-1, // bottom row
+	  '\x13\x04WWW\x03\x03\x14 SPC < + - ESC C-U ARROWS   \x13\x04??? ');
+
     inputMode = function navigation(k) {
       if (k < 0) return;
 
       let c = String.fromCharCode(k).toLowerCase();
-      iplot(0,0, 'k='+k+' c='+c+'    ');
+      //iplot(0,0, 'k='+k+' c='+c+'    ');
+
+      // less style commands?
       switch(c) {
-      case ' ': { // next page
+      case 'f':
+      case ' ': { // forward page
 	inputMode = undefined;
-	screenstartindex = i;
-	CLS();
+	// continue where we left off
+	let g = lastcleanindex; // i-50;
+	pageindex.push([i, lastcleanindex]);
+	reset(g);
+	break; }
+      case 'b': { // back page
+	inputMode = undefined;
+	// continue where we left off
+	if (!pageindex.length) break;
+	let g;
+	[g, lastcleanindex] = pageindex.pop();
+	reset(g);
 	break; }
       case 'q':
       case ESC: { // quit
 	inputMode = undefined;
-	CLS();
+	CLS(); // TODO: restore screen?
+	lastKey = -1;
 	stop();
+	return true;
 	break; }
       case '<': { // beginning
 	inputMode = undefined;
 	//step = txt.length;
-	i = 0;
-	CLS();
+	reset(0);
 	break; }
-      case '/': { // search in page
+      case '/': // search in page
 	inputMode = undefined;
-	screenstartindex = i = 0;
-	CLS();
-	break; }
+	// fall through to next
       case 'n': { // next match
 	inputMode = undefined;
-	screenstartindex = i = 0;
-	CLS();
+	reset(0);
 	break; }
       case 'p': { // prev match
 	inputMode = undefined;
-	screenstartindex = i = 0;
-	CLS();
+	reset(0);
 	break; }
       case '+': { // zoom: less rows/cols
 	inputMode = undefined;
 	// how about state? (parse from beginning?)
-	CLS();
-	screenstartindex = i = 0;
+	reset(i);
 	//step = txt.length;
 	TEXT(INT(SCREEN_ROWS/1.4+1),
 	     INT(SCREEN_COLS/1.1));
@@ -6925,8 +6988,7 @@ function showPage(h, err, nid, url){
       case '-': { // zoom out: more rows/cols
 	inputMode = undefined;
 	// how about state? (parse from beginning?)
-	CLS();
-	screenstartindex = i = 0;
+	reset(i);
 	//step = txt.length;
 	TEXT(INT(SCREEN_ROWS*1.4),
 	     INT(SCREEN_COLS*1.1));
@@ -6945,9 +7007,6 @@ function showPage(h, err, nid, url){
     row = toprow;
     col = column;
 
-    // to not get stuck later
-    //rowcounter++; 
-    rowcounter = 0;
     return;
   }
 
@@ -6962,12 +7021,21 @@ function showPage(h, err, nid, url){
       let end = i + step;
       for(; i<end; i++) {
 
+	// it's a clean state! - remember!
+	if (cstack.length == 0 &&
+	    col == 2 &&
+	    cink == ink && cpaper == paper+16) { 
+	  lastcleanindex = i;
+	}
+
+
 	if (row >= SCREEN_ROWS-2)
 	  return navigate();
 
 	if (i > txt.length) {
 	  if (col !== column) print();
 	  print('-- ' + url);
+
 	  // TODO: not accurate as involve waiting time for next page etc
 	  //print('(Rendering '+(Date.now()-startTime)+' ms)');
 	  return navigate();
@@ -7000,7 +7068,7 @@ function showPage(h, err, nid, url){
 	    for(let j=0; j<l; j++)
 	      myputc(word.charCodeAt(j));
 	    //myputc('~'.charCodeAt(0));
-	  } else if (1) { // 20% slower :-(
+	  } else if (1) {
 	    // doesn't fit
 	    let parts = hyphen(word).split(' ');
 	    parts.forEach((p,i)=>{
@@ -7018,8 +7086,11 @@ function showPage(h, err, nid, url){
 		  myputc('-'.charCodeAt(0));
 
 		// '-' could have moved us!
-		if (col !== column)
-		  myputc(10);
+		if (col !== column) {
+		  myputc(0x030a);
+		  myputc('&'.charCodeAt(0));
+		}
+
 	      }
 	      
 	      for(let j=0; j<pl; j++)
@@ -7041,6 +7112,7 @@ function showPage(h, err, nid, url){
 	} else if (ch >= 0x0200) {
 	  // end color
 	  let t = cstack.pop();
+    
 	  if (!t) {
 	    // ingore unmatched
 	    //myputc(32);
@@ -7092,7 +7164,6 @@ function showPage(h, err, nid, url){
       } // for
     }, 0); // set interval
 } // 
-
 
 /* WORD-SPLITTING
  https://english.stackexchange.com/questions/385/what-are-the-rules-for-splitting-words-at-the-end-of-a-line
@@ -7263,6 +7334,50 @@ Here they are, in roughly decreasing order of priority:
       if (1) { // for debugging
 	wget.pageid = 1;
 	wget.form[wget.pageid] = {};
+	showPage(`
+<h1>H1:header</h1>
+This is plain bread text between tags. Not indented. As it never started?
+<h2>H2:header</h2>
+<p>This is bread text in a P:tag, and when we put some <b>bold</b> words here they are shown, that way, and <i>italics</i> in such a way. <em>emphasis</em> in it's own way, or same way?</p>
+<p>Here is the second P:tag
+tag
+and
+            there
+     are   
+varying
+
+
+newlines
+interspersed.
+</p>
+<h3>H3:header</h3>
+four little lamps, went tagless
+<div>DIV: is the  newthingEND:</div><div>DIV:another div, on same line, nothing between</div>
+<div>DIV:a third div
+    with
+lots of
+white         space</div>
+<h4>H4:header</h4>
+And let's us see what we can do with a list:
+<ul>
+just inside the UL-tag (bug? should indent?)
+<li>one</li>
+<li>two</li>
+<li>three san sam tre drei tri tres tretto three san sam tre drei tri tres tretto three san sam tre drei tri tres tretto</li>
+<ul>Nested:
+<li>BEGIN:good luck</li>
+<li>it's not going to work...</li>
+<li>END:haha</li>
+</ul>
+<li>last one</li>
+</ul>and more text directly after.
+<h5>H5:header</h5>
+<p>P:tag with text text textBR:<br>BR:<br><img alt="An alt-tag on an image" src="foobar.jpg"/>and here is another image (with no alt but title <img title='title of image' src="foobar2.jpg"/> but to make it even more interesting, we put a THIRD image, but with no title, alt, or a11y at all: <img src='veryimportant.jpg'> and it was completely ignored!</p>
+<h6>H6:header</h6>
+
+
+`);
+	return;
 	showPage(`
   <form action="/html/" method="post">
     <input type="text" name="state_hidden" id="state_hidden" />
