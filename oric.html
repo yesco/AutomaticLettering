@@ -1661,6 +1661,7 @@ So far the subject of writing
     //time: Date.now(),
     //date: new Date.toISOString(),
     row = sc.row; col = sc.col;
+    if (row > SCREEN_ROWS-1) row = SCREEN_ROWS-1;    if (col > SCREEN_COLS-1) col = SCREEN_COLS-1;
     curx = sc.curx; cury = sc.cury;
     ink = sc.ink; paper = sc.paper;
     lores = sc.lores;
@@ -3814,6 +3815,50 @@ SDAY
 /* special addresses:
 some may be considere "simulated"
 
+--- GENERAL OVERVIEW ("ORIC ATMOS & ORIC 1" book)
+
+2.2 Memory map of BASIC
+
+BASIC is rather greedy on the RAM – here is how it uses its memory:
+
+#0000 – #00FF – almost all is used by BASIC – see Chapter 5.
+#0100 – #010F – used when converting floating-point numbers to strings.
+#0110 – #01FF – the normal 6502 stack area.
+#0200 – #02FF – partially used by the non-standard parts of BASIC (e.g., DRAW and MUSIC).
+#0300 – #03FF – an input/output area used by the 6522. This is not RAM.
+#0400 – #04FF – not used by BASIC – reserved for use with the disk system.
+#0501 – ( #9C) – 1 – the BASIC program occupies memory as far as indicated by the address in locations #9C and #9D.
+( #9C) – ( #9E) – 1 – any simple numeric variables are stored here, long with the identification of each string variable.
+( #9E) – ( #A0) – 1 – numeric arrays are stored in this area, along with the identification of string arrays.
+( #AO) – ( #A2) – this area of memory is unused. It can be seen that pointer #A0 reaches up to meet pointer #A2 coming down.
+(gA2)+1 – (#A6) – this area is used for storing both permanent and temporary strings of data. Temporary strings are only clearedwhen there is no more room below #A2, or when the FRE function is used.
+
+#9800 – #9BFF – a copy of the standard character set is created here when a HIRES command is executed.
+#9C00 – #9FFF – a copy of the alternate character set is moved here
+for use in HIRES.
+#A000 – #BFDF – video memory used in HIRES mode.
+#B400 – #B7FF – the standard character set when in TEXT mode.
+gB800 – #BBFF – the alternate character set when in TEXT mode.
+#BB80 – #BFDF – the video memory when in TEXT mode. Note that this overlaps part of the alternate character set.
+# BFEO – #BFFF – unused.
+
+--- MEMORY MAP TEXT vs HIRES (jsk)
+
+---		size	TEXT	HIRES
+#9800-#9bff	1024	-	std
+#9c00-#9fff	1024		alt
+#a000		8000		graphics
+#b400-#bf77	1024	std	graphics
+#b800-#bbff	896*	alt-112	graphics
+#bb80-#bfdf	1120	25x40   graphics
+-#bf3f				graphics
+#bf40-#bf67	40	?	?
+#bf68-#bfdf     223	3*40    3*40 (@49000!)
+#bfe0-#bfff	32	-	-
+
+HIRES graphics:
+(- #xbfe0 #xa000) 8160 = 8000+120+40!
+
 --- KEYS
 $17 Set to 1 if CTRL C pressed, otherwise 0. 
 $35-$84 Input buffer. (79 bytes) 
@@ -3831,13 +3876,22 @@ $20E Repeat counter for keyboard.
 $20F 
 $210 Temporary store of row of key being tested for repeat. 
 $211 Temporary store of keyboard row during strobe routine. 
+$23B-$23D Jump to GET KEY routine (V1.1). 
+$23E-$240 Jump to SEND BYTE TO PRINTER (V1.1). 
+$241-$243 Jump to PRINT TO STATUS LINE (V1.l). 
+$24E Keyboard initial repeat deiay (V1.l). 
+$24F Keyboard successive repeat delay (V1.1). 
 
 --- TEXT
 $12,$13 Address of text cursor. 
+
 $2E CTRL O flag. 0 if output to screen enabled.$30 Cursor position for Basic printout. 
 $31 Screen line width. 
 $32 8 - multiple line width. 
 $21F 0 - LORES, 1 - HIRES. 
+
+--- MEMORY
+
 $23B-$23D Jump to GET KEY routine (V1.1). 
 $23E-$240 Jump to SEND BYTE TO PRINTER (V1.1). 
 $241-$243 Jump to PRINT TO STATUS LINE (V1.l). 
@@ -3900,6 +3954,9 @@ $2F2 Bit 7 is EDIT flag, set to 1 when on.
 $2F4 TRACE flag, set if bit 7 is set. 
 
 --- PROGRAM
+$18,$19 Tokenising pointer address 
+$1A—$1C Jump location to print 'Ready'. 
+
 $A8,$A9 Current line number, top byte is #FF if in command mode. 
 $AA,$AB Previous line number. 
 $AC,$AD Last line start address. 
@@ -3907,12 +3964,18 @@ $AE,$AF Temporary copy of line number.
       
 $B4,$B5 Last variable name accessed. 
 $B6,$B7 Address of last variable value accessed
+$C3—$C5 Jump location to evaluate numeric functions.
+$C5 also used as a temporary store of the rounding byte for mathematical operations. 
+
+$E2—$E3 ? Routine to step through program to find next non space char. See $EC9C of disassembly. WIll set ($E8) to content, and inc ($E9,$EA)
+
+$E8 character from program at ($E9,$EA)
 $E9,$EA Position pointer in program. 
+
 $252 ELSE pending flag, 1 - on, 0-off (Vl.l). 
 $253-$255 
 $2F5,$2F6 Indirect jump for '!' routine. 
 $2FB-$2FD Jump to '&' routine. 
-
 
 --- HARDWARE
 $220 0 - 48K Oric, 1 - 16K Oric. 
@@ -3927,15 +3990,42 @@ $21—$23 Jump location for USR command.
 
 --- INTERNAL
       
+--- 0 PAGE, ZERO-PAGE
+
+$10,$11 Address of hires cursor.
+
+$17 Set to 1 if CTRL C pressed, otherwise 0. 
+
 $18,$19 Tokenising pointer. 
 $1A—$1C Jump location to print 'Ready'. 
 
-$C3—$C5 Jump location to evaluate numeric functions. $C5 also used as a 
-temporary store of the rounding byte for mathematical operations. 
+$35-$84 Input buffer. (79 bytes) (53--132) 
+$12,$13 Address of text cursor. 
 
-$E2—$F2 Routine to step through program to find next non space char. See 
-$EC9C of disassembly. 
+$2E CTRL O flag. 0 if output to screen enabled.$30 Cursor position for Basic printout. 
+$31 Screen line width. 
+$32 8 - multiple line width. 
 
+$A6,$A7 Himem. 
+
+$A8,$A9 Current line number, top byte is #FF if in command mode. 
+$AA,$AB Previous line number. 
+$AC,$AD Last line start address. 
+$AE,$AF Temporary copy of line number. 
+      
+$B4,$B5 Last variable name accessed. 
+$B6,$B7 Address of last variable value accessed
+
+$C3—$C5 Jump location to evaluate numeric functions.
+$C5 also used as a temporary store of the rounding byte for mathematical operations. 
+
+$E2—$E3 ? Routine to step through program to find next non space char. See $EC9C of disassembly. 
+
+$E9,$EA Position pointer in program. 
+
+--- 1 PAGE = stack
+
+--- 2 PAGE
 $20B Not used but gets written over by routine that sets $208 - $20A. 
 
 $238-$23A Jump to PRINT CHARACTER on screen (V1.1).
@@ -3944,6 +4034,20 @@ $24D Tape speed, 0 - fast, 1 - slow (Vl.l).
 $261,$262 Indirect jump for CTRL character routine.
 $263,$264 Temporary storage. 
 $276,$277 Spare counter — also used by WAIT (and printer in V1.0). 
+
+--- ROM addresses of intererests
+
+
+
+- INTERRUPTS
+Name	 		V1.0	V1.1
+Start  6522 Clocks	#ECC7	#EDE0
+Stop  6522 clocks	#ED01	#EE1A
+Update timers etc	#ED1B	#EE34
+Clear all timers	#ED70	#EE8C
+Read a timer into X Y 	#ED81	#EE9D
+Write XY into a timer	#ED8F	#EEAB
+Wait for time X Y	#EDAD
 */
 
   example_TIMER =`
@@ -6268,12 +6372,6 @@ function HTML2TELETEXT(nid, h) {
     .replace(/&#(\d+);/ig,
 	     (a,d)=>String.fromCharCode(+d))
 
-    .replace(/\u218e/ig, '<-')
-    .replace(/\u218f/ig, 'v')
-    .replace(/\u2190/ig, '<-')
-    .replace(/\u2191/ig, '^')
-    .replace(/\u2192/ig, '->')
-
     .replace(/\r/g, '\n')
     .replace(/[\x00-\x09\x11-\x1F]/g, '')
     .replace(/\xa0/g, '\u0320' /*nbsp*/)
@@ -6298,6 +6396,52 @@ function HTML2TELETEXT(nid, h) {
     .replace(/\u212b/g, 'Angstro"m')
     .replace(/\u213b/g, 'FAX ')
 
+    .replace(/\u218e/g, '&lt;-')
+    .replace(/\u218f/g, 'v')
+
+    .replace(/\u2190/g, '&lt;-')
+    .replace(/\u2191/g, '^')
+    .replace(/\u2192/g, '-&gt;')
+    .replace(/\u2193/g, 'v')
+    .replace(/\u2194/g, '&lt;-&gt;')
+    .replace(/\u2195/g, '(^|v)')
+    .replace(/\u2196/g, '(^\)')
+    .replace(/\u2197/g, '(/^)')
+    .replace(/\u2198/g, '(\v)')
+    .replace(/\u2199/g, '(v/)')
+    .replace(/\u219e/g, '&lt;&lt;-')
+    .replace(/\u219f/g, '^|^')
+    .replace(/\u21a0/g, '-&gt;&gt;')
+    .replace(/\u21a1/g, 'v|v')
+    .replace(/\u21a2/g, '&lt;-&lt;')
+    .replace(/\u21a3/g, '&gt;-&gt;')
+    .replace(/\u21a4/g, '&lt;-|')
+    .replace(/\u21a5/g, '^|.')
+    .replace(/\u21a6/g, '|-&gt;')
+    .replace(/\u21a7/g, "'|v")
+    .replace(/\u21a9/g, "&lt;-'")
+    .replace(/\u21aa/g, "'-&gt;")
+    .replace(/\u21ab/g, "'-&gt;")
+    .replace(/\u21b0/g, "&lt;-,")
+    .replace(/\u21b1/g, ",-&gt;")
+    .replace(/\u21b2/g, "&lt;-'")
+    .replace(/\u21b3/g, "'-&gt;")
+
+    .replace(/\u21b6/g, '(anticlockwise)')
+    .replace(/\u21b7/g, '(clockwise)')
+    .replace(/\u21ba/g, '(anticlockwise)')
+    .replace(/\u21bb/g, '(clockwise)')
+
+    .replace(/\u21d0/g, '&lt;==')
+    .replace(/\u21d1/g, '|^|')
+    .replace(/\u21d2/g, '==&gt;')
+    .replace(/\u21d3/g, '|v|')
+    .replace(/\u21d4/g, '&lt;==&gt;')
+
+    .replace(/\u21e4/g, '|&lt-')
+    .replace(/\u21e5/g, '-&gt;|')
+
+  
     .replace(/\u2200/g, '(forall)')
     .replace(/\u2202/g, '(partial difference)')
     .replace(/\u2203/g, '(there exists)')
@@ -6328,7 +6472,7 @@ function HTML2TELETEXT(nid, h) {
     .replace(/\u221f/g, '(L)')
     .replace(/\u2220/g, '(V)')
     .replace(/\u2221/g, '(V-)')
-    .replace(/\u2222/g, '(<|)')
+    .replace(/\u2222/g, '(&t;|)')
     .replace(/\u2223/g, '(DIVIDES)')
     .replace(/\u2224/g, '(DOES NOT DIVIDE)')
     .replace(/\u2225/g, '||')
@@ -6365,10 +6509,11 @@ function HTML2TELETEXT(nid, h) {
     .replace(/\u22bc/g, '(NAND)')
     .replace(/\u22bd/g, '(NOR)')
 
-    .replace(/\u22c8/g, '|><|')
+    .replace(/\u22c8/g, '|&gt;&lt;')
 
 
     .replace(/\u00d7/g, 'x')
+    .replace(/\u00b7/g, '-' /* middle dot */)
     .replace(/\u22c5/g, '(.)' /* dot operator */)
 
     .replace(/\u2002/g, ' ' /* en-space, lol */)
@@ -6700,6 +6845,7 @@ function showPage(h, err, nid, url, loadms){
 
   // fast go pages back
   let pageindex = [];
+  pageindex.push([0,0]);
   let lastcleanindex = 0;
 
   // state
@@ -6715,18 +6861,20 @@ function showPage(h, err, nid, url, loadms){
 
   i = 0;
 
-  function reset(atindex=-1) {
+  step = SCREEN_COLS; //SCREEN_COLS; // !
+  step = SCREEN_ROWS*SCREEN_COLS/1;
+
+  function reset(atindex=-1, lci=-1) {
     // This controls how many chars to print
     // per tick.
     //  1 = 300 baud (feels like it, readble)
     //  4 = 1200 baud
     //  SCREEN_COLS = about 1 page / second
-    step = SCREEN_ROWS*SCREEN_COLS/5;
-    step = SCREEN_COLS; //SCREEN_COLS; // !
 
     // set-up screen
     CLS();
-    iplot(0, 0, url.substring(0, SCREEN_COLS));
+    iplot(0, 0,
+	  (url || '').substring(0, SCREEN_COLS));
     startTime = Date.now();
 
     screenstartindex = atindex;
@@ -6745,6 +6893,10 @@ function showPage(h, err, nid, url, loadms){
       if (atindex >= lastcleanindex) {
 	i = lastcleanindex;
       }
+      if (lci !== -1 &&
+	  atindex >= lci) {
+	lastcleanindex = i = lci;
+      }
 
       screenstartindex = atindex>=0 ? atindex : 0;
       // charcodes of current inc/paper
@@ -6761,6 +6913,9 @@ function showPage(h, err, nid, url, loadms){
       rowcounter = 0;
       lastrow = 0;
     }
+  }
+  function redraw() {
+    reset(screenstartindex);
   }
   
   reset();
@@ -6925,9 +7080,16 @@ function showPage(h, err, nid, url, loadms){
     clearline(0);
     iplot(0,0,'l'+loadms+' f'+forwardms+' r'+renderms+' c'+lastcleanindex+' i'+i+'/'+txt.length+' h'+h.length);
     renderms = -Date.now();
+    let percent = INT(100 * screenstartindex /txt.length);
+    let percent2 = INT(100 * i /txt.length);
+    let page = pageindex.length;
+    let pages = INT(100 * pageindex.length / percent2 +0.5);
+    let posmsg = '\x00\x13'+page+'/'+pages+' '+percent2+'%';
+    iplot(SCREEN_COLS-posmsg.length, 0, posmsg);
+
     // help line
     iplot(0, SCREEN_ROWS-1, // bottom row
-	  '\x13\x04WWW\x03\x03\x14 SPC < + - ESC C-U ARROWS   \x13\x04??? ');
+	  '\x13\x04WWW\x03\x03\x14 SPC B < + - ESC C-U 319  \x13\x04??? ');
 
     inputMode = function navigation(k) {
       if (k < 0) return;
@@ -6942,16 +7104,20 @@ function showPage(h, err, nid, url, loadms){
 	inputMode = undefined;
 	// continue where we left off
 	let g = lastcleanindex; // i-50;
-	pageindex.push([i, lastcleanindex]);
-	reset(g);
+	pageindex.push([g,g]);
+	reset(g, g);
 	break; }
       case 'b': { // back page
+	iplot(0,SCREEN_ROWS-1,'back............');
 	inputMode = undefined;
 	// continue where we left off
-	if (!pageindex.length) break;
+	if (!pageindex.length)
+	  pageindex.push([0,0]);
 	let g;
 	[g, lastcleanindex] = pageindex.pop();
-	reset(g);
+	if (!pageindex.length)
+	  pageindex.push([0,0]);
+	reset(g, lastcleanindex);
 	break; }
       case 'q':
       case ESC: { // quit
@@ -6980,19 +7146,25 @@ function showPage(h, err, nid, url, loadms){
       case '+': { // zoom: less rows/cols
 	inputMode = undefined;
 	// how about state? (parse from beginning?)
-	reset(i);
 	//step = txt.length;
 	TEXT(INT(SCREEN_ROWS/1.4+1),
 	     INT(SCREEN_COLS/1.1));
+	redraw();
 	break; }
       case '-': { // zoom out: more rows/cols
 	inputMode = undefined;
 	// how about state? (parse from beginning?)
-	reset(i);
 	//step = txt.length;
 	TEXT(INT(SCREEN_ROWS*1.4),
 	     INT(SCREEN_COLS*1.1));
+	redraw();
 	break; }
+      case '3': // 300 baud!
+	step = SCREEN_COLS/20; redraw(); break;
+      case '1': // 1200 baud!
+	step = SCREEN_COLS; redraw(); break;
+      case '9': // full speed!
+	step = SCREEN_COLS*SCREEN_ROWS*10; redraw(); break;
       default: { // pass it on (arrows etc)
 	return false;
 	break; }
@@ -7004,8 +7176,8 @@ function showPage(h, err, nid, url, loadms){
       return true;
     };
 
-    row = toprow;
-    col = column;
+    //row = toprow;
+    //col = column;
 
     return;
   }
@@ -7088,7 +7260,7 @@ function showPage(h, err, nid, url, loadms){
 		// '-' could have moved us!
 		if (col !== column) {
 		  myputc(0x030a);
-		  myputc('&'.charCodeAt(0));
+		  //myputc('&'.charCodeAt(0));
 		}
 
 	      }

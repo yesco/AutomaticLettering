@@ -67,6 +67,120 @@ O
 33030   LET CG=4000
 33030   LET SG=4000
 
+ 0: NIL
+ 1: NULL?
+ 2: ATOM?
+ 3: SYMBOL?
+ 4: NUMBER?
+ 5: INT?
+ 6: STRING?
+ 7: CONS?
+ 8: EVAL
+ 9: APPLY
+10: LAMBDA
+11: NLAMBDA
+12: CONS
+13: CAR
+14: CDR
+15: SETCAR
+16: SETCDR
+17: SET
+18: SETQ
+19: QUOTE
+20: COND
+21: MAP
+22: ASSOC
+23: MEMBER
+24: PRINC
+25: PRIN1
+26: PROG
+27: esc next is ctrl-char!
+28: CONCAT
+29: APPEND
+30: EQUAL
+31: ??
+
+126: special encoding follows
+127: special encoding foloows
+
+128 
+... ORIC BASIC KEYWORDS!
+237
+
+238 ? 
+239 ?
+240 ?
+241 ?
+242 ?
+253 ?
+254 ?
+255 ? NIL ? (if 0 == end!) or 255 is end?
+
+REDUCE?
+NTH
+NTHCDR
+FUNC?
+SPLIT
+CMP?
+
+Can resuse:
+! + @ - * / ^ > = < & ABS ASC ATN CHAR CHR$ GET HEX$ ...
+
+DIM: => make-array
+LET:
+PRINT:
+DEF:
+FN:
+LIST:
+IF:
+REPEAT:
+UNTIL:
+FOR:
+AND:
+AUTO: ?
+CALL:
+CLEAR:
+CONT:
+DATA:
+EDIT:
+ELSE: ?
+END: !
+FALSE: ?
+TRUE: ?
+FRE: ?
+GOSUB: ?
+GOTO: ?
+GRAB: ?
+HIMEM: ?
+INPUT: ?
+LLIST: ?
+LPRINT: ?
+NEW: ?
+NEXT: ?
+ON: ?
+(PATTER: ?)
+POP: ?
+PULL: ?
+READ: !
+RECALL: ?
+RELEASE: ?
+RESTORE: ?
+RETURN: !
+RUN: ?
+SPC: ?
+STEP: ?
+STOP: ?
+STORE: ?
+TAB: ?
+THEN: ?
+TO: ?
+TROFF: UNTRACE
+TRON: TRACE
+UNTIL: !
+USR: ?
+VAL: EVAL !
+
+
 When floating-point numbers are stored in memory (e.g., for variables and array elements),
 
 They occupy 5 bytes of memory. This is made up as follows:
