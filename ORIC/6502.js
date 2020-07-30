@@ -48,6 +48,7 @@
 ******************************************************************************
  ****************************************************************************/
 
+// var is faster than let! about 5%! 20200730
 function cpu6502() {
   // Note: special read/write only works for LDA/STA absolute
 
@@ -92,7 +93,7 @@ function cpu6502() {
 
   // Addressing modes
 
-  let modes = {
+  var modes = {
     ___()  { },
 
     imm() { return ""+m[ip++]; },
@@ -151,8 +152,9 @@ function cpu6502() {
     eor(m) { ssz("a"); return "a^="+m+";"; },
     inc(m) { ssz(m); return "maykill("+m.substr(2,m.length-3)+");"+m+"=("+m+"+1)&255;if(!alive){ip="+ip+";return;}"; },
     inx(m) { ssz("x"); return "x=(x+1)&255;"; },
+    inx(m) { ssz("x"); return "x=(x+1)&255;"; },
     iny(m) { ssz("y"); return "y=(y+1)&255;"; },
-    jmp(m) { return fsz()+"ip="+m+"; return;"; },
+    jmp(m) { return fsz()+"ip="+m+";"; },
     jsr(m) { return fsz()+"m[256+sp]="+((ip-1)&255)+";m[256+((sp+1)&255)]="+((ip-1)>>8)+";sp=(sp+2)&255;ip="+m+";return;"; },
     lda(m) { ssz("a"); return "a="+m+";"; },
     ldx(m) { ssz("x"); return "x="+m+";"; },
@@ -247,7 +249,15 @@ function cpu6502() {
   function jit() {
     var count = 0, code = "(function(){";
     var ip0 = ip, addr;
-    var NN = 1; // was 2 meaning 2 got compiled in a row! "too clever"
+    var NN = 1; // was 2 meaning 2 got compiled in a row! "too clever" will give trouble for self-modifying code..l
+    // HOWEVER: NN=5 reaches 2kips * 5 instructions a go, so it means 1 MIPS = 1 MHz...
+    // so, this is still SLOW...
+    // NN = 1 // I'm getting only 415 kips on 
+    // Xiaomi Note 4A (2-3 years old...)
+    // if done right, then there is no reason
+    // why it would be slower than C!?!
+    // TODO: generate massive SWITCH!
+    // or array of instrunctions...
     while (count < NN) {
       count += 1;
       // magic? what instruction?
@@ -270,6 +280,7 @@ function cpu6502() {
     }
     code += fsz()+"})";
     var f = eval(code);
+    console.log('\t', f.toString());
 
     for (var i=ip0; i<ip; i++) {
       var L = jitmap[i] = (jitmap[i] || []);
@@ -291,7 +302,7 @@ function cpu6502() {
 
   // thisfunction runs tick
   function run(gotoip) {
-    console.log('run---------------------: ' + gotoip);
+    //console.log('run---------------------: ' + gotoip);
     if (gotoip && gotoip < 0) {
       if (run.timer)
 	cancelTimeout(run.timer);
@@ -310,18 +321,19 @@ function cpu6502() {
       return 'IP=0';
     } else {
       tCount++;
-      var start = (new Date).getTime();
+      var start = Date.now();
       var now;
-      while (ip != 0 && (now = (new Date).getTime()) < start + tickms) {
+      while (ip != 0 && (now = Date.now() < start + tickms)) {
         for (var k=0; ip && k<100; k++) {
           alive = true;
-	  let v= m[ip], op = opcodes[v];
-	  if (0) console.log(
-	    iCount,
-	    hex(4, ip), hex(2, v),
-	    op[0], op[1], 'a='+a+' x='+x+' y='+y,
-	  );
-          (current_f=(jitcode[ip]||(jitcode[ip]=jit())))();
+	  //let v= m[ip], op = opcodes[v];
+	  //if (0) console.log(
+	  //iCount,
+	  //hex(4, ip), hex(2, v),
+	  //op[0], op[1], 'a='+a+' x='+x+' y='+y,
+	  //);
+          //(current_f=(jitcode[ip]||(jitcode[ip]=jit())))();
+          (jitcode[ip]||(jitcode[ip]=jit()))();
 	  //console.log(current_f.toString());
 	  iCount++;
         }
@@ -376,7 +388,7 @@ function cpu6502() {
 // from nodejs? 
 if (typeof require !== 'undefined') {
   let cpu = cpu6502();
-
+  
   let start = 0x500; // can't start at 0!
   let a = start;
   cpu.mem[a++] = 0xe8; // INX
@@ -387,11 +399,203 @@ if (typeof require !== 'undefined') {
   cpu.mem[a++] = 0x00; //   00
   cpu.mem[a++] = 0x05; //   05
 
+  function run(f) {
+    [10, 20, 5, 100].forEach(z=>{
+      console.log(f.name, z, '\t', f(z, cpu));
+    });
+  }
+			     
+  run(fast6502);
+  run(rom6502);
+  run(romfunc6502);
+
+  // share mem
+  run(array6502);
+  run(switch6502);
+
   cpu.start(start);
 
   setInterval(function(){
     let r = cpu.regs();
-    console.log(JSON.stringify(r));
+    let s = cpu.stats();
+    let ips = Math.floor(s.iCount / s.tTimems);
+    console.log('\u000c', ips + ' kips', r, s);
   }, 1000);
 }
 
+// 10 MIPS only... (small hash 5 elts)
+// 11 MIPS only... (256 array is slightly faster)
+function array6502(M = 5, cpu) {
+  var start = Date.now();
+
+  var a, x, y, ip, z, s;
+  let m = cpu.mem;
+  ip = 0x500;
+
+  let iCount = 0;
+
+//  let hash = {}; // slower!
+  let array = Array(256);
+
+  function INX() {x=(x+1)&255;ip++;z=!x;s=x>127;iCount++;}
+  function DEY() {x=(x+1)&255;ip++;z=!x;s=x>127;iCount++;}
+  function JMP() {ip=m[ip+1]+m[ip+2]*256; iCount++;}
+
+  array[0xe8] = INX;
+  array[0x88] = DEY;
+  array[0x4c] = JMP;
+
+  for(iCount=0; iCount<M*1000*1000; ) {
+    // ROM - no need to decode! hard-compile:
+    //console.log('ip==', ip.toString(16));
+
+    let i = m[ip];
+    (array[i])();
+  }
+
+  let ms = Date.now()-start;
+
+  return [Math.floor(iCount / ms), iCount, ms, Math.floor(Math.log(iCount)/Math.log(10)+0.5)]; // kips!
+}
+
+// 57 MIPS: function overhead is big! = 60 %
+function romfunc6502(M = 5, cpu) {
+  var start = Date.now();
+
+  var a, x, y, ip, z, s;
+  let m = cpu.mem;
+  ip = 0x500;
+
+  let iCount = 0;
+
+  function p(x) { console.log(ip.toString(16), x); }
+
+  function INX() {x=(x+1)&255;ip++;z=!x;s=x>127;iCount++;}
+  function DEY() {x=(x+1)&255;ip++;z=!x;s=x>127;iCount++;}
+  function JMP() {ip=m[ip+1]+m[ip+2]*256; iCount++;}
+
+  for(iCount=0; iCount<M*1000*1000; ) {
+    // ROM - no need to decode! hard-compile:
+    //console.log('ip==', ip.toString(16));
+
+    // HOW big switch can it handle?
+    switch(ip) { // how clever is it?
+    case 0x0500: INX();
+    case 0x0501: INX();
+    case 0x0502: DEY();
+    case 0x0503: DEY();
+    case 0x0504: JMP(); break;
+    //case 0x5055: // ??? TOOD: compile random instruction!
+      // Shit! This may not work for "too" clever coding, where variants of instructions are run, i.e. over for example data! in which case it may need to fall back...
+      // safer: swtich over tointerpreter... :-(
+      // There is the xample BIT addr that
+      // can be used as SKIP2 bytes!
+    default: console.log('ERROR AT: ip = ', ip, ip.toString(16)); iCount++;
+    }
+  }
+
+  let ms = Date.now()-start;
+
+  return [Math.floor(iCount / ms), iCount, ms, Math.floor(Math.log(iCount)/Math.log(10)+0.5)]; // kips!
+}
+
+// TODO: here's an idea: Compile the ROM
+// to giant switch on addresses!!! LOL!
+// (they can't very well self-modify...)
+// 19 MIPS... mem access => 30x slow down :-(
+// still promising...
+//
+// 89 MIPS! - half-ass good idea! but w caveat
+function rom6502(M = 5, cpu) {
+  var start = Date.now();
+
+  var a, x, y, ip, z, s;
+  let m = cpu.mem;
+  ip = 0x500;
+
+  let iCount = 0;
+
+  function p(x) { console.log(ip.toString(16), x); }
+
+  for(iCount=0; iCount<M*1000*1000; ) {
+    // ROM - no need to decode! hard-compile:
+    //console.log('ip==', ip.toString(16));
+
+    // HOW big switch can it handle?
+    switch(ip) { // how clever is it?
+    case 0x0500: x=(x+1)&255;ip++;z=!x;s=x>127;iCount++; // INX
+    case 0x0501: x=(x+1)&255;ip++;z=!x;s=x>127;iCount++; // INX
+    case 0x0502: y=(y-1)&255;ip++;z=!y;s=y>127;iCount++; // DEY
+    case 0x0503: y=(y-1)&255;ip++;z=!y;s=y>127;iCount++; // DEY
+    case 0x0504: ip=m[ip+1]+m[ip+2]*256; iCount++; break; // JMP
+    //case 0x5055: // ??? TOOD: compile random instruction!
+      // Shit! This may not work for "too" clever coding, where variants of instructions are run, i.e. over for example data! in which case it may need to fall back...
+      // safer: swtich over tointerpreter... :-(
+      // There is the xample BIT addr that
+      // can be used as SKIP2 bytes!
+    default: console.log('ERROR AT: ip = ', ip, ip.toString(16)); iCount++;
+    }
+  }
+
+  let ms = Date.now()-start;
+
+  return [Math.floor(iCount / ms), iCount, ms, Math.floor(Math.log(iCount)/Math.log(10)+0.5)]; // kips!
+}
+
+
+// 19 MIPS... mem access => 30x slow down :-(
+// still promising...
+function switch6502(M = 5, cpu) {
+  var start = Date.now();
+  var iCount = 0;
+
+  var a, x, y, ip, z, s;
+  let m = cpu.mem;
+  ip = cpu.regs().ip;
+
+  for(let k=0; k<M*1000*1000; k++) {
+    iCount++;
+    let i = m[ip++];
+    switch(i){
+    case 0xe8: // INX
+      x=(x+1)&255;ip++;z=!(x);s=((x)>127); break;
+    case 0x88: // DEY
+      y=(y-1)&255;ip++;z=!(y);s=((y)>127); break;
+    case 0x4c: // JMP
+      ip=m[ip++]+m[ip++]*256; break;
+    }
+  }
+
+  let ms = Date.now()-start;
+
+  return [Math.floor(iCount / ms), iCount, ms, Math.floor(Math.log(iCount)/Math.log(10)+0.5)]; // kips!
+}
+
+// 590 MIPS... memory-less machine! "compiled"
+function fast6502(M = 5) {
+  var start = Date.now();
+  var iCount = 0;
+
+  var a, x, y, ip, z, s;
+  ip = 1280;
+  for(let k=0; k<M*1000*1000; k++) {
+    // INX
+    x=(x+1)&255;ip=1281;z=!(x);s=((x)>127);
+    iCount++;
+    // INX
+    x=(x+1)&255;ip=1282;z=!(x);s=((x)>127);
+    iCount++;
+    // DEY
+    y=(y-1)&255;ip=1283;z=!(y);s=((y)>127);
+    iCount++;
+    // DEY
+    y=(y-1)&255;ip=1284;z=!(y);s=((y)>127);
+    iCount++;
+    // JMP $0500
+    ip=1280;
+    iCount++;
+  }
+  let ms = Date.now()-start;
+
+  return [Math.floor(iCount / ms), iCount, ms, Math.floor(Math.log(iCount)/Math.log(10)+0.5)]; // kips!
+}
