@@ -12,8 +12,16 @@
 // INC() DEY()             - 8.6 MIPS !!!
 // 0bytes JMP self         - 87 MIPS !!!
 // 10bytes INX()...        - 147 MIPS
-// 18bytes INX()...        - 157 MIPS !!!
-//
+// 20bytes INX()...        - 157 MIPS !!!
+// >18 gets sloer fast
+// size=20b        funcs   - 157
+// size=7b         fucns   - 118
+// size=30b         inline - 165
+// size=400         inline -  96
+// size=400        func    -  17
+// size=40        func     -  28
+
+
 // conclusion:
 // - fewer switches better, too many == linear?
 // - inlining all === too much code
@@ -23,6 +31,7 @@
 // TODO: compare to "interpreted!" using switch op
 function gen(romfile, funcname, address) {
   let size = 16*1024;
+  size = 7;
 
   // PRELUDE
   console.log(`
@@ -71,7 +80,7 @@ function ${funcname}(M = 5, cpu) {
     if (a === 0xc000)
       console.log(p);
 
-    if (1 && a-address === 18) { // loop length JMP --- WOW! switch is so SLOW! realy slow!
+    if (1 && a-address === size-3) { // loop length JMP --- WOW! switch is so SLOW! realy slow!
       console.log(p+`ip=0xc000;iCount++; break; // JMP\n`);
     } else if (0 && address-a === 0) { // just loop in JMP --- ok decent
       console.log(p+`ip=0x${a.toString(16)};iCount++; break; // JMP\n`);
