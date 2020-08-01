@@ -64,8 +64,49 @@ function cpu6502() {
 
   var alive = true;
   var current_f = null;
-  var a=0, x=0, y=0, c=0, z=0, w=0, s=0, d=0, v=0, ip=0, sp=0;
+  var a=0, x=0, y=0,
+      c=0, z=0, w=0, s=0, d=0, v=0, i=0, b=0,
+      ip=0, sp=0;
 
+  // calculate status register
+/*
+SR Flags (bit 7 to bit 0):
+
+N	....	Negative
+V	....	Overflow
+-	....	ignored
+B	....	Break
+D	....	Decimal (use BCD for arithmetics)
+I	....	Interrupt (IRQ disable)
+Z	....	Zero
+C	....	Carry
+*/
+  function SR() {
+    let sr = 0;
+    sr <<= 1; sr += s?1:0; // N
+    sr <<= 1; sr += v?1:0; // V
+    sr <<= 1;              // -
+    sr <<= 1; sr += b?1:0; // B
+
+    sr <<= 1; sr += d?1:0; // D
+    sr <<= 1; sr += i?1:0; // I
+    sr <<= 1; sr += z?1:0; // Z
+    sr <<= 1; sr += c?1:0; // C
+    return sr;
+  }
+
+  function setSR(sr) {
+    s = (sr && 1); sr >>>= 1; // N
+    v = (sr && 1); sr >>>= 1; // V
+                   sr >>>= 1; // -
+    b = (sr && 1); sr >>>= 1; // B
+
+    d = (sr && 1); sr >>>= 1; // D
+    i = (sr && 1); sr >>>= 1; // I
+    z = (sr && 1); sr >>>= 1; // Z
+    c = (sr && 1); sr >>>= 1; // C
+  }
+    
   // Lazy Z/S evaluation; set_[sz] contains the code to set the flag
   // s[sz](x) sets this code, f[sz]() returns the code and clears it.
   var set_z = "";
@@ -113,14 +154,13 @@ function cpu6502() {
 
   function hex(n,x) {
     var r = "";
-    for (var i=0; i<n; i++) {
+    for (var k=0; k<n; k++) {
       r = "0123456789ABCDEF"[x & 15] + r;
       x >>= 4;
     }
     return r;
   }
 
-  console.log({modes,});
   // Opcode implentation
 
   let ops = {
@@ -136,12 +176,17 @@ function cpu6502() {
     bmi(m) { return fs()+"if(s){"+fz()+"ip="+m+";return;}"; },
     bne(m) { return fz()+"if(!z){"+fs()+"ip="+m+";return;}"; },
     bpl(m) { return fs()+"if(!s){"+fz()+"ip="+m+";return;}"; },
-    brk(m) { return fsz()+";ip=0;return;"; },
+    brk(m) { return fsz()+";i=1;"+
+	     // "jsr" but go to different address
+	     fsz()+"m[256+sp]="+((ip-1)&255)+";m[256+((sp+1)&255)]="+((ip-1)>>8)+";sp=(sp+2)&255;"+
+	     ops.php(m)+
+	     "ip=m[IRQ_VECTOR]+m[IRQ_VECTOR+1]*256;"
+	   },
     bvc(m) { return "if(!v){"+fsz()+"ip="+m+";return;}"; },
     bvs(m) { return "if(v){"+fsz()+"ip="+m+";return;}"; },
     clc(m) { return "c=0;"; },
     cld(m) { return "d=0;"; },
-    cli(m) { throw "Not implemented"; },
+    cli(m) { return "i=0;"; },
     clv(m) { return "v=0;"; },
     cmp(m) { ssz("w"); return "c=(a>="+m+");w=(a-"+m+")&255;"; },
     cpx(m) { ssz("w"); return "c=(x>="+m+");w=(x-"+m+")&255;"; },
@@ -163,20 +208,21 @@ function cpu6502() {
     nop(m) { return ""; },
     ora(m) { ssz("a"); return "a|="+m+";"; },
     pha(m) { return "m[256+sp]=a;sp=(sp+1)&255;"; },
-    php(m) { throw "Not implemented"; },
+    php(m) { return "m[256+sp]=SR();sp=(sp+1)&255;"; },
     pla(m) { ssz("a"); return "sp=(sp-1)&255;a=m[256+sp];"; },
-    plp(m) { throw "Not implemented"; },
+    plp(m) { return "sp=(sp-1)&255;setSR(m[256+sp]);"; },
+
     rol(m) { ssz(m); return "w="+m+";"+m+"=((w<<1)+c)&255;c=(w>127);"; },
     ror(m) { ssz(m); return "w="+m+";"+m+"=((w>>1)+(c<<7));c=(w&1);"; },
-    rti(m) { throw "Not implemented"; },
+    rti(m) { return ops.plp(m)+ops.rts(m); },
     rts(m) { return fsz()+"sp=(sp-2)&255;ip=(m[sp+256]+(m[256+((sp+1)&255)]<<8)+1)&65535;"; },
     sbc(m) { ssz("w"); return "w=a-"+m+"-(1-c);c=(w>=0);v=((a&0x80)!=(w&0x80));a=(w&255);"; },
     sec(m) { return "c=1;"; },
     sed(m) { throw "Not implemented"; },
-    sei(m) { throw "Not implemented"; },
+    sei(m) { return "i=0;"; },
     sta(m) { return "maykill("+m.substr(2,m.length-3)+");"+fszm()+m+"=a;if(!alive){ip="+ip+";return;}"; },
     stx(m) { return "maykill("+m.substr(2,m.length-3)+");"+fszm()+m+"=x;if(!alive){ip="+ip+";return;}"; },
-    sty(m) { return "maykill("+m.susbtr(2,m.length-3)+");"+fszm()+m+"=y;if(!alive){ip="+ip+";return;}"; },
+    sty(m) { return "maykill("+m.substr(2,m.length-3)+");"+fszm()+m+"=y;if(!alive){ip="+ip+";return;}"; },
     tax(m) { ssz("a"); return "x=a;"; },
     tay(m) { ssz("a"); return "y=a;"; },
     tsx(m) { ssz("x"); return "x=sp;"; },
@@ -222,8 +268,8 @@ function cpu6502() {
 
   var revopcodes = {};
   (function() {
-    for (var i=0; i<256; i++)
-      revopcodes[opcodes[i][0]+"/"+opcodes[i][1]] = i;
+    for (var k=0; k<256; k++)
+      revopcodes[opcodes[k][0]+"/"+opcodes[k][1]] = i;
   })();
 
   // TODO: rewrite jit to generate static
@@ -237,8 +283,8 @@ function cpu6502() {
     while (aL && aL.length) {
       var f = aL.pop();
       if (f === current_f) alive = false;
-      for (var i=f.ip0; i<f.ip; i++) {
-        var L = jitmap[i];
+      for (var k=f.ip0; k<f.ip; k++) {
+        var L = jitmap[k];
         var j = L.indexOf(f, L);
         L.splice(j, 1);
       }
@@ -300,6 +346,10 @@ function cpu6502() {
   var iCount = 0;
   var tTimems = 0;
 
+  let NMI_VECTOR   = 0xfffa;
+  let RESET_VECTOR = 0xfffc;
+  let IRQ_VECTOR   = 0xfffe;
+
   // thisfunction runs tick
   function run(gotoip) {
     //console.log('run---------------------: ' + gotoip);
@@ -311,7 +361,8 @@ function cpu6502() {
       return 'Stopped';
     }
 
-    ip = gotoip || ip;
+    ip = gotoip || ip ||
+      m[RESET_VECTOR] + m[RESET_VECTOR+1]*256;
 
     if (ip == 0) {
       if (run.timer)
@@ -322,10 +373,10 @@ function cpu6502() {
     } else {
       tCount++;
       var start = Date.now();
-      var now;
-      while (ip != 0 && (now = Date.now() < start + tickms)) {
-        for (var k=0; ip && k<100; k++) {
-          alive = true;
+      var ms;
+      while (ip != 0 && (ms = (Date.now() - start)) < tickms) {
+        for (var k=0; ip && k<1000; k++) {
+          alive = true; // this takes about 2% time
 	  //let v= m[ip], op = opcodes[v];
 	  //if (0) console.log(
 	  //iCount,
@@ -333,13 +384,16 @@ function cpu6502() {
 	  //op[0], op[1], 'a='+a+' x='+x+' y='+y,
 	  //);
           //(current_f=(jitcode[ip]||(jitcode[ip]=jit())))();
+	  // TODO: checking if have jitcode costs about 1% on average
+	  // TODO: jitcode big array lookup costs really alot we only get 425 KIPS instead of more
           (jitcode[ip]||(jitcode[ip]=jit()))();
 	  //console.log(current_f.toString());
 	  iCount++;
-        }
+	}
       }
 
-      tTimems += tickms;
+      tTimems += ms;
+
       if (ip != 0)
 	run.timer = setTimeout(run, 0);
     }
@@ -359,7 +413,7 @@ function cpu6502() {
 	a, x, y,
 	ip, sp,
 	// Carry, Zero, (sign)negative?, Decimal, oVerflow
-	c, z, s, n: s, d, v,
+	c, z, s, n: s, d, v, i,
       }
     },
     // f(data) {...}
@@ -385,17 +439,108 @@ function cpu6502() {
   };
 }
 
+const ORIC_ROM = './ROMS/BASIC V1.1B.rom';
+
+function ORIC() {
+  const SCREEN = 0x0BB80;
+
+  let cpu = cpu6502();
+  let m = cpu.mem;
+
+  // load ROM
+  let fs = require('fs');
+  let binary = fs.readFileSync(ORIC_ROM);
+  if (!binary)
+    throw 'ROM not loaded';
+  if (binary.length !== 16384)
+    throw 'ROM wrong size: ' + binary.length;
+
+  // TODO: CLI not implemented
+  
+  m.set(binary, 0xc000);
+  
+  // run!
+  cpu.start();
+
+  function puts(s) {
+    process.stdout.write(s);
+  }
+  function putchar(c) {
+    // wide characters
+    // - https://www.fileformat.info/info/unicode/block/halfwidth_and_fullwidth_forms/list.htm
+    // \uff00 = ! (i.e (ascii+ff00-32-1)
+    // \uff21 = A
+    // no space, use '  ' (two spaces)
+    //
+    // these won't do for oric, find replacement:
+    // 126: ~ (ORIC: Shaded gray block)
+    // 127: white paraenthesis (ORIC: black block)
+    if (c < 32 || c > 127) 
+      process.stdout.write(' ');
+    else
+      process.stdout.write(String.fromCharCode(c));
+  }
+  // xterm/ansi
+  function cursorOff() { puts('[?25l'); }
+  function cls() { puts('[2J'); gotorc(0,0); }
+  function cursorOn() { puts('[?25h'); }
+  function gotorc(r, c) { puts('['+r+';'+c+'H'); }
+
+  // simple monitor
+  // TODO: print screen?
+  let cursor = true;
+  let n = 0;
+  setInterval(function(){
+    cursorOff();
+    n++;
+    if ((n % 20) == 1) cls();
+    gotorc(0, 0);
+    for(let r=0; r<28; r++) {
+      puts('| ')
+      for(let c=0; c<40; c++) {
+	putchar(32);//m[SCREEN+r*40*c]);
+      }
+      puts(' |\n');
+    }
+    puts('\n\n)');
+    gotorc(30, 0);
+  
+    let r = cpu.regs();
+    let s = cpu.stats();
+    let ips = Math.floor(s.iCount / s.tTimems);
+    //console.log('\u000c', ips + ' kips', r, s);
+    puts(
+      '6502.js\t['+
+	[Math.floor(s.iCount / s.tTimems), s.iCount, s.tTimems,
+	 Math.floor(Math.log(s.iCount)/Math.log(10)+0.5)] + ']                       ');
+
+    // position cursor
+    gotorc(cpu.mem[0x28], cpu.mem[0x269]);
+
+    // make it blink
+    if (cursor) cursorOn(); else cursorOff();
+    cursor = !cursor;
+
+  }, 200);
+}
+
 // from nodejs? 
 if (typeof require !== 'undefined') {
+  if (1) {
+    ORIC();
+  } else {
   let cpu = cpu6502();
   
-  let start = 0x500; // can't start at 0!
-  let a = start;
+  // TODO: move out!
+  // TEST
+
+  let mycode = 0x500; // can't start at 0!
+  let a = mycode;
   cpu.mem[a++] = 0xe8; // INX
   cpu.mem[a++] = 0xe8; // INX
   cpu.mem[a++] = 0x88; // DEY
   cpu.mem[a++] = 0x88; // DEY
-  cpu.mem[a++] = 0x4c; // JMP start
+  cpu.mem[a++] = 0x4c; // JMP mycode
   cpu.mem[a++] = 0x00; //   00
   cpu.mem[a++] = 0x05; //   05
 
@@ -405,22 +550,29 @@ if (typeof require !== 'undefined') {
     });
   }
 			     
-  run(fast6502);
-  run(rom6502);
-  run(romfunc6502);
+  if (0) {
+    run(fast6502);
+    run(rom6502);
+    run(romfunc6502);
 
-  // share mem
-  run(array6502);
-  run(switch6502);
+    run(array6502);
+    run(switch6502);
+  }
 
-  cpu.start(start);
+  cpu.start(mycode);
 
   setInterval(function(){
     let r = cpu.regs();
     let s = cpu.stats();
     let ips = Math.floor(s.iCount / s.tTimems);
-    console.log('\u000c', ips + ' kips', r, s);
+    //console.log('\u000c', ips + ' kips', r, s);
+    console.log(
+      '6502.js',
+      [Math.floor(s.iCount / s.tTimems), s.iCount, s.tTimems,
+       Math.floor(Math.log(s.iCount)/Math.log(10)+0.5)]);
+
   }, 1000);
+}
 }
 
 // 10 MIPS only... (small hash 5 elts)
