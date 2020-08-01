@@ -442,7 +442,8 @@ C	....	Carry
 const ORIC_ROM = './ROMS/BASIC V1.1B.rom';
 
 function ORIC() {
-  const SCREEN = 0x0BB80;
+  const SCREEN = 0xbb80; // 48K
+  //const SCREEN = 0x3b80; // 16K
 
   let cpu = cpu6502();
   let m = cpu.mem;
