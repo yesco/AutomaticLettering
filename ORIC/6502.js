@@ -176,7 +176,8 @@ C	....	Carry
     bmi(m) { return fs()+"if(s){"+fz()+"ip="+m+";return;}"; },
     bne(m) { return fz()+"if(!z){"+fs()+"ip="+m+";return;}"; },
     bpl(m) { return fs()+"if(!s){"+fz()+"ip="+m+";return;}"; },
-    brk(m) { return fsz()+";i=1;"+
+    brk(m) { throw 'BRK: at address = ' + hex(4,ip);
+             return fsz()+";i=1;"+
 	     // "jsr" but go to different address
 	     fsz()+"m[256+sp]="+((ip-1)&255)+";m[256+((sp+1)&255)]="+((ip-1)>>8)+";sp=(sp+2)&255;"+
 	     ops.php(m)+
@@ -214,7 +215,7 @@ C	....	Carry
 
     rol(m) { ssz(m); return "w="+m+";"+m+"=((w<<1)+c)&255;c=(w>127);"; },
     ror(m) { ssz(m); return "w="+m+";"+m+"=((w>>1)+(c<<7));c=(w&1);"; },
-    rti(m) { return ops.plp(m)+ops.rts(m); },
+    rti(m) { return ops.plp(m)+ops.rts(m)+'ip--;'; throw "er";},
     rts(m) { return fsz()+"sp=(sp-2)&255;ip=(m[sp+256]+(m[256+((sp+1)&255)]<<8)+1)&65535;"; },
     sbc(m) { ssz("w"); return "w=a-"+m+"-(1-c);c=(w>=0);v=((a&0x80)!=(w&0x80));a=(w&255);"; },
     sec(m) { return "c=1;"; },
@@ -272,11 +273,11 @@ C	....	Carry
       revopcodes[opcodes[k][0]+"/"+opcodes[k][1]] = i;
   })();
 
-  // TODO: rewrite jit to generate static
+  // TODO(jsk): rewrite jit to generate static
   // functions not dependent on address
   var jitcode = [];
   var jitmap = [];
-  var jitstoppers = ["jmp", "jsr", "rts", "brk"];
+  var jitstoppers = ["jmp", "jsr", "rts", "brk", "rti", "irq", "nmi"];
 
   function maykill(m) {
     var aL = jitmap[m];
@@ -316,7 +317,7 @@ C	....	Carry
         ip += 3;
       } else {
         var op = opcodes[m[ip++]];
-	console.log({op, ip, m: m[ip-1]});
+	//if (trace) console.log({op, ip, m: m[ip-1]});
         code += ops[op[0]](modes[op[1]]()) + "\n";
         if (jitstoppers.indexOf(op[0]) > -1)
           break;
@@ -326,7 +327,7 @@ C	....	Carry
     }
     code += fsz()+"})";
     var f = eval(code);
-    console.log('\t', f.toString());
+    //if (trace) console.log('\t', f.toString());
 
     for (var i=ip0; i<ip; i++) {
       var L = jitmap[i] = (jitmap[i] || []);
@@ -349,6 +350,8 @@ C	....	Carry
   let NMI_VECTOR   = 0xfffa;
   let RESET_VECTOR = 0xfffc;
   let IRQ_VECTOR   = 0xfffe;
+
+  let trace = false;
 
   // thisfunction runs tick
   function run(gotoip) {
@@ -377,16 +380,32 @@ C	....	Carry
       while (ip != 0 && (ms = (Date.now() - start)) < tickms) {
         for (var k=0; ip && k<1000; k++) {
           alive = true; // this takes about 2% time
-	  //let v= m[ip], op = opcodes[v];
-	  //if (0) console.log(
-	  //iCount,
-	  //hex(4, ip), hex(2, v),
-	  //op[0], op[1], 'a='+a+' x='+x+' y='+y,
-	  //);
-          //(current_f=(jitcode[ip]||(jitcode[ip]=jit())))();
-	  // TODO: checking if have jitcode costs about 1% on average
+
+	  if (trace) {
+	    let v= m[ip], op = opcodes[v];
+	    console.log(
+	      hex(4, ip),
+	      op[0], op[1],
+	      'a='+hex(2,a)+' x='+hex(2,x)+' y='+hex(2,y),
+	      (s?'N':'_')+(v?'V':'_')+'_'+(b?'B':'_'),
+	      (d?'D':'_')+(i?'I':'_')+(z?'Z':'_')+(c?'C':'_'),
+	      'sp='+hex(2, sp),
+	    );
+	    if (typeof trace === 'function') {
+	      if (ip > 0xc000)
+		trace(ip.toString(16));
+	      // operand (ok, not really right...)
+	      let w = m[1]+m[2]*256;
+	      // find a match interesting addresses!
+	      if (w > 0xc000)
+		trace(w.toString(16));
+	    }
+	  }
+
 	  // TODO: jitcode big array lookup costs really alot we only get 425 KIPS instead of more
-          (jitcode[ip]||(jitcode[ip]=jit()))();
+          (current_f=(jitcode[ip]||(jitcode[ip]=jit())))();
+          //(jitcode[ip]||(jitcode[ip]=jit()))();
+
 	  //console.log(current_f.toString());
 	  iCount++;
 	}
@@ -416,6 +435,7 @@ C	....	Carry
 	c, z, s, n: s, d, v, i,
       }
     },
+    trace(st) { trace = st; },
     // f(data) {...}
     trapWrite(a, f) {
       special_write[a] = f;
@@ -440,6 +460,7 @@ C	....	Carry
 }
 
 const ORIC_ROM = './ROMS/BASIC V1.1B.rom';
+const ROM_DOC  = './ROMS/v1.1_rom_disassemblys.html';
 
 function ORIC() {
   const SCREEN = 0xbb80; // 48K
@@ -450,18 +471,60 @@ function ORIC() {
 
   // load ROM
   let fs = require('fs');
-  let binary = fs.readFileSync(ORIC_ROM);
-  if (!binary)
+  let rom = fs.readFileSync(ORIC_ROM);
+  if (!rom)
     throw 'ROM not loaded';
-  if (binary.length !== 16384)
-    throw 'ROM wrong size: ' + binary.length;
+  if (rom.length !== 16384)
+    throw 'ROM wrong size: ' + rom.length;
 
-  // TODO: CLI not implemented
+  // Load ROM doc
+  let doc = fs.readFileSync(ROM_DOC, 'utf8');
+  doc = doc
+    .replace(/&#160;/g, ' ')
+    .replace(/<br\/>/g, '\n')
+    .replace(/\n+/g, '\n')
   
-  m.set(binary, 0xc000);
+  ;
+  // function that will print any mentions of
+  // an address from the doc! lol
+  function describe(addr) {
+    doc.replace(
+      RegExp(`\\n.*?${addr}.*?\\n.*?\\n.*?\\n.*?\\n`, 'ig'),
+      txt=>{
+	let disp = txt
+	    .replace(/\n/g, '\t')
+	    .replace(/^\s+/, '')
+	    .replace(/xxx\t/g, '  ')
+	    .replace(/  +/g, '  ')
+	    .replace(/\t$/g, '')
+
+	;
+	
+	if (!disp.match(/[0-9a-f]{4}[\s\n]*$/i)) {
+	  // remove asm if it's same address
+	  if (disp.match(RegExp('^'+addr, 'i')))
+	    disp = disp.replace(/^.*\t/, '\t')
+
+	  if (!disp.match(/^[A-Z0-9# \$\t\s\n]*$/))
+	    console.log('\t'+disp);
+	}
+	return txt;
+      });
+  }
+  
+  m.set(rom, 0xc000);
   
   // run!
+
+  cpu.trace(describe);
+  let scon = false;
+  //let scon = true;
+
+
   cpu.start();
+
+
+
 
   function puts(s) {
     process.stdout.write(s);
@@ -487,11 +550,9 @@ function ORIC() {
   function cursorOn() { puts('[?25h'); }
   function gotorc(r, c) { puts('['+r+';'+c+'H'); }
 
-  // simple monitor
-  // TODO: print screen?
   let cursor = true;
   let n = 0;
-  setInterval(function(){
+  function updateScreen() {
     cursorOff();
     n++;
     if ((n % 20) == 1) cls();
@@ -505,23 +566,30 @@ function ORIC() {
     }
     puts('\n\n)');
     gotorc(30, 0);
+  }
+
+  // simple monitor
+  setInterval(function(){
+    if (scon)
+      updateScreen();
   
     let r = cpu.regs();
     let s = cpu.stats();
     let ips = Math.floor(s.iCount / s.tTimems);
     //console.log('\u000c', ips + ' kips', r, s);
     puts(
-      '6502.js\t['+
+      '\n6502.js\t['+
 	[Math.floor(s.iCount / s.tTimems), s.iCount, s.tTimems,
-	 Math.floor(Math.log(s.iCount)/Math.log(10)+0.5)] + ']                       ');
+	 Math.floor(Math.log(s.iCount)/Math.log(10)+0.5)] + ']                 ');
 
-    // position cursor
-    gotorc(cpu.mem[0x28], cpu.mem[0x269]);
+    if (scon) {
+      // position cursor
+      gotorc(cpu.mem[0x28], cpu.mem[0x269]);
 
-    // make it blink
-    if (cursor) cursorOn(); else cursorOff();
-    cursor = !cursor;
-
+      // make it blink
+      if (cursor) cursorOn(); else cursorOff();
+      cursor = !cursor;
+    }
   }, 200);
 }
 
