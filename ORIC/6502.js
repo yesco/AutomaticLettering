@@ -106,7 +106,17 @@ C	....	Carry
     z = (sr && 1); sr >>>= 1; // Z
     c = (sr && 1); sr >>>= 1; // C
   }
-    
+
+  // return stack as hex string reverse order
+  // (starting at FF--sp
+  function stack() {
+    let r = '';
+    for(let k=sp+1; k<=0xff; k++) {
+      r += hex(2, m[0x100 + k]) + ' ';
+    }
+    return r;
+  }
+
   // Lazy Z/S evaluation; set_[sz] contains the code to set the flag
   // s[sz](x) sets this code, f[sz]() returns the code and clears it.
   var set_z = "";
@@ -152,6 +162,24 @@ C	....	Carry
     acc() { return "a"; },
   };
 
+  // prettyprint mode for instruction at ip
+  var ppmodes = {
+    ___(ip)  { return [0, ""]; }, // jsk
+    imm(ip)  { return [1, "#$" + hex(2,m[ip])]; },
+    zpg(ip)  { return [1, "$" + hex(2,m[ip])]; },
+    zpx(ip)  { return [1, "$" + hex(2,m[ip]) + ",x"]; },
+    zpy(ip)  { return [1, "$" + hex(2,m[ip]) + ",y"]; },
+    abs(ip)  { return [2, "$" + hex(4,m[ip]+m[(ip+1)&65535]*256)]; },
+    abx(ip)  { return [2, "$" + hex(4,m[ip]+m[(ip+1)&65535]*256) + ",x"]; },
+    aby(ip)  { return [2, "$" + hex(4,m[ip]+m[(ip+1)&65535]*256) + ",y"]; },
+    iix(ip)  { return [1, "($" + hex(2,m[ip]) + ",x)"]; },
+    iiy(ip)  { return [1, "($" + hex(2,m[ip]) + "),y"]; },
+    rel(ip)  { var delta = m[ip]; if (delta>=128) delta-=256; return [1, "$" + hex(4,ip+1+delta)]; },
+    adr(ip)  { return [2, "$" + hex(4,m[ip]+m[ip+1]*256)]; },
+    ind(ip)  { return [2, "($" + hex(4,m[ip]+m[ip+1]*256) + ")"]; },
+    s_acc(ip)  { return [0, "a"]; },
+  };
+
   function hex(n,x) {
     var r = "";
     for (var k=0; k<n; k++) {
@@ -179,7 +207,7 @@ C	....	Carry
     brk(m) { throw 'BRK: at address = ' + hex(4,ip);
              return fsz()+";i=1;"+
 	     // "jsr" but go to different address
-	     fsz()+"m[256+sp]="+((ip-1)&255)+";m[256+((sp+1)&255)]="+((ip-1)>>8)+";sp=(sp+2)&255;"+
+	     fsz()+"m[256+sp]="+((ip-1)&255)+";m[256+((sp-1)&255)]="+((ip-1)>>8)+";sp=(sp-2)&255;"+
 	     ops.php(m)+
 	     "ip=m[IRQ_VECTOR]+m[IRQ_VECTOR+1]*256;"
 	   },
@@ -201,22 +229,22 @@ C	....	Carry
     inx(m) { ssz("x"); return "x=(x+1)&255;"; },
     iny(m) { ssz("y"); return "y=(y+1)&255;"; },
     jmp(m) { return fsz()+"ip="+m+";"; },
-    jsr(m) { return fsz()+"m[256+sp]="+((ip-1)&255)+";m[256+((sp+1)&255)]="+((ip-1)>>8)+";sp=(sp+2)&255;ip="+m+";return;"; },
+    jsr(m) { return fsz()+"m[256+sp]="+((ip-1)&255)+";m[256+((sp-1)&255)]="+((ip-1)>>8)+";sp=(sp-2)&255;ip="+m+";return;"; },
     lda(m) { ssz("a"); return "a="+m+";"; },
     ldx(m) { ssz("x"); return "x="+m+";"; },
     ldy(m) { ssz("y"); return "y="+m+";"; },
     lsr(m) { ssz(m); return "c="+m+"&1;"+m+">>=1;"; },
     nop(m) { return ""; },
     ora(m) { ssz("a"); return "a|="+m+";"; },
-    pha(m) { return "m[256+sp]=a;sp=(sp+1)&255;"; },
-    php(m) { return "m[256+sp]=SR();sp=(sp+1)&255;"; },
-    pla(m) { ssz("a"); return "sp=(sp-1)&255;a=m[256+sp];"; },
-    plp(m) { return "sp=(sp-1)&255;setSR(m[256+sp]);"; },
+    pha(m) { return "m[256+sp]=a;sp=(sp-1)&255;"; },
+    php(m) { return "m[256+sp]=SR();sp=(sp-1)&255;"; },
+    pla(m) { ssz("a"); return "sp=(sp+1)&255;a=m[256+sp];"; },
+    plp(m) { return "sp=(sp+1)&255;setSR(m[256+sp]);"; },
 
     rol(m) { ssz(m); return "w="+m+";"+m+"=((w<<1)+c)&255;c=(w>127);"; },
     ror(m) { ssz(m); return "w="+m+";"+m+"=((w>>1)+(c<<7));c=(w&1);"; },
     rti(m) { return ops.plp(m)+ops.rts(m)+'ip--;'; throw "er";},
-    rts(m) { return fsz()+"sp=(sp-2)&255;ip=(m[sp+256]+(m[256+((sp+1)&255)]<<8)+1)&65535;"; },
+    rts(m) { return fsz()+"ip=(m[sp+2+256]+(m[256+((sp+1)&255)]<<8)+1)&65535;sp=(sp+2)&255;"; }, // stack grew wrong direction in original!
     sbc(m) { ssz("w"); return "w=a-"+m+"-(1-c);c=(w>=0);v=((a&0x80)!=(w&0x80));a=(w&255);"; },
     sec(m) { return "c=1;"; },
     sed(m) { throw "Not implemented"; },
@@ -343,6 +371,10 @@ C	....	Carry
   }
 
   var tickms = 50;
+  var step = 1000;
+  var maxstep = 1000*1000;
+  var delay = 0;
+
   var tCount = 0;
   var iCount = 0;
   var tTimems = 0;
@@ -377,19 +409,24 @@ C	....	Carry
       tCount++;
       var start = Date.now();
       var ms;
+      var istart = iCount;
       while (ip != 0 && (ms = (Date.now() - start)) < tickms) {
-        for (var k=0; ip && k<1000; k++) {
+	if (iCount - istart > maxstep) break;
+
+        for (var k=0; ip && k<step; k++) {
           alive = true; // this takes about 2% time
 
 	  if (trace) {
 	    let v= m[ip], op = opcodes[v];
+	    let farg = ppmodes[op[1]], arg = '???';
+	    if (farg) arg = farg(ip+1)[1];
 	    console.log(
 	      hex(4, ip),
-	      op[0], op[1],
+	      op[0], arg.padEnd(9, ' '),
 	      'a='+hex(2,a)+' x='+hex(2,x)+' y='+hex(2,y),
 	      (s?'N':'_')+(v?'V':'_')+'_'+(b?'B':'_'),
 	      (d?'D':'_')+(i?'I':'_')+(z?'Z':'_')+(c?'C':'_'),
-	      'sp='+hex(2, sp),
+	      'sp='+hex(2, sp)+'( '+stack()+')',
 	    );
 	    if (typeof trace === 'function') {
 	      if (ip > 0xc000)
@@ -414,7 +451,7 @@ C	....	Carry
       tTimems += ms;
 
       if (ip != 0)
-	run.timer = setTimeout(run, 0);
+	run.timer = setTimeout(run, delay);
     }
   }
 
@@ -445,8 +482,12 @@ C	....	Carry
       special_reade[a] = f;
     },
     // allow it to run for ms each time
-    setTickms(ms) {
-      tickms = ms;
+    setTickms(ms, stp, mxstp, dly) {
+      tickms = ms | ms;
+      maxstep = mxstp || maxstep;
+      step = stp || step;
+      step = Math.min(step, maxstep);
+      delay = dly;
     },
     stats() {
       return {
@@ -463,11 +504,81 @@ const ORIC_ROM = './ROMS/BASIC V1.1B.rom';
 const ROM_DOC  = './ROMS/v1.1_rom_disassemblys.html';
 
 function ORIC() {
+  let cpu = cpu6502();
+  let m = cpu.mem;
+
+  // ---------------------------- SCREEN
   const SCREEN = 0xbb80; // 48K
   //const SCREEN = 0x3b80; // 16K
 
-  let cpu = cpu6502();
-  let m = cpu.mem;
+  function puts(s) {
+    process.stdout.write(s);
+  }
+  function putchar(c) {
+    // wide characters
+    // - https://www.fileformat.info/info/unicode/block/halfwidth_and_fullwidth_forms/list.htm
+    // \uff00 = ! (i.e (ascii+ff00-32-1)
+    // \uff21 = A
+    // no space, use '  ' (two spaces)
+    //
+    // these won't do for oric, find replacement:
+    // 126: ~ (ORIC: Shaded gray block)
+    // 127: white paraenthesis (ORIC: black block)
+    if (c == 0) {
+      puts('0');
+    } else if (c > 127) {
+      inverseOn();
+      putchar(c & 127);
+      off();
+      // TODO: restore fg/bg/blink/double?
+    } else if (c < 32) {
+      if (c < 8) {
+	fgcol(c);
+      } else if (c < 16) {
+	boldOn();
+	putchar(c + 64);
+	off();
+	// TODO: restore fg/bg/blink/double?
+      } else if (c < 24) {
+	bgcol(c - 16);
+      }
+    } else if (c == 32) {
+      process.stdout.write('_');
+    } else {
+      process.stdout.write(String.fromCharCode(c));
+    }
+  }
+  // xterm/ansi
+  function cursorOff() { puts('[?25l'); }
+  function cls() { puts('[2J'); gotorc(0,0); }
+  function cursorOn() { puts('[?25h'); }
+  function gotorc(r, c) { puts('['+r+';'+c+'H'); }
+  function fgcol(c) { puts('[0;3'+c+'m@'); } // add teletext space
+  function bgcol(c) { puts('[4'+c+'m@'); } // add teletext space
+  function inverseOn() { puts('[7m'); }
+  function underscoreOn() { puts('[4m'); }
+  function boldOn() {  puts('[1m'); }
+  // you can only turn all off! :-(
+  function off(){ puts('[m'); }
+
+  let cursor = true;
+  let n = 0;
+  function updateScreen() {
+    cursorOff();
+    n++;
+    if ((n % 20) == 1) cls();
+    gotorc(0, 0);
+    for(let r=0; r<28; r++) {
+      puts('| ')
+      for(let c=0; c<40; c++) {
+	putchar(m[SCREEN+r*40*c]);
+      }
+      off();
+      puts(' |\n');
+    }
+    puts('\n');
+    gotorc(29, 0);
+  }
 
   // load ROM
   let fs = require('fs');
@@ -506,7 +617,7 @@ function ORIC() {
 	    disp = disp.replace(/^.*\t/, '\t')
 
 	  if (!disp.match(/^[A-Z0-9# \$\t\s\n]*$/))
-	    console.log('\t'+disp);
+	    console.log('\t'+disp+'\n');
 	}
 	return txt;
       });
@@ -516,60 +627,22 @@ function ORIC() {
   
   // run!
 
-  cpu.trace(describe);
   let scon = false;
-  //let scon = true;
+  scon = true;
+  if (!scon)
+    cpu.trace(describe);
 
-
+  updateScreen();
+  //process.exit(0);
+  
+  //cpu.setTickms(1, 1, 1, 0);
   cpu.start();
-
-
-
-
-  function puts(s) {
-    process.stdout.write(s);
-  }
-  function putchar(c) {
-    // wide characters
-    // - https://www.fileformat.info/info/unicode/block/halfwidth_and_fullwidth_forms/list.htm
-    // \uff00 = ! (i.e (ascii+ff00-32-1)
-    // \uff21 = A
-    // no space, use '  ' (two spaces)
-    //
-    // these won't do for oric, find replacement:
-    // 126: ~ (ORIC: Shaded gray block)
-    // 127: white paraenthesis (ORIC: black block)
-    if (c < 32 || c > 127) 
-      process.stdout.write(' ');
-    else
-      process.stdout.write(String.fromCharCode(c));
-  }
-  // xterm/ansi
-  function cursorOff() { puts('[?25l'); }
-  function cls() { puts('[2J'); gotorc(0,0); }
-  function cursorOn() { puts('[?25h'); }
-  function gotorc(r, c) { puts('['+r+';'+c+'H'); }
-
-  let cursor = true;
-  let n = 0;
-  function updateScreen() {
-    cursorOff();
-    n++;
-    if ((n % 20) == 1) cls();
-    gotorc(0, 0);
-    for(let r=0; r<28; r++) {
-      puts('| ')
-      for(let c=0; c<40; c++) {
-	putchar(32);//m[SCREEN+r*40*c]);
-      }
-      puts(' |\n');
-    }
-    puts('\n\n)');
-    gotorc(30, 0);
-  }
 
   // simple monitor
   setInterval(function(){
+
+      // TODO: *0x030b = 40; // generate timer interrupts every 10ms
+
     if (scon)
       updateScreen();
   
