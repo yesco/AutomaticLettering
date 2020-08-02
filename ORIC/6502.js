@@ -52,6 +52,16 @@
 function cpu6502() {
   // Note: special read/write only works for LDA/STA absolute
 
+  // The original author only handled special DIRECT ABSOLUTE address and only A!!!! :-(
+  // ignores zero page...
+  // LDA, LDX, LDY
+  // STA, LDX, LDY
+  // LD? $xxxx        ! only handled for A
+  // LD? ($xxxx,x)    ! not for indirect x
+  // LD? ($xxxx),y    ! not for indirect y
+  //
+  // bad code that doesn't tell limitiations.
+
   // key=address, value=function(data){...}
   var special_write = { };
 
@@ -77,6 +87,7 @@ N	....	Negative
 V	....	Overflow
 -	....	ignored
 B	....	Break
+
 D	....	Decimal (use BCD for arithmetics)
 I	....	Interrupt (IRQ disable)
 Z	....	Zero
@@ -327,20 +338,33 @@ C	....	Carry
     var ip0 = ip, addr;
     var NN = 1; // was 2 meaning 2 got compiled in a row! "too clever" will give trouble for self-modifying code..l
     // HOWEVER: NN=5 reaches 2kips * 5 instructions a go, so it means 1 MIPS = 1 MHz...
+
     // so, this is still SLOW...
+
     // NN = 1 // I'm getting only 415 kips on 
     // Xiaomi Note 4A (2-3 years old...)
     // if done right, then there is no reason
     // why it would be slower than C!?!
-    // TODO: generate massive SWITCH!
-    // or array of instrunctions...
+
     while (count < NN) {
       count += 1;
-      // magic? what instruction?
+
+      // The original author only handled special DIRECT ABSOLUTE address and only A!!!! :-(
+      // ignores zero page...
+      // LDA, LDX, LDY
+      // STA, LDX, LDY
+      // LD? $xxxx        ! only handled for A
+      // LD? ($xxxx,x)    ! not for indirect x
+      // LD? ($xxxx),y    ! not for indirect y
+      //
+      // bad code that doesn't tell limitiations.
       if (m[ip] == 0x8D && special_write[addr=m[ip+1]+256*m[ip+2]]) {
+	// STA $xxxx (ignores zeropage)
         code += special_write[addr].name + "(a);\n";
         ip += 3;
       } else if (m[ip] == 0xAD && special_read[addr=m[ip+1]+256*m[ip+2]]) {
+	// LDA $xxxx (ignore zeropage)
+
         code += "a="+special_read[addr].name+"();\n";
         ssz("a");
         ip += 3;
@@ -578,6 +602,195 @@ function ORIC() {
 
   //catches ctrl+c event
   process.on('SIGINT', exitHandler.bind(null, {exit:true}));
+
+/* ORIC, timer load:
+
+// wow - so clumsy!!!
+
+$272,$273 Keyboard timer. 
+$274,$275 Cursor timer. 
+
+- INTERRUPTS
+Name	 		V1.0	V1.1
+Start  6522 Clocks	#ECC7	#EDE0
+Stop  6522 clocks	#ED01	#EE1A
+Update timers etc	#ED1B	#EE34
+Clear all timers	#ED70	#EE8C
+Read a timer into X Y 	#ED81	#EE9D
+Write XY into a timer	#ED8F	#EEAB
+Wait for time X Y	#EDAD	#EEC0 ???
+
+EDE0 PHA	This routine sets the three 16
+  push a
+EDE1 JSR $EE8C	bit counters (#272/3, #274/5 & 
+  jsr clearTimers
+EDE4 LDA #$00	#276/7) after setting them to 
+  a = 00
+EDE6 LDX #$00	zero. 
+  x = 00
+EDE8 LDY #$03	#272/3 is set to 3 and is used 
+  y = 03
+EDEA JSR $EEAB	as a counter for keyboard 
+  jsr writeXYtoTimerA
+EDED LDA #$01	scanning. #274/5 is set to 25 
+  a = 01
+EDEF LDY #$19	and is used as a counter for 
+  y = 19
+EDF1 JSR $EEAB	toggling the cursor. #276/7 is 
+  jsr writeXYtoTimerA
+EDF4 LDA #$00	not set here but is used in 
+EDF6 STA $0271	the WAIT command. 
+  ($271) = 00
+
+EDF9 LDA $030B 
+  a = ($30b)
+EDFC AND #$7F	This section sets up the 6522 
+EDFE ORA #$40 	to generate interrupts from
+EE00 STA $030B 	timer 1 every 10ms (in its 
+  ($30b) = (a & 7f) | 40
+EE03 LDA #$C0 	free running mode).
+EE05 STA $030E 
+  ($30e) = a = c0
+EE08 LDA #$10 
+EE0A STA $0306 
+EE0D STA $0304 
+  ($304) = ($306) = a = 10
+EE10 LDA #$27 
+EE12 STA $0307 
+EE15 STA $0305 
+  ($305) = ($307) = a = 27
+EE18 PLA 
+  pull a
+EE19 RTS
+  return
+
+via6552: IRQ every 10ms (free running mode)
+  ($30b) = (a & 7f) | 40
+  ($30e) = a = c0
+  ($304) = ($306) = a = 10
+  ($305) = ($307) = a = 27
+
+EE1A PHA 	Disable timer 1 interrupts
+EE1B LDA #$40 	from the 6522. This routine 
+EE1D STA $030E 	is used by the cassette 
+EE20 PLA commands. 
+EE21 RTS 
+
+EE22 PHA 	IRQ Handler.
+EE23 LDA $030D	Test that timer 1 has timed
+  a = ($30d)
+EE26 AND #$40	out; if so then go to service 
+  a = a & 40
+EE28 BEQ $EE30	subroutine. The interrupt 
+  if not (bit 6 is set) skip till ee30 (pla)
+EE2A STA $030D	routine is terminated by 
+  ($0d) = a
+EE2D JSR $EE34	jumping to the RTI instruction 
+  
+---> ( 6th bit not set)
+EE30 PLA 	at #24A. 
+EE31 JMP $024A 
+  user interrupt handler, init: RTI !
+
+EE34 PHA 	update clocks
+EE35 TXA 
+EE36 PHA 
+EE37 TYA 
+EE38 PHA 
+EE39 LDY #$00 	This section decrements each 
+EE3B LDA $0272,Y of the three 16 bit counters 
+EE3E SEC in page 2 by 1. 
+EE3F SBC #$01 
+EE41 STA $0272,Y 
+EE44 INY 
+EE45 LDA $0272,Y 
+EE48 SBC #$00 
+EE4A STA $0272,Y 
+EE4D INY 
+EE4E CPY #$06 
+EE50 BNE $EE3B 
+EE52 LDA #$00 	Load X (high) and Y (low) with 
+EE54 JSR $EE9D 	content of first counter. If 
+EE57 CPY #$00 	has reached zero then reload 
+EE59 BNE $EE6B 	it with the value of 3. 
+EE5B LDX #$00 
+EE5D LDY #$03 
+EE5F JSR $EEAB 	After each countdown to zero 
+EE62 JSR $F495 	strobe the keyboard; the 
+EE65 TXA result will be in X and bit 7 
+EE66 BPL $EE6B 	set if a valid key. 
+EE68 STX $02DF 	Save the new key. 
+EE6B LDA #$01 	Load X and Y with content of 
+EE6D JSR $EE9D 	the second 16 bit counter. If 
+EE70 CPY #$00 	it has reached zero then 
+EE72 BNE $EE86 	reload it with the value of 
+EE74 LDX #$00 	25. When zero, toggle the 
+EE76 LDY #$19 	cursor flag in #271. 
+EE78 JSR $EEAB 	Then place a copy of cursor
+EE7B LDA $0271 	on screen if it is enabled.
+EE7E EOR #$01 
+EE80 STA $027
+EE83 JSR $F801 
+EE86 PLA 
+EE87 TAY 
+EE88 PLA 
+EE89 TAX 
+EE8A PLA 
+EE8B RTS 
+
+EE8C PHA 	This routine sets to zero 
+EE8D TYA 	the three 16 bit counters 
+EE8E PHA 	at #272/3, #274/5 and #276/7. 
+EE8F LDY #$05 
+EE91 LDA #$00 
+EE93 STA $0272,Y 
+EE96 DEY 
+EE97 BPL $EE93 
+EE99 PLA 
+EE9A TAY 
+EE9B PLA 
+EE9C RTS 
+EE9D PHA 	This routine loads X (high) 
+EE9E ASL 	A and Y (low) with the content 
+EE9F TAY 	of the 16 bit counter 
+EEA0 SEI 	specified by the content of A. 
+EEA1 LDA $0272,Y The valid values of A are 0, 1 
+EEA4 LDX $0273,Y and 2 which load the 1st, 2nd 
+EEA7 CLI 	and 3rd counters respectively. 
+EEA8 TAY 
+EEA9 PLA 
+EEAA RTS 
+EEAB PHA 	This routine loads the 16 bit 
+EEAC TXA 	counter specified by A with 
+EEAD PHA 	the contents of X (high) and 
+EEAE TYA Y 	(low). 
+EEAF PHA 	Values of 0, 1 and 2 in A 
+EEB0 TSX 	access the 1st, 2nd and 3rd 
+EEB1 LDA $0103,X counters respectively. 
+EEB4 ASL A 
+EEB5 TAY 
+EEB6 PLA 
+EEB7 PHA 
+EEB8 SEI 
+EEB9 STA $0272,Y 
+EEBC LDA $0102,X 
+EEBF STA $0273,Y 
+EEC2 CLI 
+EEC3 PLA 
+EEC4 TAY 
+EEC5 PLA 
+EEC6 TAX 
+EEC7 PLA 
+EEC8 RTS 
+EEC9 JSR $EEAB 	Load the 16 bit counter 
+EECC JSR $EE9D 	specified by A with the 
+EECF CPY #$00 	contents of X and Y and then 
+EED1 BNE $EECC	wait until that counter has 
+EED3 CPX #$00 	decremented to zero. 
+EED5 BNE $EECC 
+EED7 RTS 
+
+*/
 
   // ---------------------------- SCREEN
   const SCREEN = 0xbb80; // 48K
