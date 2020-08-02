@@ -3843,16 +3843,16 @@ gB800 – #BBFF – the alternate character set when in TEXT mode.
 # BFEO – #BFFF – unused.
 
 --- MEMORY MAP TEXT vs HIRES (jsk)
+(+ 5120 1024 896 1000)
 
 ---		size	TEXT	HIRES
 #9800-#9bff	1024	-	std
 #9c00-#9fff	1024		alt
-#a000		8000		graphics
+#a000-		5120		graphics, 8000bytes-
 #b400-#bf77	1024	std	graphics
 #b800-#bbff	896*	alt-112	graphics
-#bb80-#bfdf	1120	25x40   graphics
--#bf3f				graphics
-#bf40-#bf67	40	?	?
+#bb80-#bfdf	1000	25x40   graphics
+#bf40-#bf67	40	?	greahics, -end
 #bf68-#bfdf     223	3*40    3*40 (@49000!)
 #bfe0-#bfff	32	-	-
 

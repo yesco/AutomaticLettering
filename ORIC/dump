@@ -1,0 +1,1 @@
+hexdump -C oric.core | less -S

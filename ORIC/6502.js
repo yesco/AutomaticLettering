@@ -61,6 +61,7 @@ function cpu6502() {
   // Virtual CPU ////////////////////////////////////////////////////////
 
   var m = new Uint8Array(65536);
+  m.fill(0);
 
   var alive = true;
   var current_f = null;
@@ -384,9 +385,23 @@ C	....	Carry
   let IRQ_VECTOR   = 0xfffe;
 
   let trace = false;
+  let error = defaultError;
+
+  function defaultError(e) {
+    throw e;
+  }
+
+  // error-catching wrapper
+  function run(gotoip) {
+    try {
+      return irun(gotoip);
+    } catch(e) {
+      error(e);
+    }
+  }
 
   // thisfunction runs tick
-  function run(gotoip) {
+  function irun(gotoip) {
     //console.log('run---------------------: ' + gotoip);
     if (gotoip && gotoip < 0) {
       if (run.timer)
@@ -463,6 +478,9 @@ C	....	Carry
     stop() {
       run(-1);
     },
+    setError(errf) {
+      error = errf || defaultError;
+    },
     mem: m,
     regs() {
       return {
@@ -502,10 +520,46 @@ C	....	Carry
 
 const ORIC_ROM = './ROMS/BASIC V1.1B.rom';
 const ROM_DOC  = './ROMS/v1.1_rom_disassemblys.html';
+const ORIC_CORE = './oric.core';
 
 function ORIC() {
+  let fs = require('fs');
+
+  // init 6502
   let cpu = cpu6502();
   let m = cpu.mem;
+
+  cpu.setError(oricError);
+
+  function oricError(e) {
+    off();
+    cursorOn();
+    gotorc(50, 0);
+    console.error('----------- EXIT ----------');
+    console.error(e);
+    console.error('Registers:');
+    console.error(cpu.regs());
+    console.error('Stats:');
+    console.error(cpu.stats());
+    console.error('...memory dumped to file: ' + ORIC_CORE);
+    console.error('(tip: hexdump -C oric.core)');
+
+    fs.writeFileSync(ORIC_CORE, m);
+    fs.appendFileSync(ORIC_CORE, '\n========= REGS & STATS ========\n');
+    fs.appendFileSync(ORIC_CORE, JSON.stringify(cpu.regs())+'\n');
+    fs.appendFileSync(ORIC_CORE, JSON.stringify(cpu.stats())+'\n');
+    process.exit(1);
+  }
+
+  function exitHandler(options, exitCode) {
+    if (options.exit) {
+      oricError('ExitCode: ' + exitCode);
+      process.exit();
+    }
+  }
+
+  //catches ctrl+c event
+  process.on('SIGINT', exitHandler.bind(null, {exit:true}));
 
   // ---------------------------- SCREEN
   const SCREEN = 0xbb80; // 48K
@@ -524,17 +578,18 @@ function ORIC() {
     // these won't do for oric, find replacement:
     // 126: ~ (ORIC: Shaded gray block)
     // 127: white paraenthesis (ORIC: black block)
+   
     if (c == 0) {
-      puts('0');
+      process.stdout.write('0');
     } else if (c > 127) {
-      inverseOn();
+      //inverseOn();
       putchar(c & 127);
-      off();
-      // TODO: restore fg/bg/blink/double?
+      //off();
+      // TODO: restore last fg/bg/blink/double?
     } else if (c < 32) {
       if (c < 8) {
 	fgcol(c);
-      } else if (c < 16) {
+      } else if (c < 16 || c >= 24) {
 	boldOn();
 	putchar(c + 64);
 	off();
@@ -543,9 +598,14 @@ function ORIC() {
 	bgcol(c - 16);
       }
     } else if (c == 32) {
-      process.stdout.write('_');
-    } else {
+      process.stdout.write(' ');
+    } else if (c) {
+      //process.stdout.write('P'); return;
       process.stdout.write(String.fromCharCode(c));
+      //process.stdout.write('['+c+']');
+    } else {
+      // undefined?
+      process.stdout.write('['+c+']');
     }
   }
   // xterm/ansi
@@ -553,7 +613,7 @@ function ORIC() {
   function cls() { puts('[2J'); gotorc(0,0); }
   function cursorOn() { puts('[?25h'); }
   function gotorc(r, c) { puts('['+r+';'+c+'H'); }
-  function fgcol(c) { puts('[0;3'+c+'m@'); } // add teletext space
+  function fgcol(c) { puts('[3'+c+'m@'); } // add teletext space
   function bgcol(c) { puts('[4'+c+'m@'); } // add teletext space
   function inverseOn() { puts('[7m'); }
   function underscoreOn() { puts('[4m'); }
@@ -571,7 +631,7 @@ function ORIC() {
     for(let r=0; r<28; r++) {
       puts('| ')
       for(let c=0; c<40; c++) {
-	putchar(m[SCREEN+r*40*c]);
+	putchar(m[SCREEN+r*40+c]);
       }
       off();
       puts(' |\n');
@@ -581,7 +641,6 @@ function ORIC() {
   }
 
   // load ROM
-  let fs = require('fs');
   let rom = fs.readFileSync(ORIC_ROM);
   if (!rom)
     throw 'ROM not loaded';
@@ -633,9 +692,8 @@ function ORIC() {
     cpu.trace(describe);
 
   updateScreen();
-  //process.exit(0);
   
-  //cpu.setTickms(1, 1, 1, 0);
+  cpu.setTickms(1, 1, 1, 1);
   cpu.start();
 
   // simple monitor
