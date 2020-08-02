@@ -400,6 +400,8 @@ C	....	Carry
     }
   }
 
+  let nextip = 0;
+
   // thisfunction runs tick
   function irun(gotoip) {
     //console.log('run---------------------: ' + gotoip);
@@ -431,10 +433,21 @@ C	....	Carry
         for (var k=0; ip && k<step; k++) {
           alive = true; // this takes about 2% time
 
-	  if (trace) {
+	  // disassemble!
+	  // AAAA JSR $8400 a=00 x=ff y=12 NV_B DIZC sp=fa ( 11 22 33 44 55 )
+	  if (trace && ((typeof trace !== 'function') || ((typeof trace == 'function') && trace(ip))))
+ {
+	    if (ip != nextip)
+	      console.log('---->');
+
 	    let v= m[ip], op = opcodes[v];
 	    let farg = ppmodes[op[1]], arg = '???';
-	    if (farg) arg = farg(ip+1)[1];
+	    nextip = ip + 1;
+	    if (farg) {
+	      let z;
+	      [z, arg] = farg(ip+1);
+	      nextip += z;
+	    }
 	    console.log(
 	      hex(4, ip),
 	      op[0], arg.padEnd(9, ' '),
@@ -490,6 +503,11 @@ C	....	Carry
 	c, z, s, n: s, d, v, i,
       }
     },
+    // st: undefined/false/true
+    // st: function(arg) {
+    //   arg: number, return true if to show trace
+    //   arg: string, search and describe,
+    //        typically called with 'ADDR'
     trace(st) { trace = st; },
     // f(data) {...}
     trapWrite(a, f) {
@@ -658,6 +676,14 @@ function ORIC() {
   // function that will print any mentions of
   // an address from the doc! lol
   function describe(addr) {
+    // used to exclude logging of some addresses!
+    // (like wait loops!)
+    if (typeof addr == 'number') {
+      // addresses/rnages we don't want to see
+      if (addr >= 0xee9d && addr <= 0xeed1) return;
+      // yes! we want trace of this address
+      return true;
+    }
     doc.replace(
       RegExp(`\\n.*?${addr}.*?\\n.*?\\n.*?\\n.*?\\n`, 'ig'),
       txt=>{
@@ -676,7 +702,7 @@ function ORIC() {
 	    disp = disp.replace(/^.*\t/, '\t')
 
 	  if (!disp.match(/^[A-Z0-9# \$\t\s\n]*$/))
-	    console.log('\t'+disp+'\n');
+	    console.log('\t\t'+disp+'\n');
 	}
 	return txt;
       });
@@ -687,13 +713,11 @@ function ORIC() {
   // run!
 
   let scon = false;
-  scon = true;
+  //scon = true;
   if (!scon)
     cpu.trace(describe);
-
-  updateScreen();
   
-  cpu.setTickms(1, 1, 1, 1);
+  //cpu.setTickms(1, 1, 1, 1);
   cpu.start();
 
   // simple monitor
@@ -708,10 +732,10 @@ function ORIC() {
     let s = cpu.stats();
     let ips = Math.floor(s.iCount / s.tTimems);
     //console.log('\u000c', ips + ' kips', r, s);
-    puts(
+    console.error(
       '\n6502.js\t['+
 	[Math.floor(s.iCount / s.tTimems), s.iCount, s.tTimems,
-	 Math.floor(Math.log(s.iCount)/Math.log(10)+0.5)] + ']                 ');
+	 Math.floor(Math.log(s.iCount)/Math.log(10)+0.5)] + ']                 \n');
 
     if (scon) {
       // position cursor
