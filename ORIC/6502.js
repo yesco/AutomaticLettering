@@ -255,12 +255,12 @@ C	....	Carry
 
     rol(m) { ssz(m); return "w="+m+";"+m+"=((w<<1)+c)&255;c=(w>127);"; },
     ror(m) { ssz(m); return "w="+m+";"+m+"=((w>>1)+(c<<7));c=(w&1);"; },
-    rti(m) { return ops.plp(m)+ops.rts(m)+'ip;'; throw "er";},
+    rti(m) { return ops.plp(m)+ops.rts(m)+"i=0;"; },
     rts(m) { return fsz()+"ip=(m[sp+2+256]+(m[256+((sp+1)&255)]<<8)+1)&65535;sp=(sp+2)&255;"; }, // stack grew wrong direction in original!
     sbc(m) { ssz("w"); return "w=a-"+m+"-(1-c);c=(w>=0);v=((a&0x80)!=(w&0x80));a=(w&255);"; },
     sec(m) { return "c=1;"; },
     sed(m) { throw "Not implemented"; },
-    sei(m) { return "i=0;"; },
+    sei(m) { return "i=1;"; },
     sta(m) { return "maykill("+m.substr(2,m.length-3)+");"+fszm()+m+"=a;if(!alive){ip="+ip+";return;}"; },
     stx(m) { return "maykill("+m.substr(2,m.length-3)+");"+fszm()+m+"=x;if(!alive){ip="+ip+";return;}"; },
     sty(m) { return "maykill("+m.substr(2,m.length-3)+");"+fszm()+m+"=y;if(!alive){ip="+ip+";return;}"; },
@@ -272,9 +272,14 @@ C	....	Carry
     tya(m) { ssz("a"); return "a=y;"; },
   };
 
-  // TODO: disable if interrupts not allowed!
+  // TOOD: i doesn't seem to be reset by rti ????
   function doBrk() {
-    i=1;
+    // ignore if already in interrupt!
+
+    if (i) return false;
+    
+    // TOOD: i doesn't seem to be reset by rti ????
+
     // "jsr" but go to different address
     // - save ip to stack
     m[256+sp]=((ip-1)&255);
@@ -282,7 +287,13 @@ C	....	Carry
     sp=(sp-2)&255;
     // save SR
     m[256+sp]=SR();sp=(sp-1)&255;
+
+    setSR(0);
+    i=1; // rti will clear!
     ip=m[IRQ_VECTOR]+m[IRQ_VECTOR+1]*256;
+
+    return true; // saying it was successful
+    // it'll be run at next tick...
   }
 
   var opcodes =
@@ -400,8 +411,8 @@ C	....	Carry
     }
     //if (trace) console.log('\t', f.toString());
 
-    for (var i=ip0; i<ip; i++) {
-      var L = jitmap[i] = (jitmap[i] || []);
+    for (var k=ip0; k<ip; k++) {
+      var L = jitmap[k] = (jitmap[k] || []);
       L.push(f);
     }
     f.ip0 = ip0;
@@ -510,7 +521,15 @@ C	....	Carry
 	  }
 
 	  // TODO: jitcode big array lookup costs really alot we only get 425 KIPS instead of more
-          (current_f=(jitcode[ip]||(jitcode[ip]=jit())))();
+
+	  // disable keeping jit-shit!
+	  // (zero page isn't handled?)
+          if (0) {
+	    (current_f=(jitcode[ip]||(jitcode[ip]=jit())))(); 
+	  } else {
+            (current_f=jit())();
+	  }
+
           //(jitcode[ip]||(jitcode[ip]=jit()))();
 
 	  //console.log(current_f.toString());
@@ -534,8 +553,9 @@ C	....	Carry
       run(-1);
     },
     // simulate hardware interrupt!
+    // returns true if interrupt enabled
     irq() {
-      doBrk(); // same as brk!
+      return doBrk(); // same as brk!
     },
     // simulate hardware interrupt!
     nmi() {
@@ -990,18 +1010,20 @@ EED7 RTS
 
   // TODO: cost of this?
   // TODO: we only care about few addresses?
+  let intCount = 0;
   let viaInterval = setInterval(()=>{
     // ($30e) = 7f 'Disable all interrupts. 
 
     // disabled
     if (m[0x30e] == 0x7f) {
-      console.error("Interrupts disabled");
+      //console.error("Interrupts disabled");
       return;
     }
     // enabled (?)
     // TODO: check what bit?
     if (m[0x30e] != 0xc0) return;
-    console.error("Interrupts enabled");
+
+    //console.error("Interrupts enabled");
 
     // F9aa RESET 6522
     // ($303) = ff 'Port A is all output
@@ -1040,7 +1062,8 @@ EED7 RTS
     m[0x30d] |= 0x40; // set 'interrupt happened'
 
     // simulate timer interrupt
-    cpu.irq();
+    if (cpu.irq())
+      intCount++;
 
     // TOOD: for now, ignore this stuff!
     return;
@@ -1082,10 +1105,14 @@ via6552: IRQ every 10ms (free running mode)
     let ips = Math.floor(s.iCount / s.tTimems);
     //console.log('\u000c', ips + ' kips', r, s);
     console.error(
-      '\n6502.js\t['+
-	[Math.floor(s.iCount / s.tTimems), s.iCount, s.tTimems,
-	 Math.floor(Math.log(s.iCount)/Math.log(10)+0.5)] + ']                 \n');
+      '\n6502.js\t[ '+
+	Math.floor(s.iCount / s.tTimems) + 'kips '+ s.iCount+ ' ' + s.tTimems +'ms ' +
+	Math.floor(Math.log(s.iCount)/Math.log(10)+0.5) + ' ' +
+	intCount + 'int ' +
+	Math.floor(s.iCount/intCount) + 'i/int]  '+m[0x30e].toString(2)+'            \n');
 
+    console.log(JSON.stringify(r));
+    console.log(JSON.stringify(s));
     if (scon) {
       // position cursor
       gotorc(cpu.mem[0x28], cpu.mem[0x269]);
