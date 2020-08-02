@@ -255,7 +255,7 @@ C	....	Carry
 
     rol(m) { ssz(m); return "w="+m+";"+m+"=((w<<1)+c)&255;c=(w>127);"; },
     ror(m) { ssz(m); return "w="+m+";"+m+"=((w>>1)+(c<<7));c=(w&1);"; },
-    rti(m) { return ops.plp(m)+ops.rts(m)+'ip--;'; throw "er";},
+    rti(m) { return ops.plp(m)+ops.rts(m)+'ip;'; throw "er";},
     rts(m) { return fsz()+"ip=(m[sp+2+256]+(m[256+((sp+1)&255)]<<8)+1)&65535;sp=(sp+2)&255;"; }, // stack grew wrong direction in original!
     sbc(m) { ssz("w"); return "w=a-"+m+"-(1-c);c=(w>=0);v=((a&0x80)!=(w&0x80));a=(w&255);"; },
     sec(m) { return "c=1;"; },
@@ -271,6 +271,19 @@ C	....	Carry
     txs(m) { return "sp=x;"; },
     tya(m) { ssz("a"); return "a=y;"; },
   };
+
+  // TODO: disable if interrupts not allowed!
+  function doBrk() {
+    i=1;
+    // "jsr" but go to different address
+    // - save ip to stack
+    m[256+sp]=((ip-1)&255);
+    m[256+((sp-1)&255)]=((ip-1)>>8);
+    sp=(sp-2)&255;
+    // save SR
+    m[256+sp]=SR();sp=(sp-1)&255;
+    ip=m[IRQ_VECTOR]+m[IRQ_VECTOR+1]*256;
+  }
 
   var opcodes =
       /*    0,8           1,9           2,A           3,B           4,C           5,D           6,E           7,F  */
@@ -379,7 +392,12 @@ C	....	Carry
         code += "ip=" + ip + ";";
     }
     code += fsz()+"})";
-    var f = eval(code);
+    var f;
+    try {
+      f = eval(code);
+    } catch(e) {
+      throw Error(e + '\n' + code);
+    }
     //if (trace) console.log('\t', f.toString());
 
     for (var i=ip0; i<ip; i++) {
@@ -515,6 +533,18 @@ C	....	Carry
     stop() {
       run(-1);
     },
+    // simulate hardware interrupt!
+    irq() {
+      doBrk(); // same as brk!
+    },
+    // simulate hardware interrupt!
+    nmi() {
+      throw 'NMI: not implemented!';
+    },
+    // simulate hardware interrupt!
+    rst() {
+      throw 'RST: not implemented!';
+    },
     setError(errf) {
       error = errf || defaultError;
     },
@@ -541,7 +571,10 @@ C	....	Carry
     trapRead(a, f) {
       special_reade[a] = f;
     },
-    // allow it to run for ms each time
+    // ms: run for max ms each tick (30)
+    // stp: steps(instructions) per go (1000)
+    // mxstp: maxsteps per tick (loose) (1M)
+    // dly: delay before running next time (0)
     setTickms(ms, stp, mxstp, dly) {
       tickms = ms | ms;
       maxstep = mxstp || maxstep;
@@ -619,6 +652,27 @@ Clear all timers	#ED70	#EE8C
 Read a timer into X Y 	#ED81	#EE9D
 Write XY into a timer	#ED8F	#EEAB
 Wait for time X Y	#EDAD	#EEC0 ???
+Reset                            F9aa
+
+F9AA LDA #$FF 	RESET 6522.
+F9AC STA $0303 	Port A all output. 
+  ($303) = ff
+F9AF LDA #$F7 	Port B all output except 
+F9B1 STA $0302 	bit 4. 
+  ($302) = f7   ( ff - 8)
+F9B4 LDA #$B7 	Turn off cassette motor. 
+F9B6 STA $0300 
+  ($d300) = b7
+F9B9 LDA #$DD 	Set CA2 and CB2 to 0 and set 
+F9BB STA $030C 	CA1 and CB1 active L to H. 
+  ($30c) = dd
+F9BE LDA #$7F 
+F9C0 STA $030E 	Disable all interrupts. 
+  ($30e) = 7f
+F9C3 LDA #$00 
+F9C5 STA $030B 	Set the ACR. 
+  ($308) = 00  
+F9C8 RTS 
 
 EDE0 PHA	This routine sets the three 16
   push a
@@ -684,7 +738,7 @@ EE26 AND #$40	out; if so then go to service
 EE28 BEQ $EE30	subroutine. The interrupt 
   if not (bit 6 is set) skip till ee30 (pla)
 EE2A STA $030D	routine is terminated by 
-  ($0d) = a
+  ($30d) = a
 EE2D JSR $EE34	jumping to the RTI instruction 
   
 ---> ( 6th bit not set)
@@ -878,6 +932,8 @@ EED7 RTS
   if (rom.length !== 16384)
     throw 'ROM wrong size: ' + rom.length;
 
+  m.set(rom, 0xc000);
+
   // Load ROM doc
   let doc = fs.readFileSync(ROM_DOC, 'utf8');
   doc = doc
@@ -921,17 +977,97 @@ EED7 RTS
       });
   }
   
-  m.set(rom, 0xc000);
-  
   // run!
 
   let scon = false;
-  //scon = true;
+  scon = true;
   if (!scon)
     cpu.trace(describe);
   
-  //cpu.setTickms(1, 1, 1, 1);
-  cpu.start();
+  // 6555 via cheat:
+  let page3 = new Uint8Array(256);
+  page3.fill(0);
+
+  // TODO: cost of this?
+  // TODO: we only care about few addresses?
+  let viaInterval = setInterval(()=>{
+    // ($30e) = 7f 'Disable all interrupts. 
+
+    // disabled
+    if (m[0x30e] == 0x7f) {
+      console.error("Interrupts disabled");
+      return;
+    }
+    // enabled (?)
+    // TODO: check what bit?
+    if (m[0x30e] != 0xc0) return;
+    console.error("Interrupts enabled");
+
+    // F9aa RESET 6522
+    // ($303) = ff 'Port A is all output
+    // ($302) = ff-8 'Port B all output except 
+    // ($d300) = b7 'Turn off cassette motor. 
+    // ($30c) = dd '
+    // 		Set CA2 and CB2 to 0 and set 
+    //  	CA1 and CB1 active L to H. 
+    // ($30e) = 7f 'Disable all interrupts. 
+    // ($308) = 00 'Set ACR (?)
+    // RTS
+
+    // IRQ Handler.
+    // Test that timer 1 has timed
+    // out; if so then go to service 
+    // subroutine. The interrupt
+    // if not (bit 6 is set) skip till ee30
+    // routine is terminated by
+    // jumping to the ram RTI (user changeable!)
+    //
+    // EE22 PHA 	 IRQ Handler
+    // EE23 LDA $030D	
+    //   a = ($30d)
+    // EE26 AND #$40	
+    //   a = a & 40
+    // EE28 BEQ $EE30	
+    // EE2A STA $030D	
+    //  ($30d) = a
+    // EE2D JSR $EE34	
+    //
+    // ---> ( 6th bit not set)
+    // EE30 PLA 	at #24A. 
+    // EE31 JMP $024A 
+    //   user interrupt handler, init: RTI !
+
+    m[0x30d] |= 0x40; // set 'interrupt happened'
+
+    // simulate timer interrupt
+    cpu.irq();
+
+    // TOOD: for now, ignore this stuff!
+    return;
+/*
+via6552: IRQ every 10ms (free running mode)
+  a = ($30b)
+  ($30b) = (a & 7f) | 40
+  ($30e) = a = c0
+  ($304) = ($306) = a = 10    '10 ms
+  ($305) = ($307) = a = 27    '////
+*/
+    // compare m with page3
+    for (let i=0; i<256; i++) {
+      if (m[i+0x300] !== page3[i]) {
+	// update copy
+	page3[i] = m[i+0x300];
+      }
+    }
+    // 
+
+  }, 10); // call "every 10ms"
+
+
+  // don't set more time than 10ms!
+  //setTickms(ms, stp, mxstp, dly)
+  //cpu.setTickms(10, 1, 1, 1);
+  cpu.start(); 
 
   // simple monitor
   setInterval(function(){
