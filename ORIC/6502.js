@@ -524,7 +524,7 @@ C	....	Carry
 
 	  // disable keeping jit-shit!
 	  // (zero page isn't handled?)
-          if (0) {
+          if (1) {
 	    (current_f=(jitcode[ip]||(jitcode[ip]=jit())))(); 
 	  } else {
             (current_f=jit())();
@@ -540,7 +540,9 @@ C	....	Carry
       tTimems += ms;
 
       if (ip != 0)
-	run.timer = setTimeout(run, delay);
+	if (run.timer) return;
+	run.timer = setInterval(run, delay);
+	//run.timer = setTimeout(run, delay);
     }
   }
 
@@ -631,7 +633,7 @@ function ORIC() {
     cursorOn();
     gotorc(50, 0);
     console.error('----------- EXIT ----------');
-    console.error(e);
+    console.error('ERROR: ', e);
     console.error('Registers:');
     console.error(cpu.regs());
     console.error('Stats:');
@@ -641,6 +643,7 @@ function ORIC() {
 
     fs.writeFileSync(ORIC_CORE, m);
     fs.appendFileSync(ORIC_CORE, '\n========= REGS & STATS ========\n');
+    fs.appendFileSync(ORIC_CORE, 'ERROR: ' + e);
     fs.appendFileSync(ORIC_CORE, JSON.stringify(cpu.regs())+'\n');
     fs.appendFileSync(ORIC_CORE, JSON.stringify(cpu.stats())+'\n');
     process.exit(1);
@@ -962,6 +965,37 @@ EED7 RTS
     .replace(/\n+/g, '\n')
   
   ;
+  // doc line per address
+  let adoc = {};
+  doc.replace(/\n([0-9A-F]{4})\b.*?\n.*?\n.*?\n.*?\n/g, (a,addr)=>{
+    //console.log(addr);
+    if (a.match(/\n[0-9A-F,\(\)\$# \s\n]{4,}$/))return;
+    addr = addr.toLowerCase();
+    //a = a.replace(/^\n(.*?)\n(.*?)\n[A-Z]{3} [0-9A-FXY,\(\)]+ \n/, '');
+    a = a.replace(/^\n(.*?)\n(.*?)\n[A-Z]{3} [\s\S]*?\n/, '')
+      .replace(/[\n\t\s]+/g, ' ')
+      .trim();
+
+    if (!a) return;
+    //a = a.replace(/\t/g, '\\t');
+    //a = a.replace(/ /g, '\\ ');
+    //a = a.replace(/\n/g, '\\n');
+    adoc[addr] = (adoc[addr] || '') + '\t\t'+ a + '\n';
+  });
+  // Xref
+  if (1)
+    doc.replace(/\n[0-9A-F]{4} \n.+?\n.+?\$([0-9A-F]{4})\b.*?\n.*?\n/g, (a,addr)=>{
+      //console.log(addr);
+      a = a.replace(/[\n\t\s]+/g, ' ')
+	.trim()
+      ;
+      if (!a) return;
+      addr = addr.toLowerCase();
+      adoc[addr] = (adoc[addr] || '') + '\t\t\tXREF: ' + a + '\n';
+    });
+
+  // process.exit(1);
+
   // function that will print any mentions of
   // an address from the doc! lol
   function describe(addr) {
@@ -973,34 +1007,15 @@ EED7 RTS
       // yes! we want trace of this address
       return true;
     }
-    doc.replace(
-      RegExp(`\\n.*?${addr}.*?\\n.*?\\n.*?\\n.*?\\n`, 'ig'),
-      txt=>{
-	let disp = txt
-	    .replace(/\n/g, '\t')
-	    .replace(/^\s+/, '')
-	    .replace(/xxx\t/g, '  ')
-	    .replace(/  +/g, '  ')
-	    .replace(/\t$/g, '')
-
-	;
-	
-	if (!disp.match(/[0-9a-f]{4}[\s\n]*$/i)) {
-	  // remove asm if it's same address
-	  if (disp.match(RegExp('^'+addr, 'i')))
-	    disp = disp.replace(/^.*\t/, '\t')
-
-	  if (!disp.match(/^[A-Z0-9# \$\t\s\n]*$/))
-	    console.log('\t\t'+disp+'\n');
-	}
-	return txt;
-      });
+    let d = adoc[addr];
+    if (d) console.log('\t'+d);
+    return;
   }
   
   // run!
 
   let scon = false;
-  scon = true;
+  //scon = true;
   if (!scon)
     cpu.trace(describe);
   
@@ -1011,7 +1026,16 @@ EED7 RTS
   // TODO: cost of this?
   // TODO: we only care about few addresses?
   let intCount = 0;
+  let lastiCount = 0;
   let viaInterval = setInterval(()=>{
+    // simulated time ~ 10ms (4500 instructions?)
+    // (/ (/ 1M 2) 100) 'ish
+    let iC = cpu.stats().iCount;
+    if (iC-lastiCount < 4500) {
+      return;
+    }
+    lastiCount = iC;
+
     // ($30e) = 7f 'Disable all interrupts. 
 
     // disabled
@@ -1111,8 +1135,8 @@ via6552: IRQ every 10ms (free running mode)
 	intCount + 'int ' +
 	Math.floor(s.iCount/intCount) + 'i/int]  '+m[0x30e].toString(2)+'            \n');
 
-    console.log(JSON.stringify(r));
-    console.log(JSON.stringify(s));
+    console.log(JSON.stringify(r)+'     ');
+    console.log(JSON.stringify(s)+'     ');
     if (scon) {
       // position cursor
       gotorc(cpu.mem[0x28], cpu.mem[0x269]);
