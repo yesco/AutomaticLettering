@@ -131,7 +131,7 @@
     if (lineno) { princ(' IN LINE'); princ(lineno); }
 
     stop(true);
-    let e = Error(msg);
+    let e = Error(msg + (data ? ' ' + data : ''));
     e.oric = 1;
     throw e;
   }
@@ -4093,11 +4093,14 @@ Wait for time X Y	#EDAD
       if (a === 0x276) return DEEK(0x276) % 256;
       if (a === 0x277) return INT(DEEK(0x276) / 256);
 
-      // DOC: Read memory byte at ADDR
-      // Simulator: only screen memory value!
-      if (hires())
-	error('?PEEK/POKE not defined for HIRES mode');
-	
+      if (a >= HIRES && a <= HIRES+HIRES_LEN) {
+	let o = a - HIRES;
+	let row = INT(o / SCREEN_COLS);
+	let col = o % SCREEN_COLS;
+	let x = screen(row, col, v, undefined, 'g');
+	return x;
+      }
+
       if (a >= SCREEN &&
 	  a <= SCREEN + SCREEN_COLS*SCREEN_ROWS) {
 	let o = a - SCREEN;
@@ -4357,21 +4360,37 @@ Wait for time X Y	#EDAD
     // if CLOAD "" click on file dialogue
     if (name === '') {
       // TODO: continue on current tap file?
-      loadFile((nme, type, size, txt, bytes)=>{
-	if (trace) {
-	  princ('nme: '); print(nme);
-	  princ('type: '); print(type);
-	  princ('size: '); print(size);
-	  princ('txt: ');
-	  print((''+txt).substr(0, 200));
-	}
-	name = nme;
-	if (name.match(/\.tap/))
-	  return alert('CLOAD: .tap file loading not implemented yet!');
+      if (CSAVE.pos < CSAVE.size) {
+	; // we already have data!
+      } else {
+	loadFile((file, type, size, txt, bytes)=>{
+	  if (1 || trace) {
+	    princ('file: '); print(file);
+	    princ('type: '); print(type);
+	    princ('size: '); print(size);
+	    princ('txt: ');
+	    print((''+txt).substr(0, 200));
+	  }
+	  CLOAD.file = file;
+	  CLOAD.type = type;
+	  CLOAD.txt = txt;
+	  CLOAD.bytes = bytes;
+	  CLOAD.size = size;
+	  CLOAD.pos = -1;
+
+	  try {
+	    parseNextFile();
+	  } catch(e) {
+	    alert('parseNextFile: ' + e + '\n' +
+		  e.stack);
+	  }
+	});
+      }
+
+      //if (name.match(/\.tap/))
+      //return alert('CLOAD: .tap file loading not implemented yet!');
 	
-	// premature return, should we "wait"
-	load(name, txt);
-      })
+
       // it'll happen in background, so, hmmm, ready will be printed first!
       return;
     }
@@ -4422,6 +4441,91 @@ Wait for time X Y	#EDAD
     error("?CLOAD FILE ERROR", origname);
   }
   
+  function parseNextFile() {
+    let file = CLOAD.file;
+    let type = CLOAD.type;
+    let txt = CLOAD.txt;
+    let bytes = CLOAD.bytes;
+    let size = CLOAD.binary;
+    let pos = CLOAD.pos;
+    
+    // try to determine what kind of file
+    let len = bytes.length;
+
+    let nascii = 0;
+    bytes.forEach(b=>{if (b < 128) nascii++});
+    
+    let txtratio = nascii / len;
+
+    let header = true;
+    while (1) {
+      let b = bytes[++pos];
+      if (b === 0x24) {
+	break;
+      } else if (b !== 0x16) {
+	header = false;
+      }
+    }
+
+    if (!header) {
+      // TODO: .tap file but no header?
+      print("?CLOAD .TAP FILE HEADER ERROR",
+	    'pos=' + pos + ' byte=' + HEX$(bytes[pos]));
+
+
+      if (nascii === len) {
+        // text file most likely, assume "basic"
+        // TODO: handle ."txt" => add linenos!
+        load(name, txt);
+      }
+    } else {
+      let reserved1 = [bytes[++pos], bytes[++pos]];
+      let typ = bytes[++pos];
+      let styp = typ === 0x00 ? 'basic' : typ === 0x80 ? 'memory' : '';
+      let run = bytes[++pos];
+      let srun = run === 0x80 ? 'run' : run === 0xc7 ? 'call' : '';
+      ++pos; let E = (bytes[pos]<<8) + bytes[pos+1]; ++pos;
+      ++pos; let A = (bytes[pos]<<8) + bytes[pos+1]; ++pos;
+      let reserved2 = bytes[++pos];
+      let name = '';
+      while (bytes[++pos]) {
+	name += String.fromCharCode(bytes[pos]);
+      }
+
+      let sum = `
+  File: ${file}
+  Size: ${size}
+  TYPE: ${type}
+
+  Name: ${name}
+    Type: ${styp}
+     Run: ${srun}
+       A: ${A}
+       E: ${E}
+     len: ${E-A+1}
+  `
+      console.log(sum);
+      print(sum);
+
+      // may need to read addtional byte!
+
+      // TODO: recognize type of data from address
+      // BASIC (tokens)
+      // HIRES (+ extended)
+      // TEXT (+ extended)
+      // charsets+HIRES+3LINES
+      // ?charsets
+
+      // for now, just POKE it!
+      for(let a=A; a<=E; a++) {
+	POKE(a, bytes[++pos]);
+      }
+
+      // save to allow load again!
+      CLOAD.pos = pos;
+    }
+  }
+
   function LOGIN(user, pass) {
     if (!pass) {
       // prompt

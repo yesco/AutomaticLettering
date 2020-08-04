@@ -276,6 +276,7 @@ C	....	Carry
   function doBrk() {
     // ignore if already in interrupt!
 
+    // TODO: could disable, but creash earlier!
     if (i) return false;
     
     // TOOD: i doesn't seem to be reset by rti ????
@@ -1015,7 +1016,7 @@ EED7 RTS
   // run!
 
   let scon = false;
-  //scon = true;
+  scon = true;
   if (!scon)
     cpu.trace(describe);
   
