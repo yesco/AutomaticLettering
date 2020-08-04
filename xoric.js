@@ -175,6 +175,11 @@ function encodeTap(fil) {
   let hiE = E >> 8;
   let loE = E & 0xff;
 
+  // warn if name longer
+  // (ORIC will handle it, just ignore up to \0!)
+  if (fil.name.length > 16)
+    console.error('encodeTap.name more than 16 chars! "', fil.name, '"');
+
   let bytes = [
     0x16, 0x16, 0x16, 0x16, // head sync
     0x24, // head end
@@ -467,7 +472,6 @@ if (typeof require !== 'undefined') {
 
     let data = fil.outdata;
 
-    console.error('xoric.out.to: ', to);
     if (to === 'new') { 
       // generate file DIR/NAME
       let name = fil.name || 'EMPTYEMPTYEMPTY';
@@ -475,13 +479,11 @@ if (typeof require !== 'undefined') {
       name = dir + '/' + name;
       name = name.replace(/\/+/g, '/');
       if (xoric.verbose)
-	console.error('----xoric.out.new: generate file: ' + name + ' >>>>>');
+	console.error('----- xoric: gen file: ' + name + ' >>>');
 
       // create file
       fs.mkdirSync(dir, {recursive: true});
       fs.writeFileSync(name, data);
-      if (xoric.verbose > 1)
-	console.error('<<<--- ', data.length, 'bytes');
     } else if (to === 'dir') {
       console.log(fil);
       // don't print bytes out
