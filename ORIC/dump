@@ -1,1 +1,2 @@
-hexdump -C oric.core | less -S
+(hexdump -C oric.core | less -S ) ; stty sane
+

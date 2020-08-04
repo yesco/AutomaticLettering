@@ -5,19 +5,22 @@
 //    file and format converter for ORIC
 
 // formats:
+//  (input/ouput)
 //    raw = byte array
 //    hex = hexify bytes in
 //    b64 = base64 encoding
 //    txt = string (utf-8!)
 //    bas = string (utf-8!)
-//    lns = string (utf-8!) (will number lines)
 //    bac = ORIC BASIC tokenized
 //    tap = ORIC .tap (archieve)
 //    fil = fil(e) object (as below)
+//  (specific for output)
 //    dir = [fil, ...]
 //    new = create new files (from tap)
+//    num = string (utf-8!) (will number lines)
+//    unm = string (utf-8!) (will number lines)
 // 
-//    dsk = not supported
+//    dsk = not supported (don't have one)
 //
 // fil(e) object (from ouput: 'dir')
 //   {
@@ -57,6 +60,10 @@ function asc2arr(s) {
   return a;
 }
 
+// parse a single byte array (data)
+// from format, to format, spec: fil
+// => [fil, ...]
+// (a tap file can give several!)
 function xoric(from, to='txt', data, fil) {
   if (data == undefined) return;
 
@@ -67,7 +74,7 @@ function xoric(from, to='txt', data, fil) {
   function expect(typ) {
     if (typeof data !== typ) {
       if (typ === 'Array' && !Array.isArray(data))
-	throw new Error('xoric: input type mismatch, got ' + typeof data + ', expected ' + typ + ' constructor='+(typeof data==='object'?data.constructor.name:''));
+	throw new Error('xoric: input type mismatch, got ' + typeof data + ', expected ' + typ + ' constructor='+(typeof data==='object'?data.constRUCTOR.name:''));
     }
   }
 
@@ -86,11 +93,6 @@ function xoric(from, to='txt', data, fil) {
   case 'b64':
     data = btoa(arr2asc(data));
     break;
-  case 'lns': 
-    data = ('\n' + arr2asc(data)).replace(
-      /\n/g, (a,i)=>'\n' + i<data.length-1 ? i * 10 : '');
-    data = asc2arr(data);
-    // fall through to make bytes
   case 'bas':
   case 'txt':
     //data = asc2arr(data);
@@ -104,20 +106,35 @@ function xoric(from, to='txt', data, fil) {
   default: throw new Error('xoric: unknow from-format: ' + from);
   }
 
-  if (xoric.verbose > 1) console.error('FROM: ', data);
-
-  // beware, this only takes first file
-  if (files && files.length && to !== 'dir') {
-    fil = files[0];
-    data = fil.data;
-  }
+  if (xoric.verbose > 2)
+    console.error('FROM: ', data);
 
   data = new Uint8Array(data);
   // update converted data
   fil.data = data;
 
-  if (xoric.verbose > 1) console.error('FROM.arr: ', data);
+  if (xoric.verbose > 2)
+    console.error('FROM.arr: ', data);
 
+  // if asking for json/dir
+  if (to === 'dir') return files;
+  
+  // process all files
+  if (!files || !files.length)
+    files = [fil];
+    
+  files.forEach(fil=>{
+    fil.outdata = convertTo(fil, to);
+  });
+  return files;
+}
+// globals/static for package, hang on function!
+xoric.verbose = 1;
+xoric.numStart = 1000;
+xoric.numStep = 10;
+
+function convertTo(fil, to) {
+  let data = fil.data;
 
   // saved byte array to following format
   switch(to) {
@@ -125,8 +142,16 @@ function xoric(from, to='txt', data, fil) {
   case 'raw': return data;
   case 'hex': return data.map(b=>b.toString(16).padStart(2, '0')).join('');
   case 'b64': return atob(data);
+  case 'num': 
+    data = ('\n' + arr2asc(data)).replace(
+      /\n/g, (a,i)=>'\n' + i<data.length-1 ? xoric.numStart + i * xoric.numStep : '');
+      // fall through
   case 'bas':
   case 'txt': return arr2asc(data);
+  case 'unm': // UNuMber text line
+    data = arr2asc(data).replace(
+      /\n\d+\s{0,1}/g, '\n');
+    return arr2asc(data);
   case 'bac': niy();
   case 'tap': return encodeTap(fil);
   case 'u8a': return new Uint8Array(data);
@@ -134,7 +159,6 @@ function xoric(from, to='txt', data, fil) {
   default: throw new Error('xoric: unknow to-format: ' + to);
   }
 }
-xoric.verbose = 1;
 
 // returns an untyped array of 'bytes'
 // (simplier to .concat()!)
@@ -194,12 +218,6 @@ function decodeTap(data) {
 // currently, throws error at error
 // TODO: return [undefined, 'error'] instead?
 function parseFromTap(bytes, pos=-1) {
-  // TOOD: buffer is not array but indexable...
-  if(0)
-  if (typeof bytes !== 'object' ||
-      !Array.isArray(bytes))
-    throw new Error('parseFromTap: expect array');
-
   let startpos = pos;
 
   if (pos+1 >= bytes.length) {
@@ -207,18 +225,24 @@ function parseFromTap(bytes, pos=-1) {
     return [undefined, undefined];
   }
 
-  // parse header (we allow N * 0x16 + 1 0x24)
-  let header = true;
+  // parse header
+  // (expect at least 1 0x16 + 1 0x24)
+  let header = 0;
   while (1) {
     let b = bytes[++pos];
     if (b === undefined)
       return [undefined, 'EOF'];
     if (xoric.verbose > 2)
-      console.error('TAP.head', b);
-    if (b === 0x24) {
+      console.error('TAP.head', ' @#' + pos.toString(16) + ' (' + pos + ')'+ '  #'+b.toString(16).padStart(2, '0') + ' (' + b + ') ');
+    if (b === 0x24 && header) {
+      header = true;
       break;
-    } else if (b !== 0x16) {
-      header = false;
+    } else if (b === 0x16) {
+      header++;
+    } else {
+      // start over 
+      // (this may be needed to skip extra byte!)
+      header = 0;
     }
   }
 
@@ -242,8 +266,11 @@ function parseFromTap(bytes, pos=-1) {
   }
 
   let len = E - A + 1;
-  if (xoric.verbose > 2)
-    console.log('parseFromTap.length: ', len);
+  if (xoric.verbose > 2) {
+    console.error('parseFromTap.E: ', E);
+    console.error('parseFromTap.A: ', A);
+    console.error('parseFromTap.length: ', len);
+  }
 
   let data = bytes.slice(pos+1, pos+1 + len);
   pos += data.length;
@@ -259,12 +286,12 @@ function parseFromTap(bytes, pos=-1) {
     data,
     startpos,
     endpos: pos,
-    length: data.length,
+    datalength: data.length,
   }
 
   if (xoric.verbose > 1)
     console.error('parseFromTap:', fil);
-  return [fil, pos + data.length];
+  return [fil, pos];
 }
 
 
@@ -289,22 +316,40 @@ if (typeof require !== 'undefined') {
       E: undefined,
       A: undefined,
       data,
-      length: data.length,
+      datalength: data.length,
     } );
   } catch(e) {}; // no input!
   
 
-  let converts = [];
+  function help(msg, e) {
+    return xoricHelp(msg, e);
+  }
 
+  let converts = [];
+  let dir = 'OUT';
   let args = process.argv.slice(2);
+
+  // if no args, or no stdin, or only -h
+  if ((!args.length && !files.length) ||
+      (args.length === 1 && args[0] === '-h')) {
+    // print help on stdout!
+    xoricHelp(undefined, undefined, console.log);
+  }
+
   args.forEach(a=>{
     if (xoric.verbose > 1)
       console.error('xoric.arg: ', a);
 
     // txt2tap
-    if (a.match(/^((raw|hex|b64|txt|bas|lns|bac|tap|fil|dir)[,2]{0,1})+$/)) {
+    if (a.match(/^((raw|hex|b64|txt|bas|new|num|bac|tap|fil|dir)[,2]{0,1})+$/)) {
       converts = converts
 	.concat(a.split(/[,2]/g));
+      return;
+    }
+
+    // help
+    if (a.match(/^\-h/)) {
+      help();
       return;
     }
 
@@ -320,38 +365,78 @@ if (typeof require !== 'undefined') {
       return;
     }
 
-    // rename last read file (like stdin!)
     if (a.match(/^\-n/)) {
-      a = a.replace(/^\-n/, '');
+      a.replace(/^\-n(\d+)(|,(\d+))$/,
+		(_,start,__,step)=>{
+		  numStart = start;
+		  if (step !== undefined)
+		    numStep = step;
+		});
+      if (xoric.verbose)
+	console.error('xoric: numStart='+numStart+' numStep='+numStep);
+      return;
+    }
+
+    // directory
+    if (a.match(/^\-d/)) {
+      a.replace(/^\-d(.+)/, (_,d)=>dir = d);
+      if (!dir)
+	help('xoric.dir: -dDIR -d./ but can not be empty! (default OUT)');
+      fs.mkdirSync(dir, {recursive: true});
+      return;
+    }
+
+    // rename last read file (like stdin!)
+    if (a.match(/^\-o/)) {
+      a = a.replace(/^\-o/, '');
       if (a === '') {
 	if (xoric.verbose > 1)
-	  console.error('xoric.rename (-nNewName): can not rename to empty name');
-	process.exit(1);
+	  help('xoric.rename (-nNewName): can not rename to empty name');
       }
-      if (!files.length) {
-	console.error('xoric.rename: no file to rename!');
-	process.exit(1);
-      }
+      if (!files.length)
+	help('xoric.rename: no file to rename!');
       files[files.length-1].name = a;
       return;
     }
 
     // assume file name with extras
-    let auto, A;
+    let auto, A, E;
     a = a.replace(/,AUTO/i, ()=>{
       auto=true;
       return '';
     });
-    a = a.replace(/,A([\d#A-F]+)/i, (_,a)=>{
-      a = a.replace(/^#/, '0x0'); // cheat!
-      A=parseInt(a);;
+    a = a.replace(/,A([\d#A-F]+)/i, (_,n)=>{
+      n = n.replace(/^#/, '0x0'); // cheat!
+      A=parseInt(n);;
+      return '';
+    });
+    a = a.replace(/,E([\d#A-F]+)/i, (_,n)=>{
+      n = n.replace(/^#/, '0x0'); // cheat!
+      E=parseInt(n);;
       return '';
     });
     let name = a;
     let type = A===undefined ? 0x00 : 0x80;
     let run = auto===undefined ? 0x00 : type==0x00 ? 0x80 : 0xc7;
 
-    let data = fs.readFileSync(a);
+    let data;
+    try {
+      data = fs.readFileSync(a);
+      E = E || (A && (A + data.length - 1));
+      let len = E-A+1;
+      if (E) {
+	if (len > data.length)
+	  help('xoric: Eaddress beyond filesize!');
+	if (len < data.length) {
+	  if (verbose)
+	    console.error('xoric: file truncated because of E (hint: no need add E)');
+	  data = data.slice(len);
+	}
+      }
+    } catch(e) {
+      help(''+e);
+    }
+
     if (xoric.verbose > 1)
       console.error('xoric.file: ', a, data.length);
     // in case of .tap file it'll be replaced
@@ -359,10 +444,10 @@ if (typeof require !== 'undefined') {
       name: a,
       type,
       run,
-      E: A && (A + data.length - 1) || 0,
+      E,
       A,
       data,
-      length: data.length,
+      datalength: data.length,
     } );
   });
 
@@ -372,37 +457,149 @@ if (typeof require !== 'undefined') {
   }
 
   if (!files.length) {
-    console.error('xoric: no files - exiting!');
+    help('xoric: no files - exiting!');
     process.exit(1);
   }
 
-  function out(r, to) {
+  function out(fil, to) {
     if (xoric.verbose > 2)
-      console.error('xoric.out.type: ', typeof r);
-    if (to === 'dir') {
-      console.log(r);
-    } else if (Array.isArray(r) && to === 'new') {
-      // array of fil!
-      r.forEach(f=>out(f, 'new'));
-    } else if (to === 'new') {
+      console.error('xoric.out.fil: ', fil);
+
+    let data = fil.outdata;
+
+    console.error('xoric.out.to: ', to);
+    if (to === 'new') { 
+      // generate file DIR/NAME
+      let name = fil.name || 'EMPTYEMPTYEMPTY';
+      name = name.replace(/\//g, '_'); // safe
+      name = dir + '/' + name;
+      name = name.replace(/\/+/g, '/');
+      if (xoric.verbose)
+	console.error('----xoric.out.new: generate file: ' + name + ' >>>>>');
+
       // create file
-      let name = r.name;
-      fs.writeFileSync(name, f);
+      fs.mkdirSync(dir, {recursive: true});
+      fs.writeFileSync(name, data);
+      if (xoric.verbose > 1)
+	console.error('<<<--- ', data.length, 'bytes');
+    } else if (to === 'dir') {
+      console.log(fil);
+      // don't print bytes out
+      return;
     } else {
-      process.stdout.write(r);
+      process.stdout.write(fil.outdata);
     }
 
     if (xoric.verbose > 1)
-      console.error('<<<--- ', r.length, 'bytes');
+      console.error('<<<--- ', data.length, 'bytes');
   }
-  // do the conversions
+  // do the conversions for each input file
   files.forEach(f=>{
-    let r = xoric(converts[0], converts[1], f.data, f);
     if (xoric.verbose)
       console.error('--- processing', f.name, '>>>');
-    out(r, converts[1]);
+
+    // tap files may yield several files
+    let fls = xoric(converts[0], converts[1], f.data, f);
+    fls.forEach(f=>out(f, converts[1]));
   });
 }
 
+function xoricHelp(msg, e, print) {
+  // allow for override when no args
+  print = print || console.error;
+
+  if (e && xori.verbose > 1) {
+    print('ERROR: ' + e);
+    print(e.stack);
+  }
+  if (msg) 
+    print('xoric.js aborted!\n', msg);
+  // generic help
+
+  print(`
+eXchange ORIC - xoric.js
+          eXchange ORIC - xoric.js
+
+ (C) 2020 Jonas S Karlsson (jsk@yesco.org)
+
+    file and format converter for ORIC
+
+==========================================
+Usage: node xoric.js FMTLIST FILE ...
+ 
+-h	print help to stderr
+-dDIR	change default directory (OUT)
+-oNAME	new name for last file
+-ONAME	output all (tap?) to one file
+-q	quiet, no info output on stderr
+-v      more verbose (default 1)
+-v -v ... even more (up to 3/4)
+
+FILE
+  filename (oric accepts upto 15 chars)
+
+  FOO		- file to read from
+  FOO.BAS,AUTO  - mark it to be AUTO loaded
+		  (if written out/.tap)
+  foo.o,A4#300	- load machine code in page 3
+  foo.o,AUTO,A. - -"-, and mark it to be called
+  big.txt,A..,E. - if E-A+1 < len(big.txt) trunc!
+
+FMTLIST
+  comma(or 2)-separated list formats:
+
+  (input/outout)
+    raw = byte array
+    hex = hexify bytes in
+    b64 = base64 encoding
+    txt = string
+    bas = string
+    bac = ORIC BASIC tokenized
+    tap = ORIC .tap (archieve)
+    fil = fil(e) object (as below)
+    new = create new files (from tap)
+
+  (specific for output)
+    dir = [fil, ...] ('json' output from tap)
+    new = create new files (from tap)
+    num = string (NUMber text lines, see -n)
+    unm = string (UNuMber text lines)
+
+  (unsupported)
+    dir = [fil, ...]
+
+EXAMPLES
+  (default prints to stdout)
+
+  (hex and b64 (base64))
+node xoric txt2hex dump.mem > dump.hex # hexdump
+node xoric hex2txt dump.hex > dump.mem # 'unhex
+node xoric txt2hex dump.hex > dump.2hx # 2xhex
+
+  (NOP)
+node xoric hex2hex fil
+node xoric XXX2XXX fil
+
+  (make .tap)
+node xoric txt2tap a b c > abc.tap   # tap-archieve
+node xoric txt2tap a b c -Oabc.tap # tap-archieve
+node xoric tap2dir a b c     # "json" dir list
+node xoric tap2txt abc.tap   # print a b c stdout
+node xoric tap2new           # create files OUT/a OUT/b OUT/c
+node xoric tap2new -Dtmp     # create files tmp/a tmp/b tmp/c
+
+  (merge .tap archieves)
+node xoric tap2tap a.tap b.tap -Oa.tap
+
+---
+Usage: node xoric.js FMTLIST FILE ...
+`);
+  // repeat as it may have been scrolled away
+  if (msg) 
+    print('xoric.js aborted!\n', msg);
+
+  print('');
+  process.exit(1);
+}
 
 module.exports = { xoric, atob, btoa, arr2asc, asc2arr, parseFromTap, decodeTap, encodeTap, };
