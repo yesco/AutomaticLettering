@@ -33,6 +33,9 @@
 //     E    : 0x509,
 //     data : <array of bytes>, // one byte extra!
 //   }
+
+let EMPTY_NAME = 'EMPTYEMPTYEMPTY';
+
 //     
 //
 // browsers have atob/btoa, nodejs doesn't have it
@@ -438,6 +441,7 @@ Usage: node xoric.js FMTLIST FILE ...
 -dDIR	change default directory (OUT)
 -oNAME	new name for last file
 -ONAME	output all (tap?) to one file
+        (if "xoric DIR/* -ODIR.tap" remove DIR from file names_
 -q	quiet, no info output on stderr
 -v      more verbose (default 1)
 -v -v ... even more (up to 3/4)
@@ -497,6 +501,9 @@ node xoric tap2new -Dtmp     # create files tmp/a tmp/b tmp/c
 
   (merge .tap archieves)
 node xoric tap2tap a.tap b.tap -Oa.tap
+
+  (make tap from directory)
+node xoric Games/* -OGamees.tap" # remove 'Games'rom file names
 
 ---
 Usage: node xoric.js FMTLIST FILE ...
@@ -853,8 +860,9 @@ if (typeof require !== 'undefined') {
 
   let converts = [];
   let dir = 'OUT';
-  let outputFile;
+  let outputFile, removePrefix='';
   let args = process.argv.slice(2);
+  console.error('ARGS: ', args);
   
   // if no args, or no stdin, or only -h
   if ((!args.length && !files.length) ||
@@ -935,6 +943,12 @@ if (typeof require !== 'undefined') {
       }
 
       outputFile = a;
+      // extract prefix before '.'
+      a.replace(/^([^\.]+?)\./, (_,p)=>{
+	removePrefix=p+'/';
+	if (xoric.verbose)
+	  console.error('xoric.removePrefix= '+removePrefix);
+      });
 
       // truncate output file first
       fs.writeFileSync(outputFile, '');
@@ -984,7 +998,7 @@ if (typeof require !== 'undefined') {
       console.error('xoric.file: ', a, data.length);
     // in case of .tap file it'll be replaced
     files.push( {
-      name: a,
+      name: a===EMPTY_NAME? '' : a,
       type,
       run,
       E,
@@ -1012,7 +1026,7 @@ if (typeof require !== 'undefined') {
 
     if (to === 'new') { 
       // generate file DIR/NAME
-      let name = fil.name || 'EMPTYEMPTYEMPTY';
+      let name = fil.name || EMPTY_NAME;
       name = name.replace(/\//g, '_'); // safe
       name = dir + '/' + name;
       name = name.replace(/\/+/g, '/');
@@ -1040,10 +1054,16 @@ if (typeof require !== 'undefined') {
     if (xoric.verbose)
       console.error('--- processing', f.name, '>>>');
 
+    if (removePrefix) {
+      f.name = f.name.replace(removePrefix, '');
+      if (xoric.verbose)
+	console.error('----- removePrefix name <- ', f.name);
+    }
+    
     // tap files may yield several files
     let fls = xoric(converts[0], converts[1], f.data, f);
     fls.forEach(f=>out(f, converts[1]));
-  });
+    });
 }
 
 // ------------ exports --------------
