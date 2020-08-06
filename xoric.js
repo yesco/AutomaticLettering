@@ -853,8 +853,9 @@ if (typeof require !== 'undefined') {
 
   let converts = [];
   let dir = 'OUT';
+  let outputFile;
   let args = process.argv.slice(2);
-
+  
   // if no args, or no stdin, or only -h
   if ((!args.length && !files.length) ||
       (args.length === 1 && args[0] === '-h')) {
@@ -922,6 +923,22 @@ if (typeof require !== 'undefined') {
       if (!files.length)
 	help('xoric.rename: no file to rename!');
       files[files.length-1].name = a;
+      return;
+    }
+
+    // rename last read file (like stdin!)
+    if (a.match(/^\-O/)) {
+      a = a.replace(/^\-O/, '');
+      if (a === '') {
+	if (xoric.verbose > 1)
+	  help('xoric.outFile (-nOfile): can not be empty rename to empty name');
+      }
+
+      outputFile = a;
+
+      // truncate output file first
+      fs.writeFileSync(outputFile, '');
+
       return;
     }
 
@@ -1009,6 +1026,8 @@ if (typeof require !== 'undefined') {
       console.log(fil);
       // don't print bytes out
       return;
+    } else if (outputFile) {
+      fs.appendFileSync(outputFile, fil.outdata);
     } else {
       process.stdout.write(fil.outdata);
     }
