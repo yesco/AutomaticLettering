@@ -862,7 +862,6 @@ if (typeof require !== 'undefined') {
   let dir = 'OUT';
   let outputFile, removePrefix='';
   let args = process.argv.slice(2);
-  console.error('ARGS: ', args);
   
   // if no args, or no stdin, or only -h
   if ((!args.length && !files.length) ||
@@ -871,6 +870,8 @@ if (typeof require !== 'undefined') {
     xoricHelp(undefined, undefined, console.log);
   }
 
+  if (xoric.verbose) console.error('ARGS: ', args);
+  
   args.forEach(a=>{
     if (xoric.verbose > 1)
       console.error('xoric.arg: ', a);
@@ -957,7 +958,17 @@ if (typeof require !== 'undefined') {
     }
 
     // assume file name with extras
-    let auto, A, E;
+    let fullname = a, auto, A, E;
+
+    let data;
+ 
+    // first see  if ,AUTO,A...,E... is part of file name (LOL)
+    try {
+      data = data || fs.readFileSync(a);
+    } catch(e) {
+      ; // it's ok, we'll try later without
+    }
+      
     a = a.replace(/,AUTO/i, ()=>{
       auto=true;
       return '';
@@ -976,29 +987,36 @@ if (typeof require !== 'undefined') {
     let type = A===undefined ? 0x00 : 0x80;
     let run = auto===undefined ? 0x00 : type==0x00 ? 0x80 : 0xc7;
 
-    let data;
     try {
-      data = fs.readFileSync(a);
-      E = E || (A && (A + data.length - 1));
-      let len = E-A+1;
-      if (E) {
-	if (len > data.length)
-	  help('xoric: Eaddress beyond filesize!');
-	if (len < data.length) {
-	  if (verbose)
-	    console.error('xoric: file truncated because of E (hint: no need add E)');
-	  data = data.slice(len);
-	}
-      }
+      // second try! (without spec)
+      data = data || fs.readFileSync(name);
     } catch(e) {
       help(''+e);
+    }
+
+    // fix name
+    name = name
+      .replace(/^.*\//, '');
+
+    // fix addresses, len, truncate
+    E = E || (A && (A + data.length - 1));
+    let len = E-A+1;
+    if (E) {
+      if (len > data.length)
+	help('xoric: Eaddress beyond filesize!');
+      if (len < data.length) {
+	if (verbose)
+	  console.error('xoric: file truncated because of E (hint: no need add E)');
+	data = data.slice(len);
+      }
     }
 
     if (xoric.verbose > 1)
       console.error('xoric.file: ', a, data.length);
     // in case of .tap file it'll be replaced
     files.push( {
-      name: a===EMPTY_NAME? '' : a,
+      fullname,
+      name: name===EMPTY_NAME? '' : name,
       type,
       run,
       E,
@@ -1024,18 +1042,13 @@ if (typeof require !== 'undefined') {
 
     let data = fil.outdata;
 
-    if (to === 'new') { 
-      // generate file DIR/NAME
-      let name = fil.name || EMPTY_NAME;
-      name = name.replace(/\//g, '_'); // safe
-      name = dir + '/' + name;
-      name = name.replace(/\/+/g, '/');
+    if (to === 'new') {
       if (xoric.verbose)
-	console.error('----- xoric: gen file: ' + name + ' >>>');
+	console.error('----- xoric: gen file: ' + fil.outname + ' >>>');
 
       // create file
       fs.mkdirSync(dir, {recursive: true});
-      fs.writeFileSync(name, data);
+      fs.writeFileSync(fil.outname, data);
     } else if (to === 'dir') {
       console.log(fil);
       // don't print bytes out
@@ -1062,8 +1075,25 @@ if (typeof require !== 'undefined') {
     
     // tap files may yield several files
     let fls = xoric(converts[0], converts[1], f.data, f);
-    fls.forEach(f=>out(f, converts[1]));
-    });
+    fls.forEach(fil=>{
+      // gen file 'DIR/NAME[,AUTO[,A...,E...]]'
+      let outname = fil.name || EMPTY_NAME;
+      outname = outname.replace(/\//g, '_'); // safe
+      outname = dir + '/' + outname;
+      outname = outname.replace(/\/+/g, '/');
+
+      if (fil.srun)
+	outname += ',AUTO';
+
+      if (fil.stype !== 'basic' && fil.A && fil.E)
+	outname += ',A#' + fil.A.toString(16) +
+	',E#' + fil.E.toString(16);
+
+      fil.outname = outname;
+
+      out(fil, converts[1]);
+    })
+  });
 }
 
 // ------------ exports --------------
