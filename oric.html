@@ -8329,7 +8329,7 @@ instruction
     n=>window[n]=()=>implemented_error(n));
 
   // REMOVE non-basic names... not extensions
-  'STEP,REM,*,&,!,+,-,/,^,<,=,>,DBG,OKK,OKC,TEMPORARY,PERSISTENT,HTML,STORE,GEDIT,THEN,TO,SCREEN_COLS,SCREEN_ROWS,HTML2TELETEXT,ORIC_TOKENZ,ELSE'.split(',').map(
+  'STEP,REM,*,&,!,+,-,/,^,<,=,>,DBG,OKK,OKC,TEMPORARY,PERSISTENT,HTML,STORE,GEDIT,THEN,TO,SCREEN_COLS,SCREEN_ROWS,GTEXT_ROWS,HTML2TELETEXT,ORIC_TOKENZ,ELSE'.split(',').map(
     n=>{
       delete OricKeywords.status[n];
     });
