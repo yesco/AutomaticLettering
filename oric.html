@@ -1247,7 +1247,6 @@ function example_LCIRCLES() {
 40 CURSET 40,37,1
 41 LET I=1
 45 LET I=I+2
-46 PRINT ".";
 50 CIRCLE I,2
 60 GOTO 45
 `;
@@ -3573,7 +3572,68 @@ SDAY
   }
 
   // 20 INPUT"ENTER SALE PRICE";SELL
-  function INPUT(prompt, v) {
+  function INPUT(p) {
+    let query = p.getstr();
+    if (query) princ(query);
+    princ('?');
+
+    let [name, idx] = variable(p);
+    if (!name) syntax_error();
+
+    // make it exit now (delay like wait)
+    forceUpdate = true;
+
+    // hookup (
+    cursorShow();
+    processInput.val = '';
+    inputMode = function(k) {
+      return processInput(k, name, idx);
+    };
+  }
+
+  function processInput(k, name, idx) {
+    let val = processInput.val;
+
+    k = lastKey;
+    if (k < 0) return;
+
+    // clear it
+    lastKey = -1;
+
+    if (k === 10 || k === 13) { // return
+      print();
+      let n = parseInt(val);
+      if (!name.endsWith('$')) {
+	// if numeric var: require valid num!
+	if (typeof n !== 'number' || Number.isNan(n)) {
+	  processInput.val = '';
+	  princ('?REDO FROM START\n?');
+	  return true;
+	}
+
+	setvar(name, idx, n);
+      } else {
+	setvar(name, idx, val);
+      }
+
+      // continue running program
+      cursorHide();
+      inputMode = undefined;
+      return;
+    }       
+
+    // non-character keys
+    if (k < 32 && k > 127)
+      return false;
+
+    let c = String.fromCharCode(k); 
+    princ(c);
+
+    val += c;
+    processInput.val = val;
+
+    // consume key
+    return true;
   }
 
   function ASC(s) {
@@ -4264,8 +4324,13 @@ Wait for time X Y	#EDAD
   // DIR(p) called by parser
   // DIR('name', ['foo','bar'])
   function DIR(name, names) {
-    if (!names || !names.length) 
+    // DOC: New: Show DIRectory of files
+    // DIR:
+    if (!names || !names.length) {
       names = dir(name);
+    } else if (!name) {
+      print("try 'DIR E:' or 'DIR L:'")
+    }
     
     if (trace) { print("NAMES:"); print(names); }
 
@@ -4292,7 +4357,7 @@ Wait for time X Y	#EDAD
     // FILES5678LONG.BAS  FILE5678TOOOLONGLON
     // GLONG.BAS
     names
-      .forEach(n=>(princ(n), TAB(-19)));
+      .forEach(n=>(princ(n), TAB(-20)));
     print();
   }
   
@@ -4590,7 +4655,7 @@ Wait for time X Y	#EDAD
   function TYPE(file) {
   }
 
-  HELP.related.push('CSAVE CLOAD LOGIN LOGOUT USER CD COPY DELETE TYPE');
+  HELP.related.push('CSAVE CLOAD DELETE TYPE DIR');
 
   // For the HIRES screen: 
   // CSAVE"filename",A40960,E48000 (48K) // a000 % 16K = 2000
@@ -7539,13 +7604,19 @@ Here they are, in roughly decreasing order of priority:
     // A      ==> 65 (with CAPS)
     // a      ==> 97
     // ALT-A  ==>
-    if (1 || c > 32) {
-      lastKey = k.charCodeAt(0);
+    if (kc >= 32) {
+      if (k.length === 1)
+	lastKey = k.charCodeAt(0);
+      else
+	lastKey = kc;
 
-      if (c)
-	lastKey -= 64;
-      else if (!caps) {
-	if (!s) lastKey += 32;
+      // letters
+      if (lastKey > 64) {
+	if (c)
+	  lastKey += - 64 - 32;
+	else if (caps) {
+	  if (!s) lastKey -= 32;
+	}
       }
 
       if (a)
@@ -7554,6 +7625,10 @@ Here they are, in roughly decreasing order of priority:
       // not just shift/ctrl/alt
       lastKey = kc;
     }
+    
+    // debug keys...
+    if (trace)
+      print('k='+k+' ch='+ch+' kc='+kc+' lastKey='+lastKey);
 
     // if set, call it
     // if return true capture, otherwise...
