@@ -3574,7 +3574,10 @@ SDAY
   // 20 INPUT"ENTER SALE PRICE";SELL
   function INPUT(p) {
     let query = p.getstr();
-    if (query) princ(query);
+    if (query) {
+      p.skip(';');
+      princ(query);
+    }
     princ('?');
 
     let [name, idx] = variable(p);
@@ -3600,12 +3603,20 @@ SDAY
     // clear it
     lastKey = -1;
 
+    // break
+    if (k === 3) {
+      cursorHide();
+      inputMode = undefined;
+      return;
+    }
+
     if (k === 10 || k === 13) { // return
       print();
       let n = parseInt(val);
-      if (!name.endsWith('$')) {
+      if (!val || !name.endsWith('$')) {
 	// if numeric var: require valid num!
-	if (typeof n !== 'number' || Number.isNan(n)) {
+	// string require non-empty string
+	if (!val || typeof n !== 'number' || Number.isNaN(n)) {
 	  processInput.val = '';
 	  princ('?REDO FROM START\n?');
 	  return true;
@@ -3615,16 +3626,20 @@ SDAY
       } else {
 	setvar(name, idx, val);
       }
+      if (trace)
+	print("--------("+name+idx+'='+val+"------------");
 
       // continue running program
       cursorHide();
       inputMode = undefined;
-      return;
+      return true;
     }       
 
     // non-character keys
-    if (k < 32 && k > 127)
+    if (k < 32 && k > 127) {
+      print("["+k+"]");
       return false;
+    }
 
     let c = String.fromCharCode(k); 
     princ(c);
