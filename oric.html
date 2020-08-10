@@ -528,6 +528,7 @@ g
 
 </div>
 
+
 <div>
 <!--------------- FULLSCREEN ------------------->
 <script>
@@ -553,10 +554,10 @@ g
     //()=>e.focus();
 
     // click on screen to "get focus" haha
-    dom('screen').onclick = function() {
+    // and...it doesn't work...
+    dom('screen').addEventListener('click', function() {
       e.focus();
-    }
-    
+    });
 
     let sfilter;
     e.onblur = function() {
@@ -6206,7 +6207,6 @@ Z zoom? Zoom?
   }
 
   function editArrow(ch) {
-    cursorHide();
     switch(ch) {
     case 37: col--; break; // left
     case 38: row--; break; // up
@@ -6220,8 +6220,6 @@ Z zoom? Zoom?
     if (row > SCREEN_ROWS-1) row = 0;
 
     findAction();
-
-    cursorShow();
   }
 
   function clearline(optRow, optCol) {
@@ -7614,7 +7612,6 @@ Here they are, in roughly decreasing order of priority:
     let kc = e.keyCode; // legacy
 
     // we seem to get this all the time!?
-
     if (k === 'camerafocus') return;
 
     // keycodes
@@ -7654,9 +7651,6 @@ Here they are, in roughly decreasing order of priority:
       if (inputMode(lastKey)) return;
     }
 
-    //console.log(`KEY lastkey=${lastKey} k='${k}' kc=${kc} ch='${ch}' c=${c} a=${a} s=${a}`);
-
-
     // magicall show attributes!
     if (c && a)
       dom('screen').classList.toggle('show-attr');
@@ -7674,6 +7668,9 @@ Here they are, in roughly decreasing order of priority:
     // if in gedit mode and arrow, exit
     if (gedit && (a || k.startsWith('arrow')))
       return GEDIT(k, kc, a, s, c, e);
+
+    if (k === 'control') return;
+    if (k === 'shift') return;
 
     // make ctrl click sound
     if ((c && !a && !s && k !== 'control')
@@ -7820,9 +7817,12 @@ still italic</i>back to bold</b>back to default<p>
     // arrow, C-arrow = copy
     let char = screen(row, col);
     if (!a && (37<=kc && kc<=40)) {
+      cursorHide();
       editArrow(kc);
       // drag/trail char to new pos!
       if (c) screen(row, col, char);
+      cursorShow();
+      return;
     }
 
     // my extensions
@@ -7842,6 +7842,9 @@ still italic</i>back to bold</b>back to default<p>
     }
     // WARNING: NO ALT (below here)
     
+    if (lastKey >= 32 && lastKey < 128)
+      editChar(lastKey);
+
     // CTRL-
     if (!c) return;
     
@@ -7868,28 +7871,6 @@ still italic</i>back to bold</b>back to default<p>
 
     //if (c) e.preventDefault();
   })
-
-  dom('exp').addEventListener('keypress', function(e) {
-    let c=e.ctrlKey,a=e.altKey,s=e.shiftKey;
-    let k = e.key.toLowerCase();
-    let ch = e.code;
-    let kc = e.keyCode; // legacy
-    let legc = e.charCode;
-
-    
-    // override all chars in gedit mode!
-    if (gedit && k.length==1)
-      return GEDIT(k, kc, a, s, c, e);
-
-    //    if (legk > 16) 
-    //    alert(`k=${k} legc=${legc} legk=${legk} ch=${ch}`);
-    // TODO: use e.code - but it's crap
-    // and don't reflect shift
-    if (e.keyCode==13) return;
-    editChar(legc) // , e.getModifierState("CapsLock"));
-    // hmmm, doesn't work?
-    //if (c) e.preventDefault();
-  });
 
   if (0) window.onerror = function(e) {
     dom('error', ''+e);
