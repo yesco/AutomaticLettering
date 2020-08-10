@@ -4343,11 +4343,11 @@ Wait for time X Y	#EDAD
     return DIR(name);
   }
 
-  // DIR(p) called by parser
   // DIR('name', ['foo','bar'])
   function DIR(name, names = []) {
     // DOC: New: Show DIRectory of files
-    // DIR L:
+    // DIR L:  'files in localStorage
+    // DIR E:  'files in examples
     if (!name) {
       print("try 'DIR E:' or 'DIR L:'")
       return;
@@ -4678,7 +4678,7 @@ Wait for time X Y	#EDAD
   function TYPE(file) {
   }
 
-  HELP.related.push('CSAVE CLOAD DELETE TYPE DIR');
+  HELP.related.push('CSAVE CLOAD DIR');
 
   // For the HIRES screen: 
   // CSAVE"filename",A40960,E48000 (48K) // a000 % 16K = 2000
