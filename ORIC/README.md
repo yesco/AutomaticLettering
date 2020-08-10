@@ -2,7 +2,7 @@
 
 ## Why?
 
-Yeah, I had an ORIC ATMOS, and it may be, physiclly, one of the most beautiful designed computers; real keyboard, black, with white letters, black machine case, with white ORIC logo that has a red line diagonally crossing the O from top-right to bottom-left, then underlining the word.
+Yeah, I had an ORIC ATMOS, and it may be, physically, one of the most beautiful designed computers; real keyboard, black, with white letters, black machine case, with white ORIC logo that has a red line diagonally crossing the O from top-right to bottom-left, then underlining the word.
 
 There are various emulators of note, however, I believe, few with sources comnpletely availabe. For example there is the goOric16 on Android -- but it's no longer working very well, and even if you have an external bluetooth key-board, it only receives input from the screen. Oricutron is the best, for many platforms, but on Android it doesnt work for reading local files etc.
 

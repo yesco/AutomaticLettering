@@ -908,6 +908,7 @@ INFO:<br><span id='info'></span><br>
       dom('gtext').innerHTML = '';
 
       TEXT.textinit = true;
+      lores = 0;
       // ok, let's create the text screen
     } else if (hires() && !mode) {
       // switch to TEXT
@@ -924,7 +925,7 @@ INFO:<br><span id='info'></span><br>
 
       dom('graphics').hidden = false;
       dom('text').hidden = true;
-      lores = 1;
+      lores = -1;
       row = toprow = SCREEN_ROWS - GTEXT_ROWS;
       if (TEXT.hiresinit) return;
 
@@ -933,6 +934,7 @@ INFO:<br><span id='info'></span><br>
 
     } else {
       // we're already in TEXT mode dummy!
+      lores = 0;
       return;
     }
 
@@ -998,16 +1000,18 @@ INFO:<br><span id='info'></span><br>
 
     let text = 8, alt = 9;
 
+    lores = mode;
+
     if (hires()) {
       // can we do without clearing screen?
       TEXT();
+      return;
     }
 
     if (mode > 0) {
       let a = mode==0 ? text : alt;
       fill(1, 0, SCREEN_ROWS-1, SCREEN_COLS, a);
 
-      lores = mode;
       return;
     }
 
@@ -1015,6 +1019,8 @@ INFO:<br><span id='info'></span><br>
 
     // TODO: and back -> default text
     // change any 9,9 -> 8,9!
+
+    lores = 1;
 
     // tries to preserve text!
     let last, lasthi;
@@ -5811,6 +5817,8 @@ errorObj : ${errorObj}
 } catch(e) {alert(e);}
     },
     L: function lores() {
+      if (hires())
+	return "Can't initiate LORES in HIRES";
       this.ink = ink;
       this.paper = paper;
       LORES();
@@ -6112,7 +6120,7 @@ Z zoom? Zoom?
 
     function msg(txt) {
       clearline(0);
-      iplot(0, 0, txt);
+      iplot(0, hires()?27:0, txt);
     }
     
     // undraw if needed
@@ -6162,7 +6170,7 @@ Z zoom? Zoom?
       
       // update pos in right corner
       let pos = '\3'+`${ABS(curx-g.ox)} ${ABS(cury-g.oy)}`+'\2'+`${curx} ${cury}`;
-      iplot(40-pos.length, 0, pos);
+      iplot(40-pos.length, hires()?27:0, pos);
     }
    
     // save for undo
