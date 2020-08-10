@@ -62,7 +62,7 @@ DRAW CURSET CURMOV CIRCLE all works, and they don't complain of drawing outside 
 
 The sixlets (six-pixel/char alt-charset graphics) works the same way as ORIC; it requires a screenn attribute to change to ALT-TEXT mode for each line---and as you very well know-LORES 1 does that for you. However, just "LORES" will not clear screen, but quote and keep the text!
 
-There is a kind of Teletext style editor. It basically it's just an extention of ORIC's normal full screen editor but with some "missing keys"!
+There is a kind of Teletext style editor. It basically it's just an extention of ORIC's normal full screen editor but with some "missing keys"! CTRL-ALT toggles display of attribute as chars.
 
 For graphics (LORES/HIRES)-mode, you can draw lines and interactively draw/undraw circles, do pixel-editing, etc. I call it GEDIT. It's activated by ALT-G.
 

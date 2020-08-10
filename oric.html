@@ -4323,13 +4323,14 @@ Wait for time X Y	#EDAD
 
   // DIR(p) called by parser
   // DIR('name', ['foo','bar'])
-  function DIR(name, names) {
+  function DIR(name, names = []) {
     // DOC: New: Show DIRectory of files
-    // DIR:
-    if (!names || !names.length) {
-      names = dir(name);
-    } else if (!name) {
+    // DIR L:
+    if (!name) {
       print("try 'DIR E:' or 'DIR L:'")
+      return;
+    } else if (!names || !names.length) {
+      names = dir(name);
     }
     
     if (trace) { print("NAMES:"); print(names); }
@@ -5835,12 +5836,6 @@ errorObj : ${errorObj}
       PAPER(++this.paper % 8);
     },
     q: function quit() {
-      if (hires()) {
-	throw 'GEDIT: quit not defined for hires yet!';
-      } else {
-
-      }
-
       gedit = false;
 
       cursorShow();
