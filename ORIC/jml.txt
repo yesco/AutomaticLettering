@@ -1,0 +1,81 @@
+foo[* 3 [+ 4 [inc 5]]]bar
+
+
+f: out f
+   inc y
+
+o: out o
+   inc y
+
+o: out o
+   inc y
+
+push y
+
+[: == [
+   inc y
+   tyx
+
+[: ...
+
+]: subst or apply y=[ and x=]
+
+
+
+
+[inc 5]
+6!!!!!!
+
+[3* abc]
+@HL!!!!!
+
+4711: abcabcabc\0
+
+
+============================ CODES (jsk)
+
+(multiple entry print)
+print_colon:
+	lda #58		# print colon (load)
+	data #2c	# skip 2 bytes
+print_dot:
+	lda #46		# print dot (load)
+	data #2c	# skip 2 bytes
+print_newline:
+	lda #10		# print newline (load)
+	data #2c	# skip 2 bytes
+print_space:
+	lda #32		# print space (load)
+	data #2c	# skip 2 bytes (bit)
+print_a
+	...
+
+
+(print string after jsr, get addr from stack, modify)
+print_string_after:
+	pla		# hi
+	sta $81	
+	pla		# lo
+	sta $80
+
+	jsr print_string
+
+	jmp ($80)	# short-cut rts!
+
+(address in $80/81, ends with 0, address point at \0)
+print_string:
+	ldy #0
+print_str_cont:
+	lda $80,y
+	beq print_end
+	jsr print_a
+	iny
+	bne print_str_cont
+	inc $81			# we don't care wrap
+	bne print_str_cont
+
+print_end:
+	clc
+	tya
+	adc $80
+	rts
