@@ -629,7 +629,11 @@ const ORIC_ROM = './ROMS/BASIC V1.1B.rom';
 const ROM_DOC  = './ROMS/v1.1_rom_disassemblys.html';
 const ORIC_CORE = './oric.core';
 
-function ORIC() {
+const PANDORIC = './pandoric.fun';
+
+function ORIC(dorom) {
+  let startAddr; // if not set, RESET
+
   let fs = require('fs');
 
   // init 6502
@@ -958,70 +962,126 @@ EED7 RTS
     gotorc(29, 0);
   }
 
-  // load ROM
-  let rom = fs.readFileSync(ORIC_ROM);
-  if (!rom)
-    throw 'ROM not loaded';
-  if (rom.length !== 16384)
-    throw 'ROM wrong size: ' + rom.length;
-
-  m.set(rom, 0xc000);
-
-  // Load ROM doc
-  let doc = fs.readFileSync(ROM_DOC, 'utf8');
-  doc = doc
-    .replace(/&#160;/g, ' ')
-    .replace(/<br\/>/g, '\n')
-    .replace(/\n+/g, '\n')
-  
-  ;
-  // doc line per address
-  let adoc = {};
-  doc.replace(/\n([0-9A-F]{4})\b.*?\n.*?\n.*?\n.*?\n/g, (a,addr)=>{
-    //console.log(addr);
-    if (a.match(/\n[0-9A-F,\(\)\$# \s\n]{4,}$/))return;
-    addr = addr.toLowerCase();
-    //a = a.replace(/^\n(.*?)\n(.*?)\n[A-Z]{3} [0-9A-FXY,\(\)]+ \n/, '');
-    a = a.replace(/^\n(.*?)\n(.*?)\n[A-Z]{3} [\s\S]*?\n/, '')
-      .replace(/[\n\t\s]+/g, ' ')
-      .trim();
-
-    if (!a) return;
-    //a = a.replace(/\t/g, '\\t');
-    //a = a.replace(/ /g, '\\ ');
-    //a = a.replace(/\n/g, '\\n');
-    adoc[addr] = (adoc[addr] || '') + '\t\t'+ a + '\n';
-  });
-  // Xref
-  if (1)
-    doc.replace(/\n[0-9A-F]{4} \n.+?\n.+?\$([0-9A-F]{4})\b.*?\n.*?\n/g, (a,addr)=>{
-      //console.log(addr);
-      a = a.replace(/[\n\t\s]+/g, ' ')
-	.trim()
-      ;
-      if (!a) return;
-      addr = addr.toLowerCase();
-      adoc[addr] = (adoc[addr] || '') + '\t\t\tXREF: ' + a + '\n';
-    });
-
-  // process.exit(1);
-
-  // function that will print any mentions of
-  // an address from the doc! lol
-  function describe(addr) {
-    // used to exclude logging of some addresses!
-    // (like wait loops!)
-    if (typeof addr == 'number') {
-      // addresses/rnages we don't want to see
-      if (addr >= 0xee9d && addr <= 0xeed1) return;
-      // yes! we want trace of this address
-      return true;
-    }
-    let d = adoc[addr];
-    if (d) console.log('\t'+d);
-    return;
+  // define functions
+  function fun(name, body) {
+    let a = fun[name] = fun.nextAddr, start = a;
+    // TODO: change
+    fun.nextAddr += 64;
+    body = body.forEach(
+      (b,i)=>{
+	console.log(name, i, b, a-start);
+	if (!b) return;
+	let v=parseInt(b, 16);
+	if (b[0] === "'") {
+	  m[a++] = b.charCodeAt(1);
+	} else if (b.length === 4 && v > 0) {
+	  m[a++] = v % 256
+	  m[a++] = v >> 8;
+	} else if (v < 256) {
+	  m[a++] = v;
+	} else {
+	  // symbol
+	  let to = fun[b];
+	  if(!to) throw Error('In "'+name+'" no address for "'+b+'"');
+	  m[a++] = 0x20; // jsr
+	  m[a++] = to % 256
+	  m[a++] = to >> 8;
+	}
+      });
+    m[a++] = 0x60; // rts
+    console.log('-->' + start.toString(16).padStart(4, '0') + ' len='+(a-start));
+    return start;
   }
-  
+
+  // TODO: change
+  fun.nextAddr = 0x601; // after basic
+
+  if (dorom === 'rom') {
+    // load ROM
+    let rom = fs.readFileSync(ORIC_ROM);
+    if (!rom)
+      throw 'ROM not loaded';
+    if (rom.length !== 16384)
+      throw 'ROM wrong size: ' + rom.length;
+
+    m.set(rom, 0xc000);
+
+    // Load ROM doc
+    let doc = fs.readFileSync(ROM_DOC, 'utf8');
+    doc = doc
+      .replace(/&#160;/g, ' ')
+      .replace(/<br\/>/g, '\n')
+      .replace(/\n+/g, '\n')
+    
+    ;
+    // doc line per address
+    let adoc = {};
+    doc.replace(/\n([0-9A-F]{4})\b.*?\n.*?\n.*?\n.*?\n/g, (a,addr)=>{
+      //console.log(addr);
+      if (a.match(/\n[0-9A-F,\(\)\$# \s\n]{4,}$/))return;
+      addr = addr.toLowerCase();
+      //a = a.replace(/^\n(.*?)\n(.*?)\n[A-Z]{3} [0-9A-FXY,\(\)]+ \n/, '');
+      a = a.replace(/^\n(.*?)\n(.*?)\n[A-Z]{3} [\s\S]*?\n/, '')
+	.replace(/[\n\t\s]+/g, ' ')
+	.trim();
+
+      if (!a) return;
+      //a = a.replace(/\t/g, '\\t');
+      //a = a.replace(/ /g, '\\ ');
+      //a = a.replace(/\n/g, '\\n');
+      adoc[addr] = (adoc[addr] || '') + '\t\t'+ a + '\n';
+    });
+    // Xref
+    if (1)
+      doc.replace(/\n[0-9A-F]{4} \n.+?\n.+?\$([0-9A-F]{4})\b.*?\n.*?\n/g, (a,addr)=>{
+	//console.log(addr);
+	a = a.replace(/[\n\t\s]+/g, ' ')
+	  .trim()
+	;
+	if (!a) return;
+	addr = addr.toLowerCase();
+	adoc[addr] = (adoc[addr] || '') + '\t\t\tXREF: ' + a + '\n';
+      });
+
+    // process.exit(1);
+
+    // function that will print any mentions of
+    // an address from the doc! lol
+    function describe(addr) {
+      // used to exclude logging of some addresses!
+      // (like wait loops!)
+      if (typeof addr == 'number') {
+	// addresses/rnages we don't want to see
+	if (addr >= 0xee9d && addr <= 0xeed1) return;
+	// yes! we want trace of this address
+	return true;
+      }
+      let d = adoc[addr];
+      if (d) console.log('\t'+d);
+      return;
+    }
+  } // rom
+  else {
+    // no rom, just "screen hardare"
+    let t = 'PANDORIC';
+    for(let s=SCREEN+40; s<SCREEN+28*40; s++)
+      m[s] = 32;
+    //for(let i=0; i<t.length; i++)
+    //m[SCREEN+40-t.length+i] = t.charCodeAt(i);
+    let f = fs.readFileSync(PANDORIC, 'utf8');
+    f.replace(/:\s*(\S+)([\s\S]*?);/g, (a,f,l)=>{
+      console.log('FUNCTION: '+f+ ' line: '+l);
+      // call last fun defined
+      startAddr = fun(f, l.trim().split(/\s+/));
+    });
+    
+    console.log('START: '+startAddr.toString(16));
+    // process.exit(33);
+    function describe(){
+      return 42;
+    }
+  }
+
   // run!
 
   let scon = false;
@@ -1124,7 +1184,7 @@ via6552: IRQ every 10ms (free running mode)
   // don't set more time than 10ms!
   //setTickms(ms, stp, mxstp, dly)
   //cpu.setTickms(10, 1, 1, 1);
-  cpu.start(); 
+  cpu.start(startAddr); 
 
   // simple monitor
   setInterval(function(){
@@ -1160,8 +1220,9 @@ via6552: IRQ every 10ms (free running mode)
 
 // from nodejs? 
 if (typeof require !== 'undefined') {
-  if (1) {
-    ORIC();
+  if (process.argv[2] !== 'test') {
+    ORIC(process.argv[2]);
+    return;
   } else {
   let cpu = cpu6502();
   
