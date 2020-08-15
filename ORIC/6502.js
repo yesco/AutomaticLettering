@@ -965,22 +965,32 @@ EED7 RTS
   // define functions
   function fun(name, body) {
     let a = fun[name] = fun.nextAddr, start = a;
+    fun[a] = name;
     // TODO: change
     fun.nextAddr += 64;
     body = body.forEach(
       (b,i)=>{
-	console.log(name, i, b, a-start);
+	console.log('\t', name, i, b, a-start);
 	if (!b) return;
 	let v=parseInt(b, 16);
-	if (b[0] === "'") {
+	// TODO: spaces inside strings...
+	if (b[0] === '"') {
+	  // zero terminated string
+	  let i = 0;
+	  while(i<b.length && (m[a++] = b.charCodeAt(++i)) !== '"');
+	  m[a-1] = 0;
+	} else if (b[0] === "'") {
+	  // char code (7 bit)
 	  m[a++] = b.charCodeAt(1);
 	} else if (b.length === 4 && v > 0) {
+	  // 4 char hexcode address, little endian
 	  m[a++] = v % 256
 	  m[a++] = v >> 8;
 	} else if (v < 256) {
+	  // 2 char hexcode
 	  m[a++] = v;
 	} else {
-	  // symbol
+	  // symbol/name (make jsr)
 	  let to = fun[b];
 	  if(!to) throw Error('In "'+name+'" no address for "'+b+'"');
 	  m[a++] = 0x20; // jsr
@@ -988,13 +998,20 @@ EED7 RTS
 	  m[a++] = to >> 8;
 	}
       });
-    m[a++] = 0x60; // rts
+    // change last jsr+rts to jmp!
+    if (m[a-2] === 0x20) {
+      m[a-2] = 0x4c; // jmp
+    } else {
+      m[a++] = 0x60; // rts
+    }
     console.log('-->' + start.toString(16).padStart(4, '0') + ' len='+(a-start));
     return start;
   }
 
   // TODO: change
   fun.nextAddr = 0x601; // after basic
+
+  let describe;
 
   if (dorom === 'rom') {
     // load ROM
@@ -1047,7 +1064,7 @@ EED7 RTS
 
     // function that will print any mentions of
     // an address from the doc! lol
-    function describe(addr) {
+    describe = function(descaddr) {
       // used to exclude logging of some addresses!
       // (like wait loops!)
       if (typeof addr == 'number') {
@@ -1064,28 +1081,53 @@ EED7 RTS
   else {
     // no rom, just "screen hardare"
     let t = 'PANDORIC';
-    for(let s=SCREEN+40; s<SCREEN+28*40; s++)
-      m[s] = 32;
     //for(let i=0; i<t.length; i++)
     //m[SCREEN+40-t.length+i] = t.charCodeAt(i);
     let f = fs.readFileSync(PANDORIC, 'utf8');
-    f.replace(/:\s*(\S+)([\s\S]*?);/g, (a,f,l)=>{
+    // remove comments in ()
+    f = f.replace(/\([\s\S]*?\)/g, ' ');
+    // extract '=' alias
+    let alias = {};
+    f = f.replace(/=\s*(\S+)([\s\S]*?);/g, (a,f,l)=>{
+      //console.log('SUBST: '+f+ ' line: '+l);
+      // call last fun defined
+      alias[f] = l;
+      return '';
+    });
+
+    // replace now (now subst inside?)
+    Object.keys(alias).forEach(
+      n=>f=f.replace(RegExp(n, 'g'), alias[n]));
+
+    // extract functions
+    f = f.replace(/:\s*(\S+)([\s\S]*?);/g, (a,f,l)=>{
       console.log('FUNCTION: '+f+ ' line: '+l);
       // call last fun defined
       startAddr = fun(f, l.trim().split(/\s+/));
+      return '';
     });
     
     console.log('START: '+startAddr.toString(16));
-    // process.exit(33);
-    function describe(){
-      return 42;
+    //process.exit(33);
+
+    if (0) {
+      describe = function(){return  42;};
+    } else {
+      describe = 
+	function desc(a){
+	  if (typeof addr == 'number') return true;
+	  let v = parseInt(a, 10);
+	  if (fun[v])
+	    console.log('====> ', fun[v]);
+	  return true;
+	}
     }
   }
 
   // run!
 
   let scon = false;
-  scon = true;
+  //scon = true;
   if (!scon)
     cpu.trace(describe);
   
