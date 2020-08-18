@@ -48,6 +48,15 @@
 ******************************************************************************
  ****************************************************************************/
 
+function hex(n,x) {
+  var r = "";
+  for (var k=0; k<n; k++) {
+    r = "0123456789ABCDEF"[x & 15] + r;
+    x >>= 4;
+  }
+  return r;
+}
+
 // var is faster than let! about 5%! 20200730
 function cpu6502() {
   // Note: special read/write only works for LDA/STA absolute
@@ -191,15 +200,6 @@ C	....	Carry
     ind(ip)  { return [2, "($" + hex(4,m[ip]+m[ip+1]*256) + ")"]; },
     s_acc(ip)  { return [0, "a"]; },
   };
-
-  function hex(n,x) {
-    var r = "";
-    for (var k=0; k<n; k++) {
-      r = "0123456789ABCDEF"[x & 15] + r;
-      x >>= 4;
-    }
-    return r;
-  }
 
   // Opcode implentation
 
@@ -970,32 +970,76 @@ EED7 RTS
     fun.nextAddr += 64;
     body = body.forEach(
       (b,i)=>{
-	console.log('\t', name, i, b, a-start);
+	process.stdout.write(`\t${name} ${i} ${b} ${a-start} `);
 	if (!b) return;
-	let v=parseInt(b, 16);
+	let v = parseInt(b, 16);
+	// TOOD: require $ prefix for hex?
+	if (v.toString(16) !== b.toLowerCase() && b[0] != '0')
+	  v = undefined;
 	// TODO: spaces inside strings...
 	if (b[0] === '"') {
 	  // zero terminated string
 	  let i = 0;
-	  while(i<b.length && (m[a++] = b.charCodeAt(++i)) !== '"');
+	  while(i<b.length && (m[a++] = b.charCodeAt(++i)) !== '"')
+	    console.log('= '+hex(2, m[a-1]));
+
+	  a--;
 	  m[a-1] = 0;
+	  console.log('= '+hex(2, m[a-1]));
 	} else if (b[0] === "'") {
 	  // char code (7 bit)
 	  m[a++] = b.charCodeAt(1);
 	} else if (b.length === 4 && v > 0) {
 	  // 4 char hexcode address, little endian
+	  console.log('= '+hex(4, v));
 	  m[a++] = v % 256
 	  m[a++] = v >> 8;
 	} else if (v < 256) {
 	  // 2 char hexcode
+	  console.log('= '+hex(2, v));
 	  m[a++] = v;
 	} else {
 	  // symbol/name (make jsr)
-	  let to = fun[b];
-	  if(!to) throw Error('In "'+name+'" no address for "'+b+'"');
-	  m[a++] = 0x20; // jsr
-	  m[a++] = to % 256
-	  m[a++] = to >> 8;
+	  let to = fun[b], op;
+	  if (!to) {
+	    op = b[0];
+	    to = b.substr(1);
+	    to = fun[to] || parseInt(to, 16);
+	  }
+	  if (!to) throw Error('In "'+name+'" no address for "'+b+'"');
+
+	  switch(op) {
+	  case '*': { // relative
+	    let d = to - a - 1;
+	    if (d < -128 || d > 127)
+	      throw Error('Relative out of byte range!');
+	    if (d < 0) d += 128+1;
+	    console.log('= '+hex(2, d));
+	    m[a++] = d;
+	    break; }
+	  case '^': // hi-byte
+	    to = to >> 8;
+	    console.log('= '+hex(2, to));
+	    m[a++] = to;
+	    break;
+	  case '_': // lo-byte
+	    to = to % 256;
+	    console.log('= '+hex(2, to));
+	    m[a++] = to;
+	    break;
+	  case undefined: // default
+	    process.stdout.write(' JSR ');
+	    m[a++] = 0x20; // jsr
+	    // fall through
+	  case '&': // address
+	    console.log('= '+hex(4, to));
+	    m[a++] = to % 256
+	    m[a++] = to >> 8;
+	    break;
+	  default:
+	    throw Error("Unknown op='"+op+"' of '"+b+"' to='"+to+"' ...");
+	    
+	  }
 	}
       });
     // change last jsr+rts to jmp!
@@ -1091,23 +1135,24 @@ EED7 RTS
     f = f.replace(/=\s*(\S+)([\s\S]*?);/g, (a,f,l)=>{
       //console.log('SUBST: '+f+ ' line: '+l);
       // call last fun defined
-      alias[f] = l;
+      alias[f] = l.trim();;
       return '';
     });
 
     // replace now (now subst inside?)
-    Object.keys(alias).forEach(
-      n=>f=f.replace(RegExp(n, 'g'), alias[n]));
+    // (reverse to match longest first1
+    Object.keys(alias).sort().reverse().forEach(
+      n=>f=f.replace(RegExp('(?<![A-Za-z])'+n+'(?![\\w#])', 'g'), alias[n]));
 
     // extract functions
     f = f.replace(/:\s*(\S+)([\s\S]*?);/g, (a,f,l)=>{
       console.log('FUNCTION: '+f+ ' line: '+l);
       // call last fun defined
-      startAddr = fun(f, l.trim().split(/\s+/));
+      fun(f, l.trim().split(/\s+/));
       return '';
     });
     
-    console.log('START: '+startAddr.toString(16));
+    startAddr = fun.reset || fun.main;
     //process.exit(33);
 
     if (0) {

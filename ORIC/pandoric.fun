@@ -16,6 +16,7 @@
 = STAZX 95 ;
 = STAA 8d ;
 = STAX 9d ;
+= STAAX 9d ;
 = STAY 99 ;
 = STAIX 81 ;
 = STAIY 91 ;
@@ -139,7 +140,7 @@
 = CLD d8 ;
 = SED f8 ;
 = CLI 58 ;
-= SEI 7? ;
+= SEI 78 ;
 = CLV b8 ;
 
 = DECZ c6 ;
@@ -178,8 +179,39 @@
 = EORIX 41 ;
 = EORIY 51 ;
 
-: stop a9 00 f0 fd ;
-: putc 9d 80 bb e8 ;
+(------------------------------- system)
+
+= SCREEN bb80 ;
+= CURSOR fc ; (fc,fd)
+
+= STRPTR fe ; (fe.ff)
+
+
+: stop
+  LDA# 00
+  BEQ *stop
+;
+
+: putc
+  STAX SCREEN
+  INX       
+;
+
+: cls
+  (TODO: actually clear screen!)
+  (SCREEN zero SCLEN)
+
+  (reset screen ptr)
+  (hi)
+  LDX# 01
+  LDA# ^SCREEN
+  STAZX CURSOR
+  (lo)
+  DEX
+  LDA# _SCREEN
+  STAZX CURSOR
+  (x == 0 now)
+;
 
 (strcpy has two functions:
    copy string from fe+1 -> fc
@@ -187,13 +219,15 @@
 : strcpy
   (advance string pointer)
   INCZ fe
-  BEQ +2
+  BNE 02
   INCZ ff
+
+  LDY# 00
 
   (read char)
   LDAIY fc
-  (return if \0
-  BNE +1
+  BNE 01
+  (return if \0 )
   RTS
 
   (print char)
@@ -201,12 +235,12 @@
 
   (advance screen pointer)
   INCZ fc
-  BEQ +2
+  BNE 02
   INCZ fd
 
   (if high-bit 7 set, end of token)
   CMPZ c9
-  BPL strcpy
+  BPL *strcpy
 
   (turn off high-bit on screen)
   AND# 7f
@@ -215,29 +249,63 @@
 ;
 
 : puts
-
   (string address is at RTS position)
   PLA
-  STAZ fe
-  PLA
   STAZ ff
+  PLA
+  STAZ fe
   
-  LDY# 00
   strcpy
+
+  LDAZ fe
+  PHA
+  LDAZ ff
+  PHA
+  RTS (jumps back after string\0!)
 ;
+
+
+(------------------------------- system)
 
 : pandoric
-  a9 'P' putc
-  a9 'A' putc
-  a9 'N' putc
-  a9 'D' putc
-  a9 'O' putc
-  a9 'R putc
-  a9 'I putc
-  a9 'C putc
+  LDX# 00 (beginnin of screen)
+
+  LDA# 'P' putc
+  LDA# 'A' putc
+  LDA# 'N' putc
+  LDA# 'D' putc
+  LDA# 'O' putc
+  LDA# 'R putc
+  LDA# 'I putc
+  LDA# 'C putc
 ;
+
 : spandoric
   puts "PandOric"
+  
+  LDA# '!' putc
+  LDA# '!' putc
+  LDA# '!' putc
 ;
-: reset a2 ff 9a 78 a2 00 pandoric spandoric stop ;
 
+: main
+  pandoric
+  spandoric
+;
+
+(todo: since don't have forward ref, this must be last!)
+
+: reset
+
+  (init stack)
+  LDX# ff
+  TXS
+
+  SEI (interrupt off)
+
+  cls
+
+  main
+
+  stop
+;
