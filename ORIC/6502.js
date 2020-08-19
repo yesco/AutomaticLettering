@@ -175,8 +175,8 @@ C	....	Carry
     abs() { ip+=2; return "m["+(m[ip-2]+(m[ip-1]<<8))+"]"; },
     abx() { ip+=2; return "m[(x+"+(m[ip-2]+(m[ip-1]<<8))+")&65535]"; },
     aby() { ip+=2; return "m[(y+"+(m[ip-2]+(m[ip-1]<<8))+")&65535]"; },
-    iix() { var z=m[ip++]; return "m[m[("+z+"+x)&255]+(m[("+(z+1)+"+x)&255]<<16)]"; },
-    iiy() { var z=m[ip++]; return "m[(m["+z+"]+(m["+((z+1)&255)+"]<<16)+y)&65535]"; },
+    iix() { var z=m[ip++]; return "m[m[("+z+"+x)&255]+(m[("+(z+1)+"+x)&255]<<8)]"; },
+    iiy() { var z=m[ip++]; return "m[(m["+z+"]+(m["+((z+1)&255)+"]<<8)+y)&65535]"; },
     rel() { var delta=m[ip++]; if(delta>=128)delta-=256; return ""+((ip+delta)&65535); },
     adr() { ip+=2; return ""+(m[ip-2]+(m[ip-1]<<8)); },
     ind() { var z=m[ip]+m[ip+1]*256; ip+=2; return "m["+z+"]+(m["+((z+1)&65535)+"]<<8)"; },
@@ -238,10 +238,9 @@ C	....	Carry
     eor(m) { ssz("a"); return "a^="+m+";"; },
     inc(m) { ssz(m); return "maykill("+m.substr(2,m.length-3)+");"+m+"=("+m+"+1)&255;if(!alive){ip="+ip+";return;}"; },
     inx(m) { ssz("x"); return "x=(x+1)&255;"; },
-    inx(m) { ssz("x"); return "x=(x+1)&255;"; },
     iny(m) { ssz("y"); return "y=(y+1)&255;"; },
     jmp(m) { return fsz()+"ip="+m+";"; },
-    jsr(m) { return fsz()+"m[256+sp]="+((ip-1)&255)+";m[256+((sp-1)&255)]="+((ip-1)>>8)+";sp=(sp-2)&255;ip="+m+";return;"; },
+    jsr(m) { return fsz()+"m[256+sp]="+((ip-1)>>8)+";m[256+((sp-1)&255)]="+((ip-1)&255)+";sp=(sp-2)&255;ip="+m+";return;"; },
     lda(m) { ssz("a"); return "a="+m+";"; },
     ldx(m) { ssz("x"); return "x="+m+";"; },
     ldy(m) { ssz("y"); return "y="+m+";"; },
@@ -256,7 +255,7 @@ C	....	Carry
     rol(m) { ssz(m); return "w="+m+";"+m+"=((w<<1)+c)&255;c=(w>127);"; },
     ror(m) { ssz(m); return "w="+m+";"+m+"=((w>>1)+(c<<7));c=(w&1);"; },
     rti(m) { return ops.plp(m)+ops.rts(m)+"i=0;"; },
-    rts(m) { return fsz()+"ip=(m[sp+2+256]+(m[256+((sp+1)&255)]<<8)+1)&65535;sp=(sp+2)&255;"; }, // stack grew wrong direction in original!
+    rts(m) { return fsz()+"ip=(m[256+((sp+1)&255)]+(m[256+((sp+2)&255)]<<8)+1)&65535;sp=(sp+2)&255;"; }, // stack grew wrong direction in original!
     sbc(m) { ssz("w"); return "w=a-"+m+"-(1-c);c=(w>=0);v=((a&0x80)!=(w&0x80));a=(w&255);"; },
     sec(m) { return "c=1;"; },
     sed(m) { throw "Not implemented"; },
@@ -419,7 +418,7 @@ C	....	Carry
     } catch(e) {
       throw Error(e + '\n' + code);
     }
-    //if (trace) console.log('\t', f.toString());
+    if (trace) console.log('\t', f.toString());
 
     for (var k=ip0; k<ip; k++) {
       var L = jitmap[k] = (jitmap[k] || []);
@@ -505,6 +504,7 @@ C	....	Carry
 
 	    let v= m[ip], op = opcodes[v];
 	    let farg = ppmodes[op[1]], arg = '???';
+            // save to detect jmp/jsr
 	    nextip = ip + 1;
 	    if (farg) {
 	      let z;
@@ -521,12 +521,16 @@ C	....	Carry
 	    );
 	    if (typeof trace === 'function') {
 	      if (ip > 0xc000)
-		trace(ip.toString(16));
+		trace(ip.toString(16), 1);
+	      else 
+		trace(ip.toString(16), 2);
 	      // operand (ok, not really right...)
+	      if (arg)
+		trace(arg, 3, x, y);
 	      let w = m[1]+m[2]*256;
 	      // find a match interesting addresses!
 	      if (w > 0xc000)
-		trace(w.toString(16));
+		trace(w.toString(16), 4);
 	    }
 	  }
 
@@ -1011,9 +1015,11 @@ EED7 RTS
 	  switch(op) {
 	  case '*': { // relative
 	    let d = to - a - 1;
+	    console.log(' d='+d);
 	    if (d < -128 || d > 127)
 	      throw Error('Relative out of byte range!');
-	    if (d < 0) d += 128+1;
+	    if (d < 0) d += 256;
+	    console.log(' d='+d);
 	    console.log('= '+hex(2, d));
 	    m[a++] = d;
 	    break; }
@@ -1108,18 +1114,28 @@ EED7 RTS
 
     // function that will print any mentions of
     // an address from the doc! lol
-    describe = function(descaddr) {
+    describe = function(descaddr, mode) {
       // used to exclude logging of some addresses!
       // (like wait loops!)
       if (typeof addr == 'number') {
 	// addresses/rnages we don't want to see
 	if (addr >= 0xee9d && addr <= 0xeed1) return;
+
 	// yes! we want trace of this address
 	return true;
       }
-      let d = adoc[addr];
-      if (d) console.log('\t'+d);
-      return;
+
+      // actual describe
+      if (mode === 1 || mode === 2) {
+	// ip
+	let d = adoc[addr];
+	if (d) console.log('\t'+d);
+	return;
+      } else if (mode === 3) {
+	// arg
+	console.log('\t@'+addr);
+	return;
+      }
     }
   } // rom
   else {
@@ -1159,11 +1175,26 @@ EED7 RTS
       describe = function(){return  42;};
     } else {
       describe = 
-	function desc(a){
+	function desc(a, mode, x, y){
 	  if (typeof addr == 'number') return true;
 	  let v = parseInt(a, 10);
-	  if (fun[v])
-	    console.log('====> ', fun[v]);
+	  if (mode === 1 || mode === 2) {
+	    if (fun[v])
+	      console.log('====> ', fun[v]);
+	  } else if (mode === 3) {
+	    // arg
+	    if (a[0] === '#') return true;
+	    console.log('\t@'+a, x, y);
+	    a.replace(/\$([0-9a-fA-F]+)/, (_,aa)=>v=parseInt(aa, 16));
+	    a.replace(/,X/,()=>v+=x);
+	    a.replace(/(?<!\(),Y/,(aa)=>v+=y);
+	    console.log('\t=>@'+hex(4, v));
+	    a.replace(/\(/,(aa)=>v=m[v]+(m[v+1]<<8));
+	    a.replace(/\),Y/,(aa)=>v+=y);
+	    console.log('\t=>@'+hex(4, v));
+	    if (m[a])
+	      console.log((m[a].toString(16).padStart(2, '0')));
+	  }
 	  return true;
 	}
     }

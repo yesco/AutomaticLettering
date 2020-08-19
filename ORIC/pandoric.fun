@@ -182,10 +182,13 @@
 (------------------------------- system)
 
 = SCREEN bb80 ;
-= CURSOR fc ; (fc,fd)
+= ZCURSORLO fc ;
+= ZCURSORHI fd ;
+= ZCURSOR fc ; (fc,fd, only use indirect)
 
-= STRPTR fe ; (fe.ff)
-
+= ZSTRLO fe ;
+= ZSTRHI ff ;
+= ZSTR fe ; (fe.ff, only use indirect)
 
 : stop
   LDA# 00
@@ -193,6 +196,17 @@
 ;
 
 : putc
+  (write char)
+  LDY# 00
+  STAIY ZCURSOR
+
+  (advance screen pointer)
+  INCZ ZCURSORLO
+  BNE 02
+  INCZ ZCURSORHI
+
+  RTS
+  (delete this)
   STAX SCREEN
   INX       
 ;
@@ -202,15 +216,10 @@
   (SCREEN zero SCLEN)
 
   (reset screen ptr)
-  (hi)
-  LDX# 01
-  LDA# ^SCREEN
-  STAZX CURSOR
-  (lo)
-  DEX
   LDA# _SCREEN
-  STAZX CURSOR
-  (x == 0 now)
+  STAZ ZCURSORLO
+  LDA# ^SCREEN
+  STAZ ZCURSORHI
 ;
 
 (strcpy has two functions:
@@ -218,48 +227,47 @@
    stop at either \0 or high-bit set char)
 : strcpy
   (advance string pointer)
-  INCZ fe
+  INCZ ZSTRLO
   BNE 02
-  INCZ ff
+  INCZ ZSTRHI
 
   LDY# 00
 
   (read char)
-  LDAIY fc
+  LDAIY ZSTR
   BNE 01
   (return if \0 )
-  RTS
+  RTS 
 
   (print char)
-  STAIY fe
+  TAX
+  AND# 7f
+  STAIY ZCURSOR
 
   (advance screen pointer)
-  INCZ fc
+  INCZ ZCURSORLO
   BNE 02
-  INCZ fd
+  INCZ ZCURSORHI
 
   (if high-bit 7 set, end of token)
-  CMPZ c9
+  TXA
   BPL *strcpy
-
-  (turn off high-bit on screen)
-  AND# 7f
-  STAIY fe
   RTS
 ;
 
 : puts
   (string address is at RTS position)
   PLA
-  STAZ ff
+  STAZ ZSTRLO
   PLA
-  STAZ fe
+  STAZ ZSTRHI
+
   
   strcpy
 
-  LDAZ fe
+  LDAZ ZSTRHI
   PHA
-  LDAZ ff
+  LDAZ ZSTRLO
   PHA
   RTS (jumps back after string\0!)
 ;
@@ -281,7 +289,7 @@
 ;
 
 : spandoric
-  puts "PandOric"
+  puts "pandoric"
   
   LDA# '!' putc
   LDA# '!' putc
