@@ -966,12 +966,12 @@ EED7 RTS
     gotorc(29, 0);
   }
 
-  // define functions
-  function fun(name, body) {
-    let a = fun[name] = fun.nextAddr, start = a;
-    fun[a] = name;
+  // define function, return #bytes used
+  function deffun(name, body) {
+    let a = deffun[name] = deffun.nextAddr, start = a;
+    deffun[a] = name;
     // TODO: change
-    fun.nextAddr += 256;
+    deffun.nextAddr += 256;
     body = body.forEach(
       (b,i)=>{
 	process.stdout.write(`\t${name} ${i} ${b} ${a-start} `);
@@ -1004,11 +1004,11 @@ EED7 RTS
 	  m[a++] = v;
 	} else {
 	  // symbol/name (make jsr)
-	  let to = fun[b], op;
+	  let to = deffun[b], op;
 	  if (!to) {
 	    op = b[0];
 	    to = b.substr(1);
-	    to = fun[to] || parseInt(to, 16);
+	    to = deffun[to] || parseInt(to, 16);
 	  }
 	  if (!to) throw Error('In "'+name+'" do not know "'+b+'"');
 
@@ -1054,12 +1054,13 @@ EED7 RTS
     } else {
       m[a++] = 0x60; // rts
     }
-    console.log('-->' + start.toString(16).padStart(4, '0') + ' len='+(a-start));
-    return start;
+    let len = a - start;
+    console.log('-->' + start.toString(16).padStart(4, '0') + ' len='+len);
+    return len;
   }
 
   // TODO: change
-  fun.nextAddr = 0x601; // after basic
+  deffun.nextAddr = 0x601; // after basic
 
   let describe;
 
@@ -1161,14 +1162,17 @@ EED7 RTS
       n=>f=f.replace(RegExp('(?<![A-Za-z])'+n+'(?![\\w#])', 'g'), alias[n]));
 
     // extract functions
+    let nbytes = 0, nfuncs = 0;
     f = f.replace(/:\s*(\S+)([\s\S]*?);/g, (a,f,l)=>{
       console.log('FUNCTION: '+f+ ' line: '+l);
       // call last fun defined
-      fun(f, l.trim().split(/\s+/));
+      nbytes += deffun(f, l.trim().split(/\s+/));
+      nfuncs++;
       return '';
     });
     
-    startAddr = fun.reset || fun.main;
+    console.log('----Total bytes used: '+nbytes+ ' for '+nfuncs+' functions');
+    startAddr = deffun.reset || deffun.main;
     //process.exit(33);
 
     if (0) {
@@ -1179,8 +1183,8 @@ EED7 RTS
 	  if (typeof addr == 'number') return true;
 	  let v = parseInt(a, 10);
 	  if (mode === 1 || mode === 2) {
-	    if (fun[v])
-	      console.log('====> ', fun[v]);
+	    if (deffun[v])
+	      console.log('====> ', deffun[v]);
 	  } else if (mode === 3) {
 	    // arg
 	    if (a[0] === '#') return true;

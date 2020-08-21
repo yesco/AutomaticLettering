@@ -404,7 +404,7 @@
   putc
 ;
 
-: putd
+: debputd
 
   LDA# 'x' putc
   puth
@@ -437,7 +437,161 @@
   putspc
 ;
 
-(------------------------------- system)
+: putd
+
+  putspc
+  (todo: refector to call same!)
+  putd10k
+  putd1k
+  putd100
+  putd10
+  LDAZ ZSTR puthn
+;
+
+(stack on page 0, each entry 2 bytes)
+(X used to index,
+ ZX stack is next byte to use
+ ???ZX stack-1 points to lo byte
+ ???ZX stack-2 points to hi byte)
+
+= stack 10 ;
+
+: drop
+  DECZ stack
+  DECZ stack
+;
+  
+: pushAY
+  LDXZ stack
+  STAZX stack
+  INX
+  TYA
+  STAZX stack
+  INX
+  STXZ stack
+;
+
+: popAY
+  LDXZ stack
+  DEX
+  LDAZX stack
+  TXA
+  STAZX stack
+  DEX
+  STXZ stack
+;
+
+: drop
+  DECZ stack
+  DECZ stack
+;
+  
+: push0
+  LDXZ stack
+  LDA# 00
+  STAZX stack
+  INX
+  STAZX stack
+  INX
+  STXZ stack
+;
+
+: push1
+  LDXZ stack
+  LDA# 00
+  STAZX stack
+  INX
+  LDA# 01
+  STAZX stack
+  INX
+  STXZ stack
+;
+
+: inc
+  LDXZ stack
+  INCZX stack-1
+  BNE 02
+  INCZX stack-2
+;
+
+: dec
+  LDXZ stack
+  DECZX stack-1
+  BNE 02
+  DECZX stack-2
+;
+
+: incwA
+  LDXZ stack
+  CLC
+  ADCZX stack-1
+  STAZX stack-1
+  BNE 02
+  ADCZX stack-2
+  STAZX stack-2
+;
+
+: decwA
+  LDXZ stack
+  CLC
+  SBCZX stack-1
+  STAZX stack-1
+  BNE 02
+  SBCZX stack-2
+  STAZX stack-2
+;
+
+: plus
+  LDXZ stack
+
+  DEX
+  CLC
+  LDAZX stack-1
+  ADCZX stack-3
+  STAZX stack-3
+
+  DEX
+  LDAZX stack-1
+  ADCZX stack-3
+  STAZX stack-3
+
+  STXZ stack
+;
+
+: minus
+  LDXZ stack
+
+  DEX
+  SEC
+  LDAZX stack-2
+  SBCZX stack-0
+  STAZX stack-2
+
+  DEX
+  LDAZX stack-2
+  ADCZX stack-0
+  STAZX stack-2
+
+  STXZ stack
+;
+
+: print
+  LDXZ stack
+
+  DEX
+  LDAZX stack-0
+  STAZX ZSTRLO
+
+  DEX
+  LDAZX stack-0
+  STAZX ZSTRHI
+
+  putd
+
+  STXZ stack
+;
+
+(------------------------------- system end)
 
 : pandoric
   LDX# 00 (beginnin of screen)
