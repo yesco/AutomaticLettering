@@ -121,7 +121,7 @@
 = RTS 60 ;
 
 = BCC 90 ; (Branch Carry Clear)
-= BCC b0 ; (Branch Carry Set)
+= BCS b0 ; (Branch Carry Set)
 
 = BMI 30 ; (Branch if MInus)
 = BPL 10 ; (Branch Positive L?)
@@ -268,6 +268,11 @@
   RTS (jumps back after string\0!)
 ;
 
+: putspc
+  LDA# 20
+  putc
+;
+  
 : puthn (put A hex nibble on screen)
   AND# 0f
   CLC
@@ -299,6 +304,138 @@
   puthb
 ;
 
+: putd10kd ($2710)
+  LDAZ ZSTRLO
+  SEC
+  SBC# 10
+  TAY
+  LDAZ ZSTRHI
+  SBC# 27
+  BCS 01
+  RTS
+  
+  STAZ ZSTRHI
+  TYA
+  STAZ ZSTRLO
+
+  INX
+  JMPA &putd10kd
+;
+
+: putd10k
+  LDX# '0'
+  putd10kd
+  TXA
+  putc
+;
+
+: putd1kd ($03e8)
+  LDAZ ZSTRLO
+  SEC
+  SBC# e8
+  TAY
+  LDAZ ZSTRHI
+  SBC# 03
+  BCS 01
+  RTS
+  
+  STAZ ZSTRHI
+  TYA
+  STAZ ZSTRLO
+
+  INX
+  JMPA &putd1kd
+;
+
+: putd1k
+  LDX# '0'
+  putd1kd
+  TXA
+  putc
+;
+
+: putd100d (64)
+  LDAZ ZSTRLO
+  SEC
+  SBC# 64
+  TAY
+  LDAZ ZSTRHI
+  SBC# 00
+  BCS 01
+  RTS
+  
+  STAZ ZSTRHI
+  TYA
+  STAZ ZSTRLO
+
+  INX
+  JMPA &putd100d
+;
+
+: putd100
+  LDX# '0'
+  putd100d
+  TXA
+  putc
+;
+
+: putd10d (0a) (can be simplified but...)
+  LDAZ ZSTRLO
+  SEC
+  SBC# 0a
+  TAY
+  LDAZ ZSTRHI
+  SBC# 00
+  BCS 01
+  RTS
+  
+  STAZ ZSTRHI
+  TYA
+  STAZ ZSTRLO
+
+  INX
+  JMPA &putd10d
+;
+
+: putd10
+  LDX# '0'
+  putd10d
+  TXA
+  putc
+;
+
+: putd
+
+  LDA# 'x' putc
+  puth
+  putspc
+  putd10k
+  putspc
+  
+  LDA# 'x' putc
+  puth
+  putspc
+  putd1k
+  putspc
+  
+  LDA# 'x' putc
+  puth
+  putspc
+  putd100
+  putspc
+  
+  LDA# 'x' putc
+  puth
+  putspc
+  putd10
+  putspc
+  
+  LDA# 'x' putc
+  puth
+  putspc
+  LDAZ ZSTR puthn
+  putspc
+;
 
 (------------------------------- system)
 
@@ -329,10 +466,17 @@
 
   LDA# 12
   STAZ ZSTRHI
-  LDA# 34
+
+  cls
+  
+  LDA# ff
   STAZ ZSTRLO
-  puth
+  LDA# ff
+  STAZ ZSTRHI
+
+  putd
 ;
+
 
 (todo: since don't have forward ref, this must be last!)
 : reset

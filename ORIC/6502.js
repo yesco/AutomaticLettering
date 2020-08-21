@@ -971,7 +971,7 @@ EED7 RTS
     let a = fun[name] = fun.nextAddr, start = a;
     fun[a] = name;
     // TODO: change
-    fun.nextAddr += 64;
+    fun.nextAddr += 256;
     body = body.forEach(
       (b,i)=>{
 	process.stdout.write(`\t${name} ${i} ${b} ${a-start} `);
@@ -1010,7 +1010,7 @@ EED7 RTS
 	    to = b.substr(1);
 	    to = fun[to] || parseInt(to, 16);
 	  }
-	  if (!to) throw Error('In "'+name+'" no address for "'+b+'"');
+	  if (!to) throw Error('In "'+name+'" do not know "'+b+'"');
 
 	  switch(op) {
 	  case '*': { // relative
