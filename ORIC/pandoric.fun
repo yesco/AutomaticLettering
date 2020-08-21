@@ -206,9 +206,6 @@
   INCZ ZCURSORHI
 
   RTS
-  (delete this)
-  STAX SCREEN
-  INX       
 ;
 
 : cls
@@ -262,7 +259,6 @@
   PLA
   STAZ ZSTRHI
 
-  
   strcpy
 
   LDAZ ZSTRHI
@@ -270,6 +266,37 @@
   LDAZ ZSTRLO
   PHA
   RTS (jumps back after string\0!)
+;
+
+: puthn (put A hex nibble on screen)
+  AND# 0f
+  CLC
+  ADC# 30
+  CMP# 3a
+  BMI 02
+  ADC# 06 (carry is set)
+  putc
+;
+
+: puthb (put byte A as hex on screen)
+  PHA
+
+  ROR
+  ROR
+  ROR
+  ROR
+  puthn
+
+  PLA
+  puthn
+;
+
+: puth
+  LDAZ ZSTRHI
+  puthb  
+
+  LDAZ ZSTRLO
+  puthb
 ;
 
 
@@ -299,10 +326,15 @@
 : main
   pandoric
   spandoric
+
+  LDA# 12
+  STAZ ZSTRHI
+  LDA# 34
+  STAZ ZSTRLO
+  puth
 ;
 
 (todo: since don't have forward ref, this must be last!)
-
 : reset
 
   (init stack)

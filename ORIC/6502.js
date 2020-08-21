@@ -1203,7 +1203,7 @@ EED7 RTS
   // run!
 
   let scon = false;
-  //scon = true;
+  scon = true;
   if (!scon)
     cpu.trace(describe);
   
