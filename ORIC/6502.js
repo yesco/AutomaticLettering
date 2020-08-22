@@ -1005,11 +1005,17 @@ EED7 RTS
 	} else {
 	  // symbol/name (make jsr)
 	  let to = deffun[b], op;
-	  if (!to) {
+	  if ('*^&_'.indexOf(b[0]) >= 0) {
 	    op = b[0];
 	    to = b.substr(1);
 	    to = deffun[to] || parseInt(to, 16);
 	  }
+	  if (b.match(/[\+\-]/)) {
+	    to = parseInt(b, 16);
+	    b.replace(/\-(\d+)/, (_,d)=>to-=d);
+	    b.replace(/\+(\d+)/, (_,d)=>to+=d);
+	  }
+
 	  if (!to) throw Error('In "'+name+'" do not know "'+b+'"');
 
 	  switch(op) {
@@ -1158,8 +1164,12 @@ EED7 RTS
 
     // replace now (now subst inside?)
     // (reverse to match longest first1
-    Object.keys(alias).sort().reverse().forEach(
-      n=>f=f.replace(RegExp('(?<![A-Za-z])'+n+'(?![\\w#])', 'g'), alias[n]));
+    let fprev;
+    do {
+      fprev = f;
+      Object.keys(alias).sort().reverse().forEach(
+	n=>f=f.replace(RegExp('(?<![A-Za-z])'+n+'(?![\\w#])', 'g'), alias[n]));
+    } while (fprev !== f);
 
     // extract functions
     let nbytes = 0, nfuncs = 0;

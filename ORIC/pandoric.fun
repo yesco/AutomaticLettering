@@ -23,7 +23,7 @@
 
 = LDX# a2 ;
 = LDXZ a6 ;
-= LDXZY b6
+= LDXZY b6 ;
 = LDXA ae ;
 = LDXAY be ;
 
@@ -33,7 +33,7 @@
 
 = LDY# a0 ;
 = LDYZ 44 ;
-= LDYZX b4
+= LDYZX b4 ;
 = LDYA ac ;
 = LDYAX bc ;
 
@@ -109,7 +109,6 @@
 = TXA 8a ;
 = TXS 9a ;
 = TYA 98 ;
-
 
 = NOP ea ;
 
@@ -222,6 +221,7 @@
 (strcpy has two functions:
    copy string from fe+1 -> fc
    stop at either \0 or high-bit set char)
+(trashes A,X,Y)
 : strcpy
   (advance string pointer)
   INCZ ZSTRLO
@@ -448,147 +448,175 @@
   LDAZ ZSTR puthn
 ;
 
-(stack on page 0, each entry 2 bytes)
+(stack on page 0,
+ starting at $ff, growing downwards,
+ at $ff, store current stack pointer X,
+ each next entry 2 bytes)
 (X used to index,
  ZX stack is next byte to use
- ???ZX stack-1 points to lo byte
- ???ZX stack-2 points to hi byte)
+ ???ZX 0 points to TOP lo byte
+ ???ZX 1 points to TOP hi byte)
 
-= stack 10 ;
+= stack ff ; (address of stack pointer X)
 
-: drop
-  DECZ stack
-  DECZ stack
+(invoke to restore date stack X)
+= dostack LDXZ stack ; 
+
+(store date stack X)
+= endstack STXZ stack ;
+
+= DEX2 DEX DEX ;
+= INX2 INX INX ;
+
+(xstack functions prefixed by
+ x to indicate that x needs to be preserved)
+
+: xdrop
+  INX2
 ;
   
-: pushAY
-  LDXZ stack
-  STAZX stack
-  INX
-  TYA
-  STAZX stack
-  INX
-  STXZ stack
+: xpushAY
+  DEX2
+  STAZX 1 (hi)
+  STYZX 0 (lo)
 ;
 
-: popAY
-  LDXZ stack
-  DEX
-  LDAZX stack
-  TXA
-  STAZX stack
-  DEX
-  STXZ stack
+: xpullAY
+  LDAZX 1
+  LDYZX 0
+  INX2
 ;
 
-: drop
-  DECZ stack
-  DECZ stack
-;
-  
-: push0
-  LDXZ stack
+: xpush0
+  DEX2
   LDA# 00
-  STAZX stack
-  INX
-  STAZX stack
-  INX
-  STXZ stack
+  STAZX 1
+  STAZX 0
 ;
 
-: push1
-  LDXZ stack
+: xpush1
+  DEX2
   LDA# 00
-  STAZX stack
-  INX
+  STAZX 1
   LDA# 01
-  STAZX stack
-  INX
-  STXZ stack
+  STAZX 0
 ;
 
-: inc
-  LDXZ stack
-  INCZX stack-1
+: xinc
+  INCZX 0
   BNE 02
-  INCZX stack-2
+  INCZX 1
 ;
 
-: dec
-  LDXZ stack
-  DECZX stack-1
+: xdec
+  DECZX 0
   BNE 02
-  DECZX stack-2
+  DECZX 1
 ;
 
-: incwA
-  LDXZ stack
+: xincwA
   CLC
-  ADCZX stack-1
-  STAZX stack-1
+  ADCZX 0
+  STAZX 0
   BNE 02
-  ADCZX stack-2
-  STAZX stack-2
+  ADCZX 1
+  STAZX 1
 ;
 
-: decwA
-  LDXZ stack
-  CLC
-  SBCZX stack-1
-  STAZX stack-1
-  BNE 02
-  SBCZX stack-2
-  STAZX stack-2
-;
-
-: plus
-  LDXZ stack
-
-  DEX
-  CLC
-  LDAZX stack-1
-  ADCZX stack-3
-  STAZX stack-3
-
-  DEX
-  LDAZX stack-1
-  ADCZX stack-3
-  STAZX stack-3
-
-  STXZ stack
-;
-
-: minus
-  LDXZ stack
-
-  DEX
+: xdecwA
+  (RSB - reverse subtrac!)
+  EOR# ff
   SEC
-  LDAZX stack-2
-  SBCZX stack-0
-  STAZX stack-2
+  SBCZX 0
+  STAZX 0
 
-  DEX
-  LDAZX stack-2
-  ADCZX stack-0
-  STAZX stack-2
-
-  STXZ stack
+  BNE 02
+  SBCZX 1
+  STAZX 1
 ;
 
-: print
-  LDXZ stack
+: xplus
+  CLC
+  LDAZX 2
+  ADCZX 0
+  STAZX 2
+
+  LDAZX 3
+  ADCZX 1
+  STAZX 2
+
+  DEX2
+;
+
+: xminus
+  SEC
+  LDAZX 2
+  SBCZX 0
+  STAZX 2
 
   DEX
-  LDAZX stack-0
+  LDAZX 3
+  ADCZX 1
+  STAZX 3
+
+  DEX2
+;
+
+: xpull
+  LDAZX 0
   STAZX ZSTRLO
 
-  DEX
-  LDAZX stack-0
+  LDAZX 1
   STAZX ZSTRHI
 
-  putd
+  DEX2
+;
 
-  STXZ stack
+; xpush (2 bytes after)
+  (value address is at RTS position)
+  PLA
+  CLC
+  ADC# 01
+  STAZ ZSTRLO
+  TAY
+
+  PLA
+  ADC# 00
+  STAZ ZSTRHI
+
+  xpushAY
+
+  (generate return address)
+  INY (lo)
+  BNE 01
+  INC (hi)
+
+  PHA (hi)
+
+  TYA (lo)
+  PHA 
+  RTS (jumps back 2 bytes call)
+;
+
+: xprint
+  xpull
+  endstack
+  putd
+  dostack
+;
+
+: xhprint
+  xpull
+  endstack
+  puth
+  dostack
+;
+
+: xsprint
+  xpull
+  endstack
+  strcpy
+  dostack
 ;
 
 (------------------------------- system end)
@@ -618,17 +646,40 @@
   pandoric
   spandoric
 
-  LDA# 12
-  STAZ ZSTRHI
+  dostack
+  LDA# 44
+  LDY# 88
 
-  cls
+  xpushAY
+  xpushAY
+
+  LDA# 'x' putc
+  xhprint
+  (print)
+
+  LDA# 00
+  LDY# 00
+  xpushAY
+  xpushAY
+  LDA# 'x' putc
+  xhprint
+  (xprint)
   
-  LDA# ff
-  STAZ ZSTRLO
-  LDA# ff
-  STAZ ZSTRHI
+  LDA# 23
+  LDY# 45
+  xpushAY
+  xpushAY
+  LDA# 'x' putc
+  xhprint
+  (xprint)
 
-  putd
+  LDA# ff
+  LDY# ff
+  xpushAY
+  xpushAY
+  LDA# 'x' putc
+  xhprint
+  (xprint)
 ;
 
 
@@ -638,6 +689,9 @@
   (init stack)
   LDX# ff
   TXS
+  (data stack)
+  DEX
+  endstack
 
   SEI (interrupt off)
 
