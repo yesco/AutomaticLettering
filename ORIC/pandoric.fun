@@ -181,13 +181,13 @@
 (------------------------------- system)
 
 = SCREEN bb80 ;
-= ZCURSORLO fc ;
-= ZCURSORHI fd ;
-= ZCURSOR fc ; (fc,fd, only use indirect)
+= ZCURSORLO 00 ;
+= ZCURSORHI 01 ;
+= ZCURSOR 00 ; (use indirect)
 
-= ZSTRLO fe ;
-= ZSTRHI ff ;
-= ZSTR fe ; (fe.ff, only use indirect)
+= ZSTRLO 02 ;
+= ZSTRHI 03 ;
+= ZSTR 02 ; (only use indirect)
 
 : stop
   LDA# 00
@@ -545,7 +545,7 @@
   ADCZX 1
   STAZX 2
 
-  DEX2
+  INX2
 ;
 
 : xminus
@@ -559,17 +559,17 @@
   ADCZX 1
   STAZX 3
 
-  DEX2
+  INX2
 ;
 
 : xpull
   LDAZX 0
-  STAZX ZSTRLO
+  STAZ ZSTRLO
 
   LDAZX 1
-  STAZX ZSTRHI
+  STAZ ZSTRHI
 
-  DEX2
+  INX2
 ;
 
 ; xpush (2 bytes after)
