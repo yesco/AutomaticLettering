@@ -418,7 +418,8 @@ C	....	Carry
     } catch(e) {
       throw Error(e + '\n' + code);
     }
-    if (trace) console.log('\t', f.toString());
+    // trace generated code
+    //if (trace) console.log('\t', f.toString());
 
     for (var k=ip0; k<ip; k++) {
       var L = jitmap[k] = (jitmap[k] || []);
@@ -520,7 +521,7 @@ C	....	Carry
 	      'sp='+hex(2, sp)+'( '+stack()+')',
 	    );
 	    if (typeof trace === 'function') {
-	      if (ip > 0xc000)
+	      if (ip >= 0xc000)
 		trace(ip.toString(16), 1);
 	      else 
 		trace(ip.toString(16), 2);
@@ -594,10 +595,20 @@ C	....	Carry
       }
     },
     // st: undefined/false/true
-    // st: function(arg) {
+    // st: function(arg[, mode]) {
+    //
+    // mode === undefined:
     //   arg: number, return true if to show trace
+    //        (!mode)
+    //
+    // mode === 1 or 2:
     //   arg: string, search and describe,
-    //        typically called with 'ADDR'
+    //        typically called with 'HEXADDR'
+    //   mode: 1 = rom (c000 >=)
+    //         2 = otherwise
+    // mode === 3: (arg, 3, x, y)
+    //   addr: string with disasm numeric argument)
+    //
     trace(st) { trace = st; },
     // f(data) {...}
     trapWrite(a, f) {
@@ -1089,10 +1100,9 @@ EED7 RTS
     
     ;
     // doc line per address
-    let adoc = {};
-    doc.replace(/\n([0-9A-F]{4})\b.*?\n.*?\n.*?\n.*?\n/g, (a,addr)=>{
-      //console.log(addr);
-      if (a.match(/\n[0-9A-F,\(\)\$# \s\n]{4,}$/))return;
+    let adoc = {}; // index by hex/4 lowercase
+    doc.replace(/\n([0-9A-F]{4})\b.*?\n.*?\n.*?\n.*?(?=\n)/g, (a,addr)=>{
+      //if (a.match(/\n[0-9A-F,\(\)\$# \s\n]{4,}$/))return;
       addr = addr.toLowerCase();
       //a = a.replace(/^\n(.*?)\n(.*?)\n[A-Z]{3} [0-9A-FXY,\(\)]+ \n/, '');
       a = a.replace(/^\n(.*?)\n(.*?)\n[A-Z]{3} [\s\S]*?\n/, '')
@@ -1100,6 +1110,9 @@ EED7 RTS
 	.trim();
 
       if (!a) return;
+      if (a.match(/^[0-9A-F]{4}$/)) return;
+
+      //console.log(addr, a);
       //a = a.replace(/\t/g, '\\t');
       //a = a.replace(/ /g, '\\ ');
       //a = a.replace(/\n/g, '\\n');
@@ -1121,7 +1134,7 @@ EED7 RTS
 
     // function that will print any mentions of
     // an address from the doc! lol
-    describe = function(descaddr, mode) {
+    describe = function(addr, mode, x, y) {
       // used to exclude logging of some addresses!
       // (like wait loops!)
       if (typeof addr == 'number') {
@@ -1133,19 +1146,24 @@ EED7 RTS
       }
 
       // actual describe
+      //console.log('trace.describe.'+mode+' addr='+addr);
+
       if (mode === 1 || mode === 2) {
 	// ip
 	let d = adoc[addr];
 	if (d) console.log('\t'+d);
-	return;
+	return true;
       } else if (mode === 3) {
 	// arg
 	console.log('\t@'+addr);
-	return;
+	return true;
       }
-    }
-  } // rom
+      return true;
+    } // end describe
+
+  } // end rom
   else {
+
     // no rom, just "screen hardare"
     let t = 'PANDORIC';
     //for(let i=0; i<t.length; i++)
