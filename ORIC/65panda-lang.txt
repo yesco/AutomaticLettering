@@ -1,0 +1,175 @@
+= 6502 panda language interpreter
+
+= Language
+
+3 plus 4 times 2 minus 1
+3     12      24      23
+
+1 to 10 sqr lt 25
+1..10   1..100  1,4,9,16
+
+== smallsquares v5 (continuation)
+// to go to continuation RTS!
+// var 0 not used
+byte 1 1
+  LDA 1
+  STA c1
+byte 2 10
+  LDA 1
+  STA c2
+byte 3 25
+  LDA 25
+  STA c3
+byte 4 0
+  LDA 0
+  STA v4
+byte 5 0
+  LDA 0
+  STA v5
+
+L0:
+upto3 1 2 4
+  LDA c1
+  STA v4
+
+L0test:
+  LDA v4
+  CMP c1
+  BNE L1
+  JMP Lfail
+
+L0next:
+  INC v4
+  JMP L0test
+
+L1:
+sqr 4 5
+  JSR Lsqr2 4 5
+  // can't fail
+
+L2:
+lt3 5 3 5
+  LDA v5
+  CMP (c2)
+  BNEG L3 // branch negative
+  JMP L0next
+
+L3:
+out1 5
+  JMP (continuation) // actual instr!
+
+== generic codegen pattern
+
+=== calling function that can fail
+  JSR function [continuation]
+Lnext:
+  ...
+
+=== funcall (1 -> 1, no fail)
+  JSR Lfunc p1 p2 p3 ...
+
+=== test (1 -> 0/1, can fail)
+  ...
+  Bxx Lnext
+  JMP Lprevfail
+
+=== out (1 -> 1, no fail)
+  RTS
+
+=== loop (1 -> N, can fail)
+  ...init...
+
+Ltest:
+  ...test...
+  Bxx Lnext
+  JMP Lprevfail
+
+Lprevfail: // notice, redefined
+  ...update...
+  JMP Ltest
+
+== JMP fail // first fail addr of fun
+Lfail:
+  RTS
+  
+== sqr2 va vb
+  ...
+  STA vb
+  JMP skip2 // == PC+=2 : RTS
+
+== %a upto %x
+A %a
+
+INC A
+
+== downto
+
+A 1
+
+
+
+== clear screen
+0 to 27 sety : 0 to 39 setx : putc 32
+
+== fixcursor
+peek %cursor lt #A8 : home
+
+== writesc %a
+fixcursor : poke %a %cursor
+
+== home
+writetow %cursor #A800
+
+poke #A8 %cursor
+poke #00 %cursor+1
+
+== putc %a
+writesc %a : right
+
+== cls
+home : 0 to 27 : 0 to 39 : putc 32
+
+home : 0 to 1119 : putc 32
+
+== frame of %a
+home
+0 upto 39 : putc %a
+back
+1 upto 27 : down : writesc %a 
+38 downto 0 : back : writesc %a
+26 downto 0 : up : writesc %a
+
+=== or
+gotoxy 0  0 : 0 to 39 : putc 65
+gotoxy 0 27 : 0 to 39 : putc 65
+gotoxy 0  0 : 0 to 27 : putc 65
+gotoxy 39 0 : 0 to 27 : putc 65
+
+== gotoxy %x %y
+home
+curmovx %y
+curmovy %x
+fixcursor
+
+== curmovy %y
+%y downto 0 : down
+
+== down
+40 addto %cursor
+
+== rightx %x
+%x addto %cursor
+
+== right
+1 addto %cursor
+
+== back / left
+1 subfrom %cursor
+
+== up
+40 subfrom %cursor
+
+== multiply by 40
+(40 = 32 + 8)
+
+
