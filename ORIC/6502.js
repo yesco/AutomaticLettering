@@ -1,3 +1,10 @@
+// this file contains various things
+// 1. a modified 6502 simulator in js
+// 2. various tests
+// 3. a text-scren oric simulator, reading ROM (and this fails during init)
+// 4. a text-scren "forthy" macro assembly language
+
+
 /* 6502.js heaviy edited by jsk@yesco.org
 
    File originally from:
@@ -1163,6 +1170,7 @@ EED7 RTS
 
   } // end rom
   else {
+    // a simple macro ASM codegen
 
     // no rom, just "screen hardare"
     let t = 'PANDORIC';

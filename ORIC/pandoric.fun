@@ -1,3 +1,13 @@
+(opcodes with named addressed modes)
+(xxx#	- immediate #const
+(xxxZ	- ZeroPage)
+(xxxZX	- ZeroPage + X)
+(xxxA	- Address)
+(xxxX	- address + X)
+(xxxY	- address + Y)
+(xxxIX	- *[IndexedAddress + X])
+(xxxIY	- *[Indexed Address] + Y)
+
 = PHP 08 ;
 = PHA 48 ;
 = PLA 68 ;
@@ -189,7 +199,7 @@
 = ZSTRHI 03 ;
 = ZSTR 02 ; (only use indirect)
 
-: stop
+: stop (loop forever)
   LDA# 00
   BEQ *stop
 ;
@@ -207,7 +217,7 @@
   RTS
 ;
 
-: cls
+: cls (this is currently 'home')
   (TODO: actually clear screen!)
   (SCREEN zero SCLEN)
 
@@ -217,6 +227,8 @@
   LDA# ^SCREEN
   STAZ ZCURSORHI
 ;
+
+(strings: ends with 0, or byte with high bit set)
 
 (strcpy has two functions:
    copy string from fe+1 -> fc
@@ -261,6 +273,7 @@
 
   strcpy
 
+  (isn't all this same as JMPI ZSTR+1 ?)
   LDAZ ZSTRHI
   PHA
   LDAZ ZSTRLO
@@ -394,7 +407,7 @@
   STAZ ZSTRLO
 
   INX
-  JMPA &putd10d
+  JMPA &putd10d (== jsr+rts)
 ;
 
 : putd10
@@ -448,7 +461,7 @@
   LDAZ ZSTR puthn
 ;
 
-(stack on page 0,
+(data stack on page 0,
  starting at $ff, growing downwards,
  at $ff, store current stack pointer X,
  each next entry 2 bytes)
@@ -459,7 +472,7 @@
 
 = stack ff ; (address of stack pointer X)
 
-(invoke to restore date stack X)
+(invoke to restore data stack X)
 = dostack LDXZ stack ; 
 
 (store date stack X)
