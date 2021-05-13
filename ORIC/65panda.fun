@@ -225,8 +225,7 @@
   STAIY ZCURSOR
   FALLTHROUGH
 ;
-
-: forward
+: right
   (advance screen pointer)
   INCZ ZCURSORLO
   BNE 02
@@ -234,7 +233,7 @@
   (todo: check/fix OOB)
 ;
 
-: back
+: left
   (back screen pointer)
   LDAZ ZCURSORLO
   BNE 02
@@ -266,7 +265,27 @@
   (todo: check/fix OOB)
 ;
 
-
+: movx
+  BNE 01
+  RTS
+  right
+  DEX
+  JMPA &movx
+;
+: movy
+  BNE 01
+  RTS
+  down
+  DEY
+  JMPA &movy
+;
+  
+: gotoxy (using x=col, y=row!)
+  home
+  CPX# 00  movx
+  CPY# 00  movy
+;
+  
 (strings: ends with 0, or byte with high bit set)
 
 (strcpy has two functions:
@@ -761,11 +780,16 @@
 
   puts "THREE"
 
-  back back
+  left left
   puts "AB"
 
   down puts "^^"
   up puts "vv"
+
+  LDX# 02
+  LDY# 1b
+  gotoxy
+  puts "----------lower2col------"
 ;
 
 (todo: since don't have forward ref, this must be last!)
