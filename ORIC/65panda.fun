@@ -724,6 +724,52 @@
   BNE *drawt0
 ;
 
+= Zto 80 ;
+
+: printA
+  TAY LDA# 00 xpushAY xprint TYA
+;
+
+(panda002: simulated 1 upto 10)
+: panda002 (init)
+  LDA# 1
+  STAZ Zto
+  puts "-panda002-"
+  FALLTHROUGH ;
+: panda002a (loop)
+
+  (test)
+  LDAZ Zto
+  CMP# 0a
+
+  ( == or < )
+  BEQ 09
+  BCC 07
+
+  ( fail/end - implicit rts) ;
+: panda002to
+  INCZ Zto
+  JMPA &panda002a ;
+
+: panda002emit
+  (out TODO: call continuation)
+  printA
+  JMPA &panda002to
+;
+
+
+: panda001
+  LDX# 00
+  LDY# 05
+  gotoxy
+  puts "_______"
+  
+  LDA# 00
+  LDY# 2a
+  xpushAY
+  xprint
+;
+
 : main
   pandoric
   spandoric
@@ -790,6 +836,9 @@
   LDY# 1b
   gotoxy
   puts "----------lower2col------"
+
+  panda001
+  panda002
 ;
 
 (todo: since don't have forward ref, this must be last!)

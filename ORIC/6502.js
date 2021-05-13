@@ -1007,8 +1007,11 @@ EED7 RTS
           // zero terminated string
 	  // TODO: bug can't handle space!!!
 	  let i = 0;
-	  while(i<b.length && (m[a++] = b.charCodeAt(++i)) !== 34)
-	    console.log('= '+hex(2, m[a-1]));
+          while(i<b.length && (m[a++] = b.charCodeAt(++i)) !== 777) {
+            // TODO: obviously 777 is not right!, if set to 34 " then it skips last char
+            console.log('= '+hex(2, m[a-1]));
+	  }
+	      
 	  // make sure string is terminated
           if (b.charAt(b.length-1)!='"') {
             throw "%% Bug! Can't handle space in strings! LOL >"+ b +"<";
