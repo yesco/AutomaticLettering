@@ -724,21 +724,36 @@
   BNE *drawt0
 ;
 
-= Zto 80 ;
-
 : printA
   TAY LDA# 00 xpushAY xprint TYA
 ;
 
+= Zsqrinc 81 ;
+: sqrA (init)
+  STAZ Zsqrinc
+  TAX
+  FALLTHROUGH ;
+: sqrAa (test)
+  BNE 03
+
+  LDAZ Zsqr
+  RTS
+  
+  CLC
+  ADCZ Zsqrinc
+
+  DEX
+  JMPA &sqrAa
+;
+
+= Zto 80 ;
 (panda002: simulated 1 upto 10)
 : panda002 (init)
   LDA# 1
   STAZ Zto
   puts "-panda002-"
   FALLTHROUGH ;
-: panda002a (loop)
-
-  (test)
+: panda002a (test)
   LDAZ Zto
   CMP# 0a
 
