@@ -764,9 +764,24 @@
   INCZ Zto
   JMPA &panda002a ;
 
+(next with relative jump!)
+: panda002sqr
+  sqrA
+  FALLTHROUGH ;
+
+(next)
+: panda002lt ( lt 30 )
+  CMP# 24
+  BCC 03
+  (fail)
+  JMPA &panda002to
+
+  FALLTHROUGH ;
+
+(next)
 : panda002emit(
   (out TODO: call continuation)
-  printA sqrA printA
+  printA
   JMPA &panda002to
 ;
 
