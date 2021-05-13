@@ -194,6 +194,11 @@
 
 (------------------------------- system)
 
+: stop (loop forever)
+  LDA# 00
+  BEQ *stop
+;
+
 = SCREEN bb80 ;
 
 (screen cursor pointer)
@@ -206,24 +211,6 @@
 = ZSTRHI 03 ;
 = ZSTR 02 ; (only use indirect)
 
-: stop (loop forever)
-  LDA# 00
-  BEQ *stop
-;
-
-: putc
-  (write char)
-  LDY# 00
-  STAIY ZCURSOR
-
-  (advance screen pointer)
-  INCZ ZCURSORLO
-  BNE 02
-  INCZ ZCURSORHI
-
-  RTS
-;
-
 : home
   (reset screen ptr)
   LDA# _SCREEN
@@ -231,6 +218,54 @@
   LDA# ^SCREEN
   STAZ ZCURSORHI
 ;
+
+: putc
+  (write char)
+  LDY# 00
+  STAIY ZCURSOR
+  FALLTHROUGH
+;
+
+: forward
+  (advance screen pointer)
+  INCZ ZCURSORLO
+  BNE 02
+  INCZ ZCURSORHI
+  (todo: check/fix OOB)
+;
+
+: back
+  (back screen pointer)
+  LDAZ ZCURSORLO
+  BNE 02
+  DECZ ZCURSORHI
+
+  DECZ ZCURSORLO
+  (todo: check/fix OOB)
+;
+
+: up
+  SEC
+  LDAZ ZCURSORLO
+  SBC# 28
+  STAZ ZCURSORLO
+  LDAZ ZCURSORHI
+  SBC# 0
+  STAZ ZCURSORHI
+  (todo: check/fix OOB)
+;
+
+: down
+  CLC
+  LDA# 28
+  ADCZ ZCURSORLO
+  STAZ ZCURSORLO
+  LDA# 00
+  ADCZ ZCURSORHI
+  STAZ ZCURSORHI
+  (todo: check/fix OOB)
+;
+
 
 (strings: ends with 0, or byte with high bit set)
 
@@ -527,7 +562,7 @@
 
 : xdec
   DECZX 0
-  BNE 02
+  BNE 02 (possibly wrong)
   DECZX 1
 ;
 
@@ -725,6 +760,12 @@
   puts "foobar"
 
   puts "THREE"
+
+  back back
+  puts "AB"
+
+  down puts "^^"
+  up puts "vv"
 ;
 
 (todo: since don't have forward ref, this must be last!)
