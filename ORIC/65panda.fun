@@ -725,7 +725,7 @@
 ;
 
 : printA
-  TAY LDA# 00 xpushAY xprint TYA
+  PHA TAY LDA# 00 xpushAY xprint PLA
 ;
 
 = Zsqrinc 81 ;
@@ -734,15 +734,13 @@
   TAX
   FALLTHROUGH ;
 : sqrAa (test)
-  BNE 03
-
-  LDAZ Zsqr
+  DEX
+  BNE 01
   RTS
   
   CLC
   ADCZ Zsqrinc
 
-  DEX
   JMPA &sqrAa
 ;
 
@@ -766,9 +764,9 @@
   INCZ Zto
   JMPA &panda002a ;
 
-: panda002emit
+: panda002emit(
   (out TODO: call continuation)
-  printA
+  printA sqrA printA
   JMPA &panda002to
 ;
 
