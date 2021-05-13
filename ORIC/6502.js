@@ -986,13 +986,17 @@ EED7 RTS
 
   // define function, return #bytes used
   function deffun(name, body) {
-    let a = deffun[name] = deffun.nextAddr, start = a;
+    // lol, "funny" bug
+    if (name.match(/^[0-9a-f]{2,}$/)) {
+	throw "%% Function can't have name that is also hex chars)";
+    }
+    let a = deffun[name] = deffun.nextAddr;
+    let start = a;
     deffun[a] = name;
-    // TODO: change
-    deffun.nextAddr += 256;
     body = body.forEach(
       (b,i)=>{
-	process.stdout.write(`\t${name} ${i} ${b} ${a-start} `);
+        let aa = hex(4,a);
+	process.stdout.write(`\t${aa} ${name} ${i} ${b} ${a-start} `);
 	if (!b) return;
 	let v = parseInt(b, 16);
 	// TOOD: require $ prefix for hex?
@@ -1075,11 +1079,23 @@ EED7 RTS
     // change last jsr+rts to jmp!
     if (m[a-2] === 0x20) {
       m[a-2] = 0x4c; // jmp
+    } else if (!m[a-3] && !m[a-2] && !m[a-1]) {
+	// FALLTHROUGH
+	//m[--a] = 0xea; // nop
+
+	a -= 3;
+
+	console.log("FALLTHROUGH: ",a,start,a-start);
+	//process.exit(77);
     } else {
+      // add an RTS (hmmm)
       m[a++] = 0x60; // rts
     }
     let len = a - start;
     console.log('-->' + start.toString(16).padStart(4, '0') + ' len='+len);
+
+    // leave no gap for next function
+    deffun.nextAddr += len;
     return len;
   }
 
@@ -1174,11 +1190,17 @@ EED7 RTS
 
     // no rom, just "screen hardare"
     let t = 'PANDORIC';
+    let fn = process.argv[2] || PANDORIC;
+    console.log("FISH: ", fn);      
+
+    // fill screen with pattern
     //for(let i=0; i<t.length; i++)
     //m[SCREEN+40-t.length+i] = t.charCodeAt(i);
-    let f = fs.readFileSync(PANDORIC, 'utf8');
+    let f = fs.readFileSync(fn, 'utf8');
+
     // remove comments in ()
     f = f.replace(/\([\s\S]*?\)/g, ' ');
+
     // extract '=' alias
     let alias = {};
     f = f.replace(/=\s*(\S+)([\s\S]*?);/g, (a,f,l)=>{
