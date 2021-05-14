@@ -182,6 +182,12 @@ https://docs.google.com/document/d/16Sv3Y-3rHPXyxT1J3zLBVq4reSPYtY2G6OSojNTm4SQ/
 = SBCIX e1 ;
 = SBCIY f1 ;
 
+= ASL 0a ;
+= ASLZ 06 ;
+= ASLZX 16 ;
+= ASLA 0e ;
+= ASLAX 1e ;
+
 = LSR 4a ;
 = LSRZ 46 ;
 = LSRZX 56 ;
@@ -837,48 +843,167 @@ https://docs.google.com/document/d/16Sv3Y-3rHPXyxT1J3zLBVq4reSPYtY2G6OSojNTm4SQ/
   PHA TAY LDA# 00 xpushYA xprint PLA
 ;
 
-(basic function/1 A->A)
-= Zsqrinc 81 ;
-: sqrA (init)
-  STAZ Zsqrinc
-  TAX
-  FALLTHROUGH ;
-: sqrAa (test)
-  DEX
-  BNE 01
-  RTS
-  
-  CLC
-  ADCZ Zsqrinc
+( efficient 32-bit DEC32
+  - https://news.ycombinator.com/item?id=17275797)
 
-  JMPA &sqrAa
+( - https://llx.com/Neil/a2/mult.html )
+
+( 16x16 => 32 bit multiplication
+LDA #0       ;Initialize RESULT to 0
+STA RESULT+2
+LDX #16      ;There are 16 bits in NUM2
+L1:
+LSR NUM2+1   ;Get low bit of NUM2
+ROR NUM2
+BCC L2       ;0 or 1?
+TAY          ;If 1, add NUM1 (hi byte of RESULT is in A)
+CLC
+LDA NUM1
+ADC RESULT+2
+STA RESULT+2
+TYA
+ADC NUM1+1
+L2      
+ROR A        ;"Stairstep" shift
+ROR RESULT+2
+ROR RESULT+1
+ROR RESULT
+DEX
+BNE L1
+STA RESULT+3
+)
+
+( 16/16 divsion => 16,16
+LDA #0      ;Initialize REM to 0
+STA REM
+STA REM+1
+LDX #16     ;There are 16 bits in NUM1
+L1 :     
+ASL NUM1    ;Shift hi bit of NUM1 into REM
+ROL NUM1+1  ;(vacating the lo bit, which will be used for the quotient)
+ROL REM
+ROL REM+1
+LDA REM
+SEC         ;Trial subtraction
+SBC NUM2
+TAY
+LDA REM+1
+SBC NUM2+1
+BCC L2      ;Did subtraction succeed?
+STA REM+1   ;If yes, save it
+STY REM
+INC NUM1    ;and record a 1 in the quotient
+L2:
+DEX
+BNE L1
+)
+
+( leif stenson clever 8x8=>16 bits mult
+  19 bytes only! avg 130 cycles
+  - https://www.lysator.liu.se/~nisse/misc/6502-mul.html
+  same as:
+  - https://llx.com/Neil/a2/mult.html )
+= ZmulsLO 85 ;
+= ZmulsHI 86 ;
+
+: mulYA
+  STAZ ZmulsLO
+  STYZ ZmulsHI
+
+  LDA# 00 (hi result byte)
+  LDX# 08
+  LSRZ ZmulsLO
+  FALLTHROUGH ;
+: mulYAloop
+  BCC 03
+  CLC
+  ADCZ ZmulsHI
+  (no add)
+  ROR
+  RORZ ZmulsLO
+  DEX
+  BNE *mulYAloop
+
+  TAY
+  LDAZ ZmulsLO
 ;
 
-(handgenerated code for 1 to 10 sqr lt 30)
+: sqrA
+  TAY
+  JMPA &mulYA
+;
+
+= ZmulaLO 85 ;
+= ZmulaHI 86 ;
+= ZmulLO 87 ;
+= ZmulHI 88 ;
+= ZmulY 89 ;
+
+(russian peasant multiplication)
+: mulYAr (Y*A -> YA)
+  STAZ ZmulaLO
+  LDA# 00
+  STAZ ZmulaHI
+  STAZ ZmulLO
+  STAZ ZmulHI
+  STYZ ZmulY
+
+  FALLTHROUGH ;
+: mulYArl
+  (half)
+  LSRZ ZmulY
+  BCS 07 (bit 1 was set)
+  BNE 0d (0 => return)
+  LDAZ ZmulLO
+  LDYZ ZmulHI
+  RTS
+
+  (add)
+  CLC
+  LDAZ ZmulLO
+  ADCZ ZmulaLO
+  STAZ ZmulLO
+  LDAZ ZmulHI
+  ADCZ ZmulaHI
+  STAZ ZmulHI
+
+  (double)
+  ASLZ ZmulaLO
+  ROLZ ZmulaHI
+
+  JMPA &mulYArl
+;
+
+: sqrAr
+  TAY
+  JMPA &mulYAr
+;
+
+(handgenerated code for 1 to 15 sqr lt 180)
 = Zto 80 ;
 = tocontJMP 0082 ; (jmp instruction)
 = Ztocont 83 ; (continuation)
 = ZtocontLO 83 ;
 = ZtocontHI 84 ;
-(panda002: simulated 1 upto 10)
+(panda002: simulated 1 upto 255)
 : panda002 (init)
 
   (init jmpa location)
   LDA# 4c
   STAA tocontJMP
+
   LDA# 08
   STAZ ZtocontHI
   LDA# 9b
- ( LDA# 49 )   (pandoric)
   STAZ ZtocontLO
 
+  (init loop)
   LDA# 1
   STAZ Zto
-  puts "-panda002-"
   FALLTHROUGH ;
 : panda002a (test)
   LDAZ Zto
-  CMP# 0a
+  CMP# 0f (15)
 
   ( == or < )
   BEQ 09
@@ -896,7 +1021,7 @@ https://docs.google.com/document/d/16Sv3Y-3rHPXyxT1J3zLBVq4reSPYtY2G6OSojNTm4SQ/
 
 (next)
 : panda002lt ( lt 30 )
-  CMP# 24
+  CMP# b4 ( 180 )
   BCC 03
   (fail)
   JMPA &panda002to
@@ -934,15 +1059,6 @@ https://docs.google.com/document/d/16Sv3Y-3rHPXyxT1J3zLBVq4reSPYtY2G6OSojNTm4SQ/
   JMPA tocontJMP      ( NOT )
 
   (-it'll do RTS back to here!)
-
-  printA
-  puts "-RESULT---"
-
-  LDAZ ZtocontLO
-  LDYZ ZtocontHI
-  xpushYA
-  xhprint
-
   JMPA &panda002to
 ;
 
@@ -1033,11 +1149,6 @@ https://docs.google.com/document/d/16Sv3Y-3rHPXyxT1J3zLBVq4reSPYtY2G6OSojNTm4SQ/
   STAZ ZtocontLO
   LDA# _printA
   STAZ ZtocontHI
-
-  LDAZ ZtocontLO
-  LDYZ ZtocontHI
-  xpushYA
-  xhprint
 
   panda002
 ;
