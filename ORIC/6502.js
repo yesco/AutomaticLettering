@@ -1206,8 +1206,12 @@ EED7 RTS
     //m[SCREEN+40-t.length+i] = t.charCodeAt(i);
     let f = fs.readFileSync(fn, 'utf8');
 
-    // remove comments in ()
-    f = f.replace(/\([\s\S]*?\)/g, ' ');
+    // remove comments in () nesting ok
+    let ff;
+    do {
+      ff = f;
+      f = f.replace(/\([^\(\)]*?\)/g, ' ');
+    } while (ff != f);
 
     // extract '=' alias
     let alias = {};

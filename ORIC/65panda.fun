@@ -1,5 +1,97 @@
-(opcodes with named addressed modes)
-(xxx#	- immediate #const
+(--- .fun files
+
+I tried to find various 6502 assemblers,
+but many are PC oriented, or don't exist
+in source code form for linux.
+
+So... write your own, included in the
+JS-6502 simulator.
+
+It's a simple macro assembler, that
+basically just produces a stream of bytes.
+
+It's really stupid; it doesn't select
+op-codes depending on the arguments but
+instead you need to be specific:
+
+Normal 6502	Simplified form
+-----------	---------------
+INX		INX
+LDA #$12	LDA# 12
+STA $4711,X	STAAX 4711
+STA ($4711),X	STAIX 4711
+STA ($4711),Y   STAIX 4711
+
+Note that 4 character values, or addresses,
+are changed to the little-endian.
+These are the same:
+
+STA $4711,X	STAAX 4711
+STA $4711,X	STAAX 11 47
+
+"macros" are substituted by name,
+recursively:
+
+= INX2 INX INX ;
+
+= fourbytes 11 22 33 44 ;
+= eightbytes fourbytes fourbytes ;
+= sixteenbytes eightbytes eightbytes ;
+
+The same defined as a "function":
+
+: INX2
+  INX
+  INX
+;
+
+NOTE: I call it "functions" as RTS is
+added at the end, unless it ends with
+"FALLTHROUGH":
+
+So they are basically labels, but when
+referred to automatically generates
+JSR label, that's why I call them
+functions.
+
+Notice, how, below, it doesn't matter
+if INX2 is a "function" or a macro;
+that is the benefit of this way.
+
+: INX4
+  INX2
+  FALLTHROUGH ;
+: INX2
+  INX
+  INX
+;
+
+NOTE: parenthesis are comments and
+cannot be nested, LOL.
+
+=== address value manipulations ===
+Other functions:
+_4711	=>	11
+^711	=>	47
+*4711	=>	relative addressing
+                -> 1 byte
+&label	=>	4 byte address from label,
+		and it doesn't do JSR.
+
+label+12 =>	add decimal 12 to 4 byte label value
+label-7	=>	subtract dec12 from label
+
+Cannot be used as 4711+12, even if it
+read FOOADDR+12. TODO maybe?
+)
+
+(--- SAN - the Simple Assembly Notation
+
+https://docs.google.com/document/d/16Sv3Y-3rHPXyxT1J3zLBVq4reSPYtY2G6OSojNTm4SQ/edit?usp=drivesdk
+)
+
+(--- opcodes with named addressed modes)
+(xxx#	- immediate #const)
 (xxxZ	- ZeroPage)
 (xxxZX	- ZeroPage + X)
 (xxxA	- Address)
@@ -8,6 +100,7 @@
 (xxxIX	- *[IndexedAddress + X])
 (xxxIY	- *[Indexed Address] + Y)
 
+(--- basic 6502 instructions)
 = PHP 08 ;
 = PHA 48 ;
 = PLA 68 ;
@@ -42,7 +135,7 @@
 = STXA 8e ;
 
 = LDY# a0 ;
-= LDYZ 44 ;
+= LDYZ a4 ;
 = LDYZX b4 ;
 = LDYA ac ;
 = LDYAX bc ;
@@ -519,6 +612,21 @@
   LDAZ ZSTR puthn
 ;
 
+(alt: many data stacks
+ - zero page
+ STAZX LDAZX INX DEX = data stack below
+ STXZY LDXZY INY DEY
+ STYZX LDYZX INX DEX
+ - using fixed position = static vars
+ STAX LDAX INX DEX
+ STAY LDAY INY DEY
+ - using a changable "stack base" pointer
+ STAIY LDAIY INY DEY
+
+ - using an array of base stack pointers?
+ STAIX LDAIX
+)
+
 (data stack on page 0,
  starting at $ff, growing downwards,
  at $ff, store current stack pointer X,
@@ -546,13 +654,14 @@
   INX2
 ;
   
-: xpushAY (6 bytes)
+( YA = 2 byte integer, Y=hi, A=lo )
+: xpushYA (6 bytes)
   DEX2
   STAZX 1 (hi)
   STYZX 0 (lo)
 ;
 
-: xpullAY
+: xpullYA
   LDAZX 1
   LDYZX 0
   INX2
@@ -655,7 +764,7 @@
   ADC# 00
   STAZ ZSTRHI
 
-  xpushAY
+  xpushYA
 
   (generate return address)
   INY (lo)
@@ -725,9 +834,10 @@
 ;
 
 : printA
-  PHA TAY LDA# 00 xpushAY xprint PLA
+  PHA TAY LDA# 00 xpushYA xprint PLA
 ;
 
+(basic function/1 A->A)
 = Zsqrinc 81 ;
 : sqrA (init)
   STAZ Zsqrinc
@@ -744,9 +854,24 @@
   JMPA &sqrAa
 ;
 
+(handgenerated code for 1 to 10 sqr lt 30)
 = Zto 80 ;
+= tocontJMP 0082 ; (jmp instruction)
+= Ztocont 83 ; (continuation)
+= ZtocontLO 83 ;
+= ZtocontHI 84 ;
 (panda002: simulated 1 upto 10)
 : panda002 (init)
+
+  (init jmpa location)
+  LDA# 4c
+  STAA tocontJMP
+  LDA# 08
+  STAZ ZtocontHI
+  LDA# 9b
+ ( LDA# 49 )   (pandoric)
+  STAZ ZtocontLO
+
   LDA# 1
   STAZ Zto
   puts "-panda002-"
@@ -779,9 +904,45 @@
   FALLTHROUGH ;
 
 (next)
-: panda002emit(
-  (out TODO: call continuation)
+: panda002emit (call continuation)
+  ( printA JMPA &panda002to )
+
+  (-fake a return address below JMPI)
+  TAY
+
+  LDA# _panda002emit
+  CLC
+
+  ADC# 11
+  TAX
+
+  LDA# ^panda002emit
+  ADC# 00
+  PHA
+  TXA PHA
+
+  TYA
+  
+  (-call print/emit = with ADC# 11
+    here can be only 3 bytes!)
+
+  (JSRA &printA)        ( works! )
+  (printA)              ( same )
+  (JSRA 089b)		( same )
+
+  (RTS BRK BRK)         ( test bytes )
+  JMPA tocontJMP      ( NOT )
+
+  (-it'll do RTS back to here!)
+
   printA
+  puts "-RESULT---"
+
+  LDAZ ZtocontLO
+  LDYZ ZtocontHI
+  xpushYA
+  xhprint
+
   JMPA &panda002to
 ;
 
@@ -794,7 +955,7 @@
   
   LDA# 00
   LDY# 2a
-  xpushAY
+  xpushYA
   xprint
 ;
 
@@ -806,8 +967,8 @@
   LDA# 44
   LDY# 88
 
-  xpushAY
-  xpushAY
+  xpushYA
+  xpushYA
 
   LDA# 'x' putc
   xhprint
@@ -815,24 +976,24 @@
 
   LDA# 00
   LDY# 00
-  xpushAY
-  xpushAY
+  xpushYA
+  xpushYA
   LDA# 'x' putc
   xhprint
   (xprint)
   
   LDA# 23
   LDY# 45
-  xpushAY
-  xpushAY
+  xpushYA
+  xpushYA
   LDA# 'x' putc
   xhprint
   (xprint)
 
   LDA# ff
   LDY# ff
-  xpushAY
-  xpushAY
+  xpushYA
+  xpushYA
   LDA# 'x' putc
   xhprint
   (xprint)
@@ -866,6 +1027,18 @@
   puts "----------lower2col------"
 
   panda001
+
+  (continuation to be called)
+  LDA# ^printA
+  STAZ ZtocontLO
+  LDA# _printA
+  STAZ ZtocontHI
+
+  LDAZ ZtocontLO
+  LDYZ ZtocontHI
+  xpushYA
+  xhprint
+
   panda002
 ;
 
