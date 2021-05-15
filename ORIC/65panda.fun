@@ -843,8 +843,92 @@ https://docs.google.com/document/d/16Sv3Y-3rHPXyxT1J3zLBVq4reSPYtY2G6OSojNTm4SQ/
   PHA TAY LDA# 00 xpushYA xprint PLA
 ;
 
+(-----------------------------)
+(--- panda style functions ---)
+
+(- temporary zero page storage )
+= Za 80 ; (use in fun that no call other)
+= Zb 81 ;
+= Zc 82 ;
+
+= Zaa 83 ;
+= ZaaLO 83 ;
+= ZaaHI 84 ;
+
+= Zbb 85 ;
+= ZbbLO 85 ;
+= ZbbHI 86 ;
+
+= Zcc 85 ;
+= ZccLO 85 ;
+= ZccHI 86 ;
+
 ( efficient 32-bit DEC32
   - https://news.ycombinator.com/item?id=17275797)
+
+: addx0  INX  BNE 01 INY ;
+: addx1  addx0  addx0 ;
+: addx2  addx1  addx1 ;
+: addx3  addx2  addx2 ;
+: addx4  addx3  addx3 ;
+: addx5  addx4  addx4 ;
+: addx6  addx5  addx5 ;
+: addx7  addx6  addx6 ;
+
+: addpeano (YX + A -> YX)
+  LSR  BCC 03  addx0
+  LSR  BCC 03  addx1
+  LSR  BCC 03  addx2
+  LSR  BCC 03  addx3
+  LSR  BCC 03  addx4
+  LSR  BCC 03  addx5
+  LSR  BCC 03  addx6
+  LSR  BCC 03  addx7
+;
+
+: swapAY
+  TAX
+  TYA
+  PHA
+  TXA
+  TAY
+  PLA
+;
+
+: printYA
+  swapAY
+  dostack
+  xpushYA xprint
+  endstack
+;
+
+: addtest
+  home
+  puts "---ADDTEST---"
+  
+  LDY# 04
+  LDX# 01
+  LDA# 05
+
+  addpeano
+  TXA
+
+  printYA
+
+  puts "______________"
+  
+  puts "-addtest---"
+;
+
+: mulYApeano (Y + A -> YA)
+  PHA
+  TAX
+  TYA
+  PHA
+
+  LDY# 00
+  addpeano (0X + A -> YX)
+;
 
 ( - https://llx.com/Neil/a2/mult.html )
 
@@ -1114,6 +1198,8 @@ BNE L1
   xhprint
   (xprint)
 
+  endstack
+
   puts "ONE"
 
   puts "TWO"
@@ -1151,6 +1237,8 @@ BNE L1
   STAZ ZtocontHI
 
   panda002
+
+  addtest
 ;
 
 (todo: since don't have forward ref, this must be last!)
