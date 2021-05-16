@@ -305,7 +305,7 @@ https://docs.google.com/document/d/16Sv3Y-3rHPXyxT1J3zLBVq4reSPYtY2G6OSojNTm4SQ/
   - pascal ascii name (1B len + chars)
   - lenB DATA/parameters/const/variables
   - (':' - optional to identify code)
-  - CODE (may not always be possible)
+  - CODE: optional (@pointer code)
 
   The name is a pascal string; 1 byte
   length followed by characters, no \0.
@@ -327,6 +327,13 @@ https://docs.google.com/document/d/16Sv3Y-3rHPXyxT1J3zLBVq4reSPYtY2G6OSojNTm4SQ/
   
   - https://www.forth.com/starting-forth/9-forth-execution/
 )
+
+= 
+: addict (add name to dictionary)
+;
+
+: findict (find a name in dictioary)
+;
 
 (--- SYSTEM ---)
 

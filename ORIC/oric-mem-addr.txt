@@ -1,0 +1,292 @@
+----------------------------------------
+2.2 Memory map of BASIC
+----------------------------------------
+
+BASIC is rather greedy on the RAM – here is how it uses its memory:
+
+----------------------------------------
+
+#0000 – #00FF – almost all is used by BASIC – see Chapter 5.
+#0100 – #010F – used when converting floating-point numbers to strings.
+#0110 – #01FF – the normal 6502 stack area.
+#0200 – #02FF – partially used by the non-standard parts of BASIC (e.g., DRAW and MUSIC).
+#0300 – #03FF – an input/output area used by the 6522. This is not RAM.
+#0400 – #04FF – not used by BASIC – reserved for use with the disk system.
+#0501 – ( #9C) – 1 – the BASIC program occupies memory as far as indicated by the address in locations #9C and #9D.
+( #9C) – ( #9E) – 1 – any simple numeric variables are stored here, long with the identification of each string variable.
+( #9E) – ( #A0) – 1 – numeric arrays are stored in this area, along with the identification of string arrays.
+( #AO) – ( #A2) – this area of memory is unused. It can be seen that pointer #A0 reaches up to meet pointer #A2 coming down.
+(gA2)+1 – (#A6) – this area is used for storing both permanent and temporary strings of data. Temporary strings are only clearedwhen there is no more room below #A2, or when the FRE function is used.
+
+#9800 – #9BFF – a copy of the standard character set is created here when a HIRES command is executed.
+#9C00 – #9FFF – a copy of the alternate character set is moved here
+for use in HIRES.
+#A000 – #BFDF – video memory used in HIRES mode.
+#B400 – #B7FF – the standard character set when in TEXT mode.
+gB800 – #BBFF – the alternate character set when in TEXT mode.
+#BB80 – #BFDF – the video memory when in TEXT mode. Note that this overlaps part of the alternate character set.
+# BFEO – #BFFF – unused.
+
+----------------------------------------
+--- MEMORY MAP TEXT vs HIRES (jsk)
+
+(+ 5120 1024 896 1000)
+
+---		size	TEXT	HIRES
+#9800-#9bff	1024	-	std
+#9c00-#9fff	1024		alt
+#a000-		5120		graphics, 8000bytes-
+#b400-#bf77	1024	std	graphics
+#b800-#bbff	896*	alt-112	graphics
+#bb80-#bfdf	1000	25x40   graphics
+#bf40-#bf67	40	?	greahics, -end
+#bf68-#bfdf     223	3*40    3*40 (@49000!)
+#bfe0-#bfff	32	-	-
+
+HIRES graphics:
+(- #xbfe0 #xa000) 8160 = 8000+120+40!
+
+----------------------------------------
+Page 0 Allocation
+----------------------------------------
+
+This page of memory (between #0000 and #00FF) is used to store most of the variables used by 
+BASIC and a few of those used by the operating system. Many of the locations are used for more 
+than one purpose, those without comments are not used. The use of each memory location is the 
+same for the Oric-1 and Atmos unless otherwise indicated. This is done by indicating the ROM 
+version of the computer to which the description is applicable. The version number is written at the 
+top of the screen on power up.
+----------------------------------------
+$00-$0B 
+$0C,$0D Indirect pointer for screen and Hex number construction area. 
+$0E,$0F Indirect pointer for the screen. 
+$10,$11 Address of hires cursor. 
+$12,$13 Address of text cursor. 
+$14—$16 Expression workspace. 
+$17 Set to 1 if CTRL C pressed, otherwise 0. 
+$18,$19 Tokenising pointer. 
+$1A—$1C Jump location to print 'Ready'. 
+$1D,$1E Counter for searching through lines of program. 
+$1F,$20 Calculation of cursor address. 
+$21—$23 Jump location for USR command. 
+$24—$26 Expression workspace. 
+$27 Temporary storage — often for characters being printed. 
+$28 Set to #FF if dealing with strings. 
+$29 Bit 7 is set if using integer variable. 
+$2A Garbage collection flag or flag for skipping through DATA 
+statements. 
+$2B Bit 7 when set inhibits the use of integers. Bit 6 when set 
+indicates STORE or RECALL commands in use. 
+$2C Zero if REDOing input FROM START. 
+$2D Temporary storage for expression evaluator. 
+$2E CTRL O flag. 0 if output to screen enabled. 
+$2F Next byte to/from cassette. 
+$30 Cursor position for Basic printout. 
+$31 Screen line width. 
+$32 8 - multiple line width. 
+$33,$34 Integer values to/from main floating point accumulator. 
+$35-$84 Input buffer. (79 bytes) 
+$35-$48 Name of program required for CLOAD (V1.0 only). 
+$49-$5D Name of program just loaded (V1.0 only). 
+$5F,$60 Start address of data to/from tape (V1.0 only). 
+$61,$62 End address of data to/from tape (V1.0 only). 
+$63 1 when using AUTO else 0 (V1.0 only). 
+$64 0 for Basic, 1 for machine code (Vl.0 only). 
+$67 Tape speed - 0 fast, 1 slow (Vl.0 only). 
+$85 String block stack pointer. 
+$86,$87 Address of top active string in memory. 
+$88-$90 Temporary string stack. 
+$91,$92 String address pointer. 
+$93,$94 General memory pointer. 
+$95—$99 Work area for multiply and divide routines.
+$9A,$9B Start of Basic pointer. 
+$9C,$9D End of Basic pointer. 
+$9E,$9F End of variables pointer. 
+$A0,$A1 End of Arrays pointer. 
+$A2,$A3 Bottom of string area pointer. 
+$A4,$A5 Work pointer for allocating strings.
+
+
+$A6,$A7 Himem. 
+$A8,$A9 Current line number, top byte is #FF if in command mode. 
+$AA,$AB Previous line number. 
+$AC,$AD Last line start address. 
+$AE,$AF Temporary copy of line number. 
+$B0,$B1 Data pointer. 
+$B2,$B3 Data pointer. 
+$B4,$B5 Last variable name accessed. 
+$B6,$B7 Address of last variable value accessed. 
+$B8,$B9 Destination pointer for temporary assignment of variable. 
+$BA Temporary storage for expression evaluator. 
+$BB,$BC 
+$BD—$C1 Temporary storage of floating point accumulator. 
+$BD,$BE FN (function) pointer. 
+$BF,$C0 String pointer. 
+$C2 String pointer size, used in Garbage Collection. 
+$C3—$C5 Jump location to evaluate numeric functions. $C5 also used as a 
+temporary store of the rounding byte for mathematical operations. 
+$C6—$CA Temporary storage of floating point accumulator. 
+$C7,$C8 Pointer. 
+$C9,$CA Pointer. 
+$CB—$CF Temporary storage of floating point accumulator. 
+$CE,$CF Pointer for STORE. 
+$D0 Exponent of main floating point accumulator. 
+$D1—$D4 Mantissa of main floating point accumulator. 
+$D5 Sign of mantissa for main FPA when unpacked. 
+$D6 Series evaluation counter. 
+$D7 Sign extend byte. 
+$D8 Exponent of work floating point accumulator. 
+$D9—$DC Mantissa of work floating point accumulator. 
+$DD Sign of mantissa for work FPA when unpacked. 
+$DE,$DF String pointer. 
+$DE Holds Exclusive OR of sign byte of both FPAs. 
+$DF Rounding byte for calculations. 
+$E0,$E1 Array and string workspace. 
+$E2—$F2 Routine to step through program to find next non space char. See 
+$EC9C of disassembly. 
+$E9,$EA Position pointer in program. 
+$F3-$F9 
+$FA—$FE Copy of floating point number used by RND. 
+$FF Used in number to string conversion.
+----------------------------------------
+Appendix D
+
+Page 2 Allocation
+
+This page of memory (between #0200 and #02FF) is used to store most of the variables used by the 
+operating system and a few of those used by BASIC. Many of the locations are used for more than 
+one purpose, those without comments are not used. The use of each memory location is the same 
+for the Oric-1 and Atmos unless otherwise indicated. This is done by indicating the ROM version 
+of the computer to which the description is applicable. The version number is written at the top of 
+the screen on power up. 
+Address Function
+----------------------------------------
+$200,$201 Pointer for screen handling. 
+$202,$203 Pointer for screen handling. 
+$204-$207 Work bytes for Hires routines. 
+$208 Key address if pressed — #38 if no key pressed. 
+$209 Key status, 
+ #38 - Default, 
+ #A2 - CONTROL, 
+ #A4 - Left SHIFT, 
+ #A5 - FUNCTION (Atmos only), 
+ #A7 - Right SHIFT. 
+$20A Saved key column for repeat. 
+$20B Not used but gets written over by routine that sets $208 - $20A. 
+$20C Bit 7 is set if CAPS is on otherwise clear. 
+$20D 
+$20E Repeat counter for keyboard. 
+$20F 
+$210 Temporary store of row of key being tested for repeat. 
+$211 Temporary store of keyboard row during strobe routine. 
+$212 Holds FB code in hires commands. 
+$213 Pattern data for hires screen. 
+$214 Temporary copy of pattern byte for drawing lines. 
+$215 Holds position of pixel in byte corresponding to position of 
+cursor on hires screen. 
+$216,$217 Temporary store of hires X and Y cursor positions. 
+$218 Temporary store for content of $215. 
+$219 Hires cursor — X coordinate. 
+$21A Hires cursor — Y coordinate. 
+$21B-$21E 
+$21F 0 - LORES, 1 - HIRES. 
+$220 0 - 48K Oric, 1 - 16K Oric. 
+$221-$227 
+$228-$22A Jump to IRQ routine (V1.0). 
+$22B-$22D Jump to NMI routine (V1.0). 
+$22E,$22F 
+$230 RTI instruction (V1.0). 
+$231-$237 
+$238-$23A Jump to PRINT CHARACTER on screen (V1.1).
+$23B-$23D Jump to GET KEY routine (V1.1). 
+$23E-$240 Jump to SEND BYTE TO PRINTER (V1.1). 
+$241-$243 Jump to PRINT TO STATUS LINE (V1.l). 
+$244-$246 Jump to IRQ routine (Vl.l). 
+$247-$249 Jump to NMI routine (Vl.l). 
+$24A—$24C RTI instruction which can be intercepted by a jump (Vl.l). 
+$24D Tape speed, 0 - fast, 1 - slow (Vl.l). 
+$24E Keyboard initial repeat deiay (V1.l). 
+$24F Keyboard successive repeat delay (V1.1). 
+$250 
+$251 Cursor enabie in CTRL routines (Vl.l).
+
+$252 ELSE pending flag, 1 - on, 0-off (Vl.l). 
+$253-$255 
+$256 Printer width (Vl.l). 
+$257 Screen width (Vl.l). 
+$258 Printer cursor position (V1.1). 
+$259 Screen cursor position (V1.1). 
+$25A Cassette JOIN flag, off when 0 (V1.1). 
+$25B Cassette VERIFY flag, off when 0 (Vl.l). 
+$25C,$25D Cassette verify error counter (Vl.l). 
+$25E 
+$25F,$260 Contains 1 byte messages printed to status line. 
+$261,$262 Indirect jump for CTRL character routine.
+$263,$264 Temporary storage. 
+$265 Current cursor state indicator, 0 - off, 1 — on. 
+$266,$267 
+$268 Cursor row number, (status line is row 0). 
+$269 Cursor column position. 
+$26A Flag byte. 
+ Bit Flag function when bit is set to 1. 
+ 0 Cursor on. 
+ 1 Printout to screen enabled. 
+ 2 Unused. 
+ 3 Disable keyciick. 
+ 4 Previous printed character was ESC 
+ 5 Protect columns 0 and 1 of screen. 
+ 6 Double height characters. 
+ 7 Unused. 
+$26B Paper colour (+16). 
+$26C Ink colour. 
+$26D,$26E Start address of screen memory. 
+$26F Number of text lines available on screen (V1.0). 
+$270 Cursor on/off flag. 
+$271 Cursor invert flag. 
+$272,$273 Keyboard timer. 
+$274,$275 Cursor timer. 
+$276,$277 Spare counter — also used by WAIT (and printer in V1.0). 
+$278,$279 Address of second line on screen (V1.1). 
+$27A,$27B Address of first line on screen (V1.1). 
+$27C,$27D Number of characters normally used in screen scrolling, 
+26 x 40 – 1,040 or #410 (V1.1). 
+$27E Number of rows of text available (V1.1). 
+$27F-$28F Name of program to be loaded off cassette (V1.1). 
+$290-$292 
+$293-$2A3 Name of file just loaded off cassette (Vl.l). 
+$2A4-$2A8 
+$2A9,$2AA Start address of data for / from cassette (Vl.l). 
+$2AB,$2AC End address of data for/from cassette (Vl.l). 
+$2AD Auto indicator, 0 is off (Vl.l). 
+$2AE Program type. 
+$2AF Array type-copy of $28(Vl.l). 
+$2B0 Array type - copy of $29 (V1. 1). 
+$2B1 Bit 7 set to 1 if format error. 
+$2B2-$2BF 
+$2C0 Screen status, 0=GRAB, 2=TEXT and 3=HIRES. 
+$2C1,$2C2 Char set start address in HIRES mode (V1.1). 
+$2C3 Cursor movement in hires, 0 = Absolute, 1 = 
+$2C4-$2DE 
+$2DF Latest key from keyboard. Bit 7 set if valid. 
+$2E0 Non zero if error in Sound / Graphics routines. 
+$2E1,$2E2 First parameter location for the sound and graphics commands 
+(including INK and PAPER). Lower byte of integer is at $02E1.
+
+$2E3,$2E4 Second parameter location for the sound and graphics commands. 
+Lower byte of integer is at $2E3. 
+$2E5,$2E6 Third parameter location for the sound and graphics commands. 
+Lower byte of integer is at $2E5. 
+$2E7,$2E8 Fourth parameter location which is only used by MUSIC and PLAY. 
+Lower byte of integer is at $2E7. 
+$2E9-$2F0 
+$2F1 Bit 7 set to 1 if printer enabled. 
+$2F2 Bit 7 is EDIT flag, set to 1 when on. 
+$2F3 
+$2F4 TRACE flag, set if bit 7 is set. 
+$2F5,$2F6 Indirect jump for '!' routine. 
+$2F7 
+$2F8 Temporary row indicator for PLOT. 
+$2F9,$2FA 
+$2FB-$2FD Jump to '&' routine. 
+$2FE-$2FF
+----------------------------------------
