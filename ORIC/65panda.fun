@@ -291,6 +291,43 @@ https://docs.google.com/document/d/16Sv3Y-3rHPXyxT1J3zLBVq4reSPYtY2G6OSojNTm4SQ/
 
 = FALLTHROUGH 00 00 00 ;
 
+(--- COMPILATION ---)
+
+(dictionary implementation sketch:
+  Inspired by forth (see ref at end).
+  The dictionary is a linked list,
+  where the last added word is first.
+
+  Fields:
+  - 2B pointer to previous word
+  - 2B pointer to address of code
+  - 1B len of datafield (max 255)
+  - pascal ascii name (1B len + chars)
+  - lenB DATA/parameters/const/variables
+  - (':' - optional to identify code)
+  - CODE (may not always be possible)
+
+  The name is a pascal string; 1 byte
+  length followed by characters, no \0.
+  (upper 3 bits can be various info,
+  this gives 5 bits =  32 length names.
+
+  I like the idea of having the name
+  directly preceeding, makes for fun to
+  read memory dumps for debugging?
+  
+  However, a problem here is that we may
+  have optimized FALLTHROUGH code, and
+  unless we generate code to skip to CODE
+  it's not going to "work". But then,
+  it's no longer efficient, is it?
+
+  Also, it wouldn't fit in ROM, as DATA
+  (variables) need to be in RAM (?).
+  
+  - https://www.forth.com/starting-forth/9-forth-execution/
+)
+
 (--- SYSTEM ---)
 
 : stop (loop forever)
@@ -411,20 +448,9 @@ https://docs.google.com/document/d/16Sv3Y-3rHPXyxT1J3zLBVq4reSPYtY2G6OSojNTm4SQ/
 ;
 
 : movx
-  BNE 01
-  RTS
-  right
-  DEX
-  JMPA &movx
-;
-: movy
-  BNE 01
-  RTS
-  down
-  DEY
-  JMPA &movy
-;
-  
+  TXA  PHA
+  FALLTHROUGH ;
+
 : gotoxy (using x=col, y=row!)
   home
 
@@ -433,12 +459,22 @@ https://docs.google.com/document/d/16Sv3Y-3rHPXyxT1J3zLBVq4reSPYtY2G6OSojNTm4SQ/
   STXA CURCOL
   STXZ ZCURCOL
 
-  (move cursor step by step)
-  (TODO: make more efficent)
-  CPX# 00  movx
-  CPY# 00  movy
+  LDAZ ZCURSORLO
+  CLC
+  ADC# 28	
+
+  NOP NOP NOP NOP NOP
+  INCZ ZCURSORHI
+
+( any code added here doesnt work? )
+(
+  BCC 02
+  INCZ ZCURSORHI
+)
+
+  STAZ ZCURSORLO
 ;
-  
+
 : cls
 RTS
   home
@@ -1550,15 +1586,23 @@ BNE L1
   
   main
 
-  (prompt)
-  LDY# 10   LDX# 00  gotoxy
-  LDA# '>'  putc
   FALLTHROUGH ;
 
 : readevalloop  
+  (prompt)
+  LDY# 10   LDX# 00  gotoxy
+  LDA# '>'  putc
+
   readline
-  puts "<<<<<<<<<DONE!!!!!"
-  (JMPA &readevalloop)
+
+  puts "<<<"
+
+  LDX# 05
+  LDYA CURROW
+  INY
+  gotoxy
+
+  JMPA &readevalloop
   
   stop
 ;
