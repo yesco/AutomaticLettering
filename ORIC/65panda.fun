@@ -291,24 +291,38 @@ https://docs.google.com/document/d/16Sv3Y-3rHPXyxT1J3zLBVq4reSPYtY2G6OSojNTm4SQ/
 
 = FALLTHROUGH 00 00 00 ;
 
-(------------------------------- system)
+(--- SYSTEM ---)
 
 : stop (loop forever)
   LDA# 00
   BEQ *stop
 ;
 
-= SCREEN bb80 ;
+= SCREENPTR 026d ; (TODO: use)
+= SCREEN bb80 ; (content)
+= CURROW 0268 ;
+= CURCOL 0269 ; (or address 30)
+                (40 == address 31)
+= ZCURCOL 30 ;
+= ZCURWID 31 ;
 
-(screen cursor pointer)
-= ZCURSORLO 00 ;
-= ZCURSORHI 01 ;
-= ZCURSOR 00 ; (only use indirect)
+= PAPER 028b ;
+= INK 026c ;
+
+(- screen cursor pointer)
+(ORIC:
+  $12,$13 Address of text cursor. 
+  $259 Screen cursor position (V1.1). 
+  $265 Current cursor state indicator, 0 - off, 1 — on.
+)
+= ZCURSORLO 12 ;
+= ZCURSORHI 13 ;
+= ZCURSOR 12 ; (only use indirect)
 
 (used for copying strings)
-= ZSTRLO 02 ;
-= ZSTRHI 03 ;
-= ZSTR 02 ; (only use indirect)
+= ZSTRLO 00 ;
+= ZSTRHI 01 ;
+= ZSTR 00 ; (only use indirect)
 
 : home
   (reset screen ptr)
@@ -316,19 +330,51 @@ https://docs.google.com/document/d/16Sv3Y-3rHPXyxT1J3zLBVq4reSPYtY2G6OSojNTm4SQ/
   STAZ ZCURSORLO
   LDA# ^SCREEN
   STAZ ZCURSORHI
+
+  (update cursor pos)
+  LDA# 00
+  STAA CURROW
+  STAA CURCOL
+  STAZ ZCURCOL
 ;
 
-: putc
+: scroll
+  (TODO: implement!)
+  (for now, just wrap around?)
+
+  home
+;
+
+: putc (register A retained, Y trashed)
   (write char)
   LDY# 00
   STAIY ZCURSOR
-  FALLTHROUGH
-;
+  FALLTHROUGH ;
+
 : right
   (advance screen pointer)
   INCZ ZCURSORLO
   BNE 02
   INCZ ZCURSORHI
+
+  (update cursor pos)
+  INCA CURCOL
+
+  LDYZ ZCURCOL
+  INY
+  STYZ ZCURCOL
+
+  CPY# 28 (TODO: use ZCURWID, init)
+  BNE 0a
+  INCA CURROW
+  LDA# 00
+  STAA CURCOL
+  STAZ ZCURCOL
+
+  CMP# 1c
+  BNE 03
+  scroll
+  
   (todo: check/fix OOB)
 ;
 
@@ -381,10 +427,47 @@ https://docs.google.com/document/d/16Sv3Y-3rHPXyxT1J3zLBVq4reSPYtY2G6OSojNTm4SQ/
   
 : gotoxy (using x=col, y=row!)
   home
+
+  (update cursor pos)
+  STYA CURROW
+  STXA CURCOL
+  STXZ ZCURCOL
+
+  (move cursor step by step)
+  (TODO: make more efficent)
   CPX# 00  movx
   CPY# 00  movy
 ;
   
+: cls
+RTS
+  home
+
+  (todo use generic fill routine?)
+
+  LDY# 1c (28 rows)
+  FALLTHROUGH ;
+: clsyloop  
+  LDX# 28 (40 cols)
+  FALLTRHOUGH ;
+: clsxloop  
+
+  TXA PHA
+  TYA PHA
+    LDA# 32  putc
+  PLA TAY
+  PLA TAX
+
+  DEX
+  BNE *clsxloop
+  DEY
+  BNE *clsyloop
+
+  home
+;
+
+(- strings -)
+
 (strings: ends with 0, or byte with high bit set)
 
 (strcpy has two functions:
@@ -618,6 +701,83 @@ https://docs.google.com/document/d/16Sv3Y-3rHPXyxT1J3zLBVq4reSPYtY2G6OSojNTm4SQ/
   LDAZ ZSTR puthn
 ;
 
+
+(- keyboard )
+( ORIC:
+
+  $2DF Latest key from keyboard. Bit 7 set if valid.
+
+  C779 LSR $02DF Clear key pressed flag
+  C77C LDA $02DF Wait until key is pressed
+  C77F BPL $C77C
+)
+
+= KEYADDR 02df ;
+
+: waitkey (-> A)
+  LSRA KEYADDR (hi bit indicate new char)
+  FALLTHROUGH ;
+
+: waitkeyloop  
+  LDAA KEYADDR
+  BPL *waitkeyloop
+  AND# 7f (clear top bit)
+;
+
+($35-$84 Input buffer. 79 bytes)
+= ZINPUTBUF 35 ;
+= INPUTBUFLEN 4f ;
+= RETURNKEY 0d ;
+= BSKEY 8 ;
+= CTRLA 1 ;
+
+: readline (at ZINPUTBUF, X chars, zero terminated)
+
+  LDX# 00 (how many chars read?)
+  FALLTHROUGH ;
+
+: readlineloop  
+
+  (zero terminate)
+  LDA# 00
+  STAZX ZINPUTBUF
+
+  waitkey (-> A)
+
+  (- control chars)
+  CMP# RETURNKEY
+  BNE 01
+  RTS
+
+  CPX# INPUTBUFLEN-2
+  BEQ *readlineloop (ignore, TODO: beep)
+  
+  (TODO: CTRL-A read from screen)
+  (TODO: allow cursor to move around)
+
+  (- printable char)
+  STAZX ZINPUTBUF
+  INX
+  putc
+  
+  JMPA &readlineloop
+;
+
+(- Convenience -)
+
+: screeninit
+(cls)
+  LDY# 00  LDX# 24  gotoxy
+  puts "CAPS"
+  puts "Ready" (TODO: too BASICy)
+  (- TODO: blinking cursor -)
+  home down down
+
+  LDX# 00  LDY# 02  gotoxy
+;
+
+(--- DATA STACK ---)
+
 (alt: many data stacks
  - zero page
  STAZX LDAZX INX DEX = data stack below
@@ -805,7 +965,7 @@ https://docs.google.com/document/d/16Sv3Y-3rHPXyxT1J3zLBVq4reSPYtY2G6OSojNTm4SQ/
   dostack
 ;
 
-(------------------------------- system end)
+(--- END LIBRARY ---)
 
 : pandoric
   LDX# 00 (beginnin of screen)
@@ -970,8 +1130,60 @@ https://docs.google.com/document/d/16Sv3Y-3rHPXyxT1J3zLBVq4reSPYtY2G6OSojNTm4SQ/
   (TODO: multiply $0100(Y) by A)
 ;  
 
+
+: mul7 (handgen)
+  FALLTHROUGH;
+
+: mul72
+  JSRA &mul72+3
+  FALLTHROUGH;
+: mul71
+  JSRA &mul71+3
+  FALLTHROUGH;
+: mul71+3
+  ADC# 07
+  BCC 01
+  INY
+;
+
+: mulp (A*Y -> AY)
+  TSX
+  PHA
+
+  (general idea is to push a program
+   on the stack (in revesre order))
+  LDA# RTS     PHA
+  LDA# TXS     PHA (restore stack)
+  TXA  	       PHA
+  LDA# LDX#    PHA (stored S)
+
+  (push call on stack)
+  LDA# ^addx0  PHA
+  LDA# _addx0  PHA
+  LDA# JSRA    PHA
+
+  (here Y is untouched)
+  LDXA 0100 (get)
+
+  FALLTHROUGH;
+
+  (fill the stack with NOP)  
+  LDA# NOP (harmless op)
+: fill
+  PHA
+  TSX
+  BNE *fill
+
+  PLA (drop)
+  
+  LDA# 00 (lo result)
+  LDY# 00 (hi result)
+  JSRA 0100 (or jmp)
+;
+
+
 ( jsk 6502 mulAY challange
-  - https://m.facebook.com/groups/6502CPU/?multi_permalinks=2933057450297175 )
+  - https://m.facebook.com/groups/6502CPU/?multi_permalinks=2933057/450297175 )
 
 : mulstackYA
 
@@ -1334,9 +1546,19 @@ BNE L1
 
   SEI (interrupt off)
 
-  home
-
+  screeninit
+  
   main
 
+  (prompt)
+  LDY# 10   LDX# 00  gotoxy
+  LDA# '>'  putc
+  FALLTHROUGH ;
+
+: readevalloop  
+  readline
+  puts "<<<<<<<<<DONE!!!!!"
+  (JMPA &readevalloop)
+  
   stop
 ;

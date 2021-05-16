@@ -906,8 +906,19 @@ EED7 RTS
 */
 
   // ---------------------------- SCREEN
+  // $26D,$26E Start address of screen memory. 
+  const SCREENPTR = 0x026d;
   const SCREEN = 0xbb80; // 48K
   //const SCREEN = 0x3b80; // 16K
+
+  const CURPTR = 0x0012;
+  const CURROW = 0x0268;
+  const CURCOL = 0x0269; // also copy in 30
+  const ZCURCOL = 0x0030;
+  const PAPER = 0x026b; // +16
+  const INK = 0x026c;
+
+  const KEYADDR = 0x02df; // hi bit set = new char
 
   function puts(s) {
     process.stdout.write(s);
@@ -924,7 +935,8 @@ EED7 RTS
     // 127: white paraenthesis (ORIC: black block)
    
     if (c == 0) {
-      process.stdout.write('0');
+      process.stdout.write(' ');
+      //process.stdout.write('0');	
     } else if (c > 127) {
       //inverseOn();
       putchar(c & 127);
@@ -954,7 +966,7 @@ EED7 RTS
   }
   // xterm/ansi
   function cursorOff() { puts('[?25l'); }
-  function cls() { puts('[2J'); gotorc(0,0); }
+  function cls() { puts('[2J'); gotorc(0, 0); }
   function cursorOn() { puts('[?25h'); }
   function gotorc(r, c) { puts('['+r+';'+c+'H'); }
   function fgcol(c) { puts('[3'+c+'m@'); } // add teletext space
@@ -967,10 +979,13 @@ EED7 RTS
 
   let cursor = true;
   let n = 0;
+
+  // redraws whole screen
+  // TODO: call more often?
   function updateScreen() {
     cursorOff();
     n++;
-    if ((n % 20) == 1) cls();
+    if ((n % 20) == 1) cls(); // hmmm?
     gotorc(0, 0);
     for(let r=0; r<28; r++) {
       puts('| ')
@@ -981,8 +996,15 @@ EED7 RTS
       puts(' |\n');
     }
     puts('\n');
+    // position cursor at end of screen
+    // for writing debug info and other
     gotorc(29, 0);
+    // after that cursor is moved      
   }
+
+  // --- END ORIC----------------------
+
+  // --- PandOric Simple Assembler Names
 
   // define function, return #bytes used
   function deffun(name, body) {
@@ -1034,17 +1056,22 @@ EED7 RTS
 	  m[a++] = v;
 	} else {
 	  // symbol/name (make jsr)
-	  let to = deffun[b], op;
+	  let to = b, op;
 	  if ('*^&_'.indexOf(b[0]) >= 0) {
 	    op = b[0];
-	    to = b.substr(1);
-	    to = deffun[to] || parseInt(to, 16);
+            to = b.substr(1);
+  	  }
+          to = to.replace(/[\+\-].*$/, '');
+
+	  // make integer
+          if (deffun[to]) {
+            to = +deffun[to];
+	  } else {
+            to = parseInt(to, 16);
 	  }
-	  if (b.match(/[\+\-]/)) {
-	    to = parseInt(b, 16);
-	    b.replace(/\-(\d+)/, (_,d)=>to-=d);
-	    b.replace(/\+(\d+)/, (_,d)=>to+=d);
-	  }
+
+          b.replace(/\-(\d+)/, (_,d)=>to-=+d);
+	  b.replace(/\+(\d+)/, (_,d)=>to+=+d);
 
 	  if (!to) throw Error('In "'+name+'" do not know "'+b+'"');
 
@@ -1053,7 +1080,7 @@ EED7 RTS
 	    let d = to - a - 1;
 	    console.log(' d='+d);
 	    if (d < -128 || d > 127)
-	      throw Error('Relative out of byte range!');
+	      throw Error('Relative out of byte range! (to='+to+', a='+a+')');
 	    if (d < 0) d += 256;
 	    console.log(' d='+d);
 	    console.log('= '+hex(2, d));
@@ -1385,7 +1412,7 @@ via6552: IRQ every 10ms (free running mode)
 
     if (scon)
       updateScreen();
-  
+
     let r = cpu.regs();
     let s = cpu.stats();
     let ips = Math.floor(s.iCount / s.tTimems);
@@ -1401,13 +1428,51 @@ via6552: IRQ every 10ms (free running mode)
     console.log(JSON.stringify(s)+'     ');
     if (scon) {
       // position cursor
-      gotorc(cpu.mem[0x28], cpu.mem[0x269]);
+      gotorc(cpu.mem[CURROW]+1,
+             cpu.mem[CURCOL]+3);
 
       // make it blink
       if (cursor) cursorOn(); else cursorOff();
       cursor = !cursor;
     }
   }, 200);
+
+  // simulate keystroke
+  let keybuf = [];
+  function sendKey() {
+    // key not yet consumed
+    if (cpu.mem[KEYADDR] & 128)
+      return;
+
+    let key = keybuf.shift();
+    if (!key) return;
+
+    cpu.mem[KEYADDR] = 128 + key;
+  }	
+
+  // set up capture of key strokes
+  const readline = require('readline');
+  readline.emitKeypressEvents(process.stdin);
+  process.stdin.setRawMode(true);
+  process.stdin.on('keypress', (str, key) => {
+    if (key.ctrl && key.name === 'c') {
+      process.exit();
+    } else {
+      // assume get onle one key
+      keybuf.push(key.sequence.charCodeAt(0));
+      if (1) {
+        gotorc(40, 0);
+        console.log(`You pressed the "${str}" key`);
+        console.log();
+        console.log(key);
+        console.log();
+      }
+
+      sendKey();
+    }
+  });
+
+  setInterval(sendKey, 1000);
 }
 
 // from nodejs? 
