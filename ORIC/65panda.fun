@@ -866,6 +866,12 @@ https://docs.google.com/document/d/16Sv3Y-3rHPXyxT1J3zLBVq4reSPYtY2G6OSojNTm4SQ/
 ( efficient 32-bit DEC32
   - https://news.ycombinator.com/item?id=17275797)
 
+
+
+
+
+(add without add)
+
 : addx0  INX  BNE 01 INY ;
 : addx1  addx0  addx0 ;
 : addx2  addx1  addx1 ;
@@ -920,6 +926,7 @@ https://docs.google.com/document/d/16Sv3Y-3rHPXyxT1J3zLBVq4reSPYtY2G6OSojNTm4SQ/
   puts "-addtest---"
 ;
 
+(not complete yet)
 : mulYApeano (Y + A -> YA)
   PHA
   TAX
@@ -928,6 +935,70 @@ https://docs.google.com/document/d/16Sv3Y-3rHPXyxT1J3zLBVq4reSPYtY2G6OSojNTm4SQ/
 
   LDY# 00
   addpeano (0X + A -> YX)
+;
+
+: mulYpush
+  PHA
+
+  TSX
+  TXA
+  FALLTHROUGH ;
+
+: fill stack
+  PHA
+  TSX
+  BNE *fill
+  (reached the bottom of stack?)
+  PLA
+  TYA
+  PHA
+  (now the $0100 contains original Y)
+  FALLTHROUGH;
+
+: remove (all S from stack)
+  PLA (it contains original S)
+  EOR# (255-A)
+  TAY (number of entries to remove)
+  FALLTHROUGH ;
+: removeloop
+  PLA
+  TSX
+  BNE *removeloop ;
+
+  PLA (get the original A)
+
+  (TODO: multiply $0100(Y) by A)
+;  
+
+( jsk 6502 mulAY challange
+  - https://m.facebook.com/groups/6502CPU/?multi_permalinks=2933057450297175 )
+
+: mulstackYA
+
+  TSX
+  PHA
+  TYA
+  PHA
+  TYA
+  PLA
+  PLA
+
+  LDA# 00 (hi result byte)
+  LDY# 08
+  LSRAX 0100
+  FALLTHROUGH ;
+: mulstackloop
+  BCC 04 (no add)
+  CLC
+  ADCAX 00ff
+  (no add)
+  ROR
+  RORAX 0100
+  DEY
+  BNE *mulstackloop
+
+  TAY
+  LDAX 0100
 ;
 
 ( - https://llx.com/Neil/a2/mult.html )
@@ -1239,6 +1310,16 @@ BNE L1
   panda002
 
   addtest
+
+  puts "Stack--"
+  LDY# 11
+  LDA# 2a
+  printYA
+  LDY# 63
+  LDA# 4d
+  mulstackYA
+  printYA
+  puts "--kcatS"
 ;
 
 (todo: since don't have forward ref, this must be last!)
