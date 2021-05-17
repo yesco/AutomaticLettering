@@ -293,19 +293,19 @@ https://docs.google.com/document/d/16Sv3Y-3rHPXyxT1J3zLBVq4reSPYtY2G6OSojNTm4SQ/
 
 (--- COMPILATION ---)
 
-(dictionary implementation sketch:
+(dictionary implementation sketch
   Inspired by forth (see ref at end).
   The dictionary is a linked list,
   where the last added word is first.
 
-  Fields:
+  Fields
   - 2B pointer to previous word
   - 2B pointer to address of code
   - 1B len of datafield (max 255)
   - pascal ascii name (1B len + chars)
   - lenB DATA/parameters/const/variables
-  - (':' - optional to identify code)
-  - CODE: optional (@pointer code)
+  - (a colon - optional to identify code)
+  - CODE optional (@pointer code)
 
   The name is a pascal string; 1 byte
   length followed by characters, no \0.
@@ -338,7 +338,7 @@ https://docs.google.com/document/d/16Sv3Y-3rHPXyxT1J3zLBVq4reSPYtY2G6OSojNTm4SQ/
 (--- SYSTEM ---)
 
 : stop (loop forever)
-  LDA# 00
+  INX
   BEQ *stop
 ;
 
