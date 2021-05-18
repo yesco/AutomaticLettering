@@ -140,19 +140,22 @@ sub guessNameFromOP {
 sub guessNameFromOP2 {
     my ($op, $h, $l, $hn, $ln, $odd) = @_;
 
-    my ($s, $i) = guessNameFromOP2h(@_);
+    #my ($s, $i) = guessNameFromOP2h(@_);
+    my ($s, $i) = guessNameFromOP2asm(@_);
     if ($i eq 'result') {
 	return $s;
     } else {
 	return substr($s, $i * 3, 3);
     }
 }
+
 sub guessNameFromOP2h {
     my ($op, $h, $l, $hn, $ln, $odd) = @_;
     my $name = '-';
     
     my $bit = 'BITJMPSTYLDYCPYCPX';
     my $branch = 'PLMIVCVSCCCSNEEQ';
+    my $branch3 = 'BPLBMIBVCBVSBCCBCSBNEBEQ';
     my $brk = 'BRKJSRRTIRTS';
     my $php = 'PHPCLCPLPSECPHACLIPLASEIDEYTYATAYCLVINYCLDINXSED';
     my $ora = 'ORAANDEORADCSTALDACMPSBC';
@@ -161,10 +164,10 @@ sub guessNameFromOP2h {
     my $stx = 'STXLDXDECINC';
     
     my $half = int($hn/2);
+    
     if ($l eq '0') {
         if ($hn & 1) {
-	    # Branch
-	    return 'B'.substr($branch, $hn-1, 2), 'result';
+	    return $branch3, $half;
 	} elsif ($hn & 8) {
 	    return $bit, $half-6;
 	} else {
@@ -187,9 +190,66 @@ sub guessNameFromOP2h {
 	} else {
 	    return $asl, $half;
 	}
+    } else {
+	$y = '-';
+	$a = 'result';
     }
 
-    return '-', 'result';
+    return $y, $a;
+}
+
+sub guessNameFromOP2asm {
+    my ($op, $h, $l, $hn, $ln, $odd) = @_;
+    my $name = '-';
+    
+    my $bit = 'BITJMPSTYLDYCPYCPX';
+    my $branch = 'PLMIVCVSCCCSNEEQ';
+    my $branch3 = 'BPLBMIBVCBVSBCCBCSBNEBEQ';
+    my $brk = 'BRKJSRRTIRTS';
+    my $php = 'PHPCLCPLPSECPHACLIPLASEIDEYTYATAYCLVINYCLDINXSED';
+    my $ora = 'ORAANDEORADCSTALDACMPSBC';
+    my $asl = 'ASLROLLSRROR';
+    my $txa = 'TXATXSTAXTSXDEX---NOP---';
+    my $stx = 'STXLDXDECINC';
+    
+    my $half = int($hn/2);
+    
+    my $a = $half; # index
+    my $x = $hn; # saved
+    my $y = ""; # offset
+    
+    if ($l eq '0') {
+        if ($hn & 1) {
+	    $y=$branch3;
+	} elsif ($hn & 8) {
+	    $y=$bit; $a-=6;
+	} else {
+	    $y=$brk;
+	    return $brk, $half;
+	}
+    } elsif ($l eq '8') {
+	$y=$php; $a=$x;
+    } elsif ($ln & 5 == 5) {
+	$y=$ora;
+    } elsif ($l =~ /[4c]/) {
+	$y=$bit; $a-=1;
+    } elsif ($ln & 2 && $ln & 12) {
+#    } else { # why is this not same?
+	if ($hn & 8) {
+	    if ($l eq 'a') {
+		$y=$txa; $a=$x; $a-=8;
+	    } else {
+		$y=$stx; $a-=4;
+	    }
+	} else {
+	    $y=$asl;
+	}
+    } else {
+	$y = '-';
+	$a = 'result';
+    }
+
+    return $y, $a;
 }
 
 sub guessOPFromName {
