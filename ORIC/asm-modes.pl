@@ -1,3 +1,11 @@
+# embryo for encoding/coding
+# dis/asm op codes and parse mnemonics
+#
+# One way to test it, is to see if
+# it maps to the same both ways:
+#
+#   perl asm-modes.pl | sort -k2 | less
+
 open IN, "sort asm.opcodes |" or die "nmo file";
 
 while (<IN>) {
@@ -69,6 +77,13 @@ sub dataFromOP {
 
     $name = guessNameFromOP($op, $h, $l, $hn, $ln, $odd);
 
+    my $name2 = guessNameFromOP2($op, $h, $l, $hn, $ln, $odd);
+
+    unless($name2 eq $name) {
+	print "%%---------ERR: $op $name $name2 - not the same\n";
+	exit;
+    }
+    
     $mode = "#" if $op =~ /(a0|c0|.2)/;
 
     $mode .= $ix;
@@ -83,39 +98,192 @@ sub guessNameFromOP {
     my $name = '-';
     
     my $bitcpx = 'BITJMPSTYLDYCPYCPX';
+    my $branch = 'PLMIVCVSCCCSNEEQ';
+    my $brk = 'BRKJSRRTIRTS';
+    my $php = 'PHPCLCPLPSECPHACLIPLASEIDEYTYATAYCLVINYCLDINXSED';
+    my $ora = 'ORAANDEORADCSTALDACMPSBC';
+    my $asl = 'ASLROLLSRROR';
+    my $txa = 'TXATXSTAXTSXDEX---NOP---';
+    my $stx = 'STXLDXDECINC';
     
     my $half = int($hn/2);
     if ($l eq '0') {
         if ($odd) {
 	    # Branch
-	    $name = 'B' . substr('PLMIVCVSCCCSNEEQ', $hn-1, 2);
+	    $name = 'B' . substr($branch, $hn-1, 2);
 	} elsif ($hn <= 8) {
-	    $name = substr('BRKJSRRTIRTS', $half*3, 3);
+	    $name = substr($brk, $half*3, 3);
 	} else {
 	    $name = substr($bitcpx, ($half-6)*3, 3);
 	}
     } elsif ($l eq '8') {
-	$name = substr('PHPCLCPLPSECPHACLIPLASEIDEYTYATAYCLVINYCLDINXSED', $hn*3, 3);
+	$name = substr($php, $hn*3, 3);
     } elsif ($l =~ /[159d]/) {
-	$name = substr('ORAANDEORADCSTALDACMPSBC', $half*3, 3);
+	$name = substr($ora, $half*3, 3);
     } elsif ($l =~ /[4c]/) {
 	$name = substr($bitcpx, ($half-1)*3, 3);
     } elsif ($l =~ /[6ae]/) {
 	if ($hn < 8) {
-	    $name = substr('ASLROLLSRROR', $half*3, 3);
+	    $name = substr($asl, $half*3, 3);
 	} else { # hn >= 8
 	    if ($l eq 'a') {
-		$name = substr('TXATXSTAXTSXDEX---NOP---', ($hn-8)*3, 3);
+		$name = substr($txa, ($hn-8)*3, 3);
 	    } elsif ($l =~ /[26e]/) {
-		$name = substr('STXLDXDECINC', ($half-4)*3, 3);
+		$name = substr($stx, ($half-4)*3, 3);
 	    }
 	}
-    } else {	
-	# guess
-	$name = $guessop{'0'};
     }
 
     return $name;
+}
+
+sub guessNameFromOP2 {
+    my ($op, $h, $l, $hn, $ln, $odd) = @_;
+
+    my ($s, $i) = guessNameFromOP2h(@_);
+    if ($i eq 'result') {
+	return $s;
+    } else {
+	return substr($s, $i * 3, 3);
+    }
+}
+sub guessNameFromOP2h {
+    my ($op, $h, $l, $hn, $ln, $odd) = @_;
+    my $name = '-';
+    
+    my $bit = 'BITJMPSTYLDYCPYCPX';
+    my $branch = 'PLMIVCVSCCCSNEEQ';
+    my $brk = 'BRKJSRRTIRTS';
+    my $php = 'PHPCLCPLPSECPHACLIPLASEIDEYTYATAYCLVINYCLDINXSED';
+    my $ora = 'ORAANDEORADCSTALDACMPSBC';
+    my $asl = 'ASLROLLSRROR';
+    my $txa = 'TXATXSTAXTSXDEX---NOP---';
+    my $stx = 'STXLDXDECINC';
+    
+    my $half = int($hn/2);
+    if ($l eq '0') {
+        if ($hn & 1) {
+	    # Branch
+	    return 'B'.substr($branch, $hn-1, 2), 'result';
+	} elsif ($hn & 8) {
+	    return $bit, $half-6;
+	} else {
+	    return $brk, $half;
+	}
+    } elsif ($l eq '8') {
+	return $php, $hn;
+    } elsif ($ln & 5 == 5) {
+	return $ora, $half;
+    } elsif ($l =~ /[4c]/) {
+	return $bit, $half-1;
+    } elsif ($ln & 2 && $ln & 12) {
+	if ($hn & 8) {
+	    if ($l eq 'a') {
+		return $txa, $hn-8
+	    } else {
+		return $stx, $half-4;
+	    }
+	} else {
+	    return $asl, $half;
+	}
+    }
+
+    return '-', 'result';
+}
+
+sub guessOPFromName {
+    my ($name) = @_;
+    my $op = '-';
+    
+    my $h = '-';
+    my $l = '-';
+
+    if ($name =~ /^O../) {
+	$h = '[01]'; # ORA
+    } elsif ($name =~ /^E../) {
+	$h = '[45]'; # EOR
+    } elsif ($name =~ /^N../) {
+	$h = 'e'; # NOP ea
+	$l = 'a';
+    } elsif ($name =~ /^T../) {
+	$h = '[ab89]';
+	$l = '[a8]';
+    } elsif ($name =~ /^.I./) {
+	$h = '2'; # BIT
+	$l = '[4c]';
+    } elsif ($name =~ /^B../) {
+	$h = '[13579bdf]'; # Branch
+	$l = '0';
+    } elsif ($name =~ /^D../) {
+	$h = '[8cd]'; # DE.
+	$l = '[68ae]';
+    } elsif ($name =~ /^P../) {
+	$h = '[0246]'; # PL/PH
+	$l = '8';
+    } elsif ($name =~ /^D../) {
+	$h = '[8cd]'; # PL/PH
+	$l = '[68ae]';
+    } elsif ($name =~ /^J../) {
+      if ($name =~ /^.M/) {
+      	 $h = '[46]'; JMP
+	 $l = 'c';
+      }	else {
+         $h = '2'; # JSR
+         $l = '0';
+      }
+    } elsif ($name =~ /^I../) {
+      if ($name =~ /^..C/) {
+      	 $h = '[ef]'; INC
+	 $l = '[6e]';
+      }	else {
+         $h = ($name =~ /^..X/) ? 'e' : 'c'; # INX INY
+         $l = '8';
+      }
+    } elsif ($name =~ /^.E./) {
+	$h = '[37f]'; # SE.
+	$l = '8';
+    } elsif ($name =~ /^.M./) {
+	$h = '[cd]'; # CMP
+	$l = '[159d]';
+    } elsif ($name =~ /^.L./) {
+	$h = '[15bd]'; # CL.
+	$l = '8';
+    } elsif ($name =~ /^.B./) {
+	$h = '[ef]'; # SBC
+	$l = '[159d]';
+    } elsif ($name =~ /^S../) {
+	$h = '[89]'; # ST.
+	$l = '[1456cde]';
+    } elsif ($name =~ /^.T./) {
+	# RTS/RTI
+	$h = ($name =~ /^..I/) ? '4' : '6';
+	$l = '0';
+    } elsif ($name =~ /^C../) {
+	$h = ($name =~ /^..X/) ? 'e' : 'c';
+	$l = '[04c]';
+    } elsif ($name =~ /^R../) {
+	# ROL ROR
+	$h = ($name =~ /^..L/) ? '[23]' : '[67]';
+	$l = '[6ae]';
+    } elsif ($name =~ /^...L/) {
+	$h = '[01]'; # 
+	$l = '[1456cde]';
+    } elsif ($name =~ /^...C/) {
+	$h = '[67]'; # ADC
+	$l = '[159d]';
+    } elsif ($name =~ /^.S./) {
+	$h = '[45]'; # LSR
+	$l = '[6e]';
+    } else {
+	$h = '[ab]'; # LD
+	if ($name =~ /^..X/) {
+	    $l = '[26e]';
+	} else {
+	    $l = '[04c]';
+	}
+    }
+
+    return $h.$l;
 }
 
 sub dataFromName {
@@ -202,5 +370,3 @@ sub dataFromName {
     my $rop = substr($op,1,1).substr($op,0,1);
     return ($name, $op, $rop, $mode, $bytes, $cycles);
 }
-
-
