@@ -176,8 +176,8 @@ sub guessNameFromOP2h {
 	return $ora, $half;
     } elsif ($l =~ /[4c]/) {
 	return $bit, $half-1;
-#    } elsif ($ln & 2 && $ln & 12) {
-    } else {
+    } elsif ($ln & 2 && $ln & 12) {
+#    } else { # why is this not same?
 	if ($hn & 8) {
 	    if ($l eq 'a') {
 		return $txa, $hn-8
