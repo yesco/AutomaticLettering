@@ -1,0 +1,187 @@
+(--- basic 6502 instructions)
+= PHP 08 ;
+= PHA 48 ;
+= PLA 68 ;
+= PLP 28 ;
+
+= LDA# a9 ;
+= LDAZ a5 ;
+= LDAZX b5 ;
+= LDAA ad ;
+= LDAX bd ;
+= LDAY b9 ;
+= LDAIX a1 ;
+= LDAIY b1 ;
+
+= STAZ 85 ;
+= STAZX 95 ;
+= STAA 8d ;
+= STAAX 9d ;
+= STAY 99 ;
+= STAIX 81 ;
+= STAIY 91 ;
+
+= LDX# a2 ;
+= LDXZ a6 ;
+= LDXZY b6 ;
+= LDXA ae ;
+= LDXAY be ;
+
+= STXZ 86 ;
+= STXZY 96 ;
+= STXA 8e ;
+
+= LDY# a0 ;
+= LDYZ a4 ;
+= LDYZX b4 ;
+= LDYA ac ;
+= LDYAX bc ;
+
+= STYZ 84 ;
+= STYZX 94 ;
+= STYA 8c ;
+
+= CMP# c9 ;
+= CMPZ c5 ;
+= CMPZX d5 ;
+= CMPA cd ;
+= CMPAX dd ;
+= CMPAY d9 ;
+= CMPIX c1 ;
+= CMPIY d1 ;
+
+= CPX# e0 ;
+= CPXZ e4 ;
+= CPXA ec ;
+
+= CPY# c0 ;
+= CPYZ c4 ;
+= CPYA cc ;
+
+= BITZ 24 ;
+= BITA 2c ;
+
+= ADC# 69 ;
+= ADCZ 65 ;
+= ADCZX 75 ;
+= ADCA 6d ;
+= ADCAX 7d ;
+= ADCAY 79 ;
+= ADCIX 61 ;
+= ADCIY 71 ;
+
+= SBC# e9 ;
+= SBCZ e5 ;
+= SBCZX f5 ;
+= SBCA ed ;
+= SBCAX fd ;
+= SBCAY f9 ;
+= SBCIX e1 ;
+= SBCIY f1 ;
+
+= ASL 0a ;
+= ASLZ 06 ;
+= ASLZX 16 ;
+= ASLA 0e ;
+= ASLAX 1e ;
+
+= LSR 4a ;
+= LSRZ 46 ;
+= LSRZX 56 ;
+= LSRA 4e ;
+= LSRAX 5e ;
+
+= ROL 2a ;
+= ROLZ 26 ;
+= ROLZX 36 ;
+= ROLA 2e ;
+= ROLAX 3e ;
+
+= ROR 6a ;
+= RORZ 66 ;
+= RORZX 76 ;
+= RORA 6e ;
+= RORAX 7e ;
+
+= TAX aa ;
+= TAY a8 ;
+= TSX ba ;
+= TXA 8a ;
+= TXS 9a ;
+= TYA 98 ;
+
+= NOP ea ;
+
+= JMPA 4c ;
+= JMPI 6c ;
+
+= JSRA 20 ;
+= RTS 60 ;
+
+= BCC 90 ; (Branch Carry Clear)
+= BCS b0 ; (Branch Carry Set)
+
+= BMI 30 ; (Branch if MInus)
+= BPL 10 ; (Branch Positive L?)
+
+= BNE d0 ; (Branch Not Equal)
+= BEQ f0 ; (Branch EQual)
+
+= BVC 50 ; (Branch if oVerflow Clear)
+= BVS 70 ; (Branch if oVerflow Set)
+
+= BRK 00 ; (Force interrupt)
+= RTI 40 ;
+
+= CLC 18 ;
+= SEC 38 ;
+= CLD d8 ;
+= SED f8 ;
+= CLI 58 ;
+= SEI 78 ;
+= CLV b8 ;
+
+= DECZ c6 ;
+= DECZX d6 ;
+= DECA ce ;
+= DECAX de ;
+
+= DEX ca ;
+
+= DEY 88 ;
+
+= INCZ e6 ;
+= INCZX f6 ;
+= INCA ee ;
+= INCAX fe ;
+
+= INX e8 ;
+
+= INY c8 ;
+
+= AND# 29 ;
+= ANDZ 25 ;
+= ANDZX 35 ;
+= ANDA 2d ;
+= ANDAX 3d ;
+= ANDAY 39 ;
+= ANDIX 21 ;
+= ANDIY 31 ;
+
+= ORA# 09 ;
+= ORAZ 05 ;
+= ORAZX 15 ;
+= ORAA 0d ;
+= ORAAX 1d ;
+= ORAAY 19 ;
+= ORAIX 01 ;
+= ORAIY 11 ;
+
+= EOR# 49 ;
+= EORZ 45 ;
+= EORZX 55 ;
+= EORA 4d ;
+= EORAX 5d ;
+= EORAY 59 ;
+= EORIX 41 ;
+= EORIY 51 ;

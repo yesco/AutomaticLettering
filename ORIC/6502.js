@@ -654,6 +654,13 @@ const ORIC_CORE = './oric.core';
 const PANDORIC = './pandoric.fun';
 
 function ORIC(dorom) {
+  // set flag if compile only    
+  let compileOnly;
+  if (process.argv[2] === '-c') {
+    compileOnly = true;
+    process.argv.shift();
+  }
+
   let startAddr; // if not set, RESET
 
   let fs = require('fs');
@@ -969,8 +976,8 @@ EED7 RTS
   function cls() { puts('[2J'); gotorc(0, 0); }
   function cursorOn() { puts('[?25h'); }
   function gotorc(r, c) { puts('['+r+';'+c+'H'); }
-  function fgcol(c) { puts('[3'+c+'m@'); } // add teletext space
-  function bgcol(c) { puts('[4'+c+'m@'); } // add teletext space
+  function fgcol(c) { puts('[3'+c+'m '); } // add teletext space
+  function bgcol(c) { puts('[4'+c+'m '); } // add teletext space
   function inverseOn() { puts('[7m'); }
   function underscoreOn() { puts('[4m'); }
   function boldOn() {  puts('[1m'); }
@@ -1112,7 +1119,7 @@ EED7 RTS
 	}
       });
     // change last jsr+rts to jmp!
-    if (m[a-2] === 0x20) {
+    if (m[a-2] === 0x20) { // rts
       m[a-2] = 0x4c; // jmp
     } else if (!m[a-3] && !m[a-2] && !m[a-1]) {
 	// FALLTHROUGH
@@ -1138,7 +1145,6 @@ EED7 RTS
   deffun.nextAddr = 0x601; // after basic
 
   let describe;
-
   if (dorom === 'rom') {
     // load ROM
     let rom = fs.readFileSync(ORIC_ROM);
@@ -1222,7 +1228,7 @@ EED7 RTS
   } // end rom
   else {
     // a simple macro ASM codegen
-
+      
     // no rom, just "screen hardare"
     let t = 'PANDORIC';
     let fn = process.argv[2] || PANDORIC;
@@ -1301,7 +1307,9 @@ EED7 RTS
     }
   }
 
-  // run!
+  if (compileOnly) process.exit(0);
+
+  // --- run!
 
   let scon = false;
   scon = true;
@@ -1472,7 +1480,7 @@ via6552: IRQ every 10ms (free running mode)
     }
   });
 
-  setInterval(sendKey, 1000);
+  setInterval(sendKey, 10);
 }
 
 // from nodejs? 

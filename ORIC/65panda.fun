@@ -118,7 +118,6 @@ https://docs.google.com/document/d/16Sv3Y-3rHPXyxT1J3zLBVq4reSPYtY2G6OSojNTm4SQ/
 = STAZ 85 ;
 = STAZX 95 ;
 = STAA 8d ;
-= STAX 9d ;
 = STAAX 9d ;
 = STAY 99 ;
 = STAIX 81 ;
@@ -206,12 +205,6 @@ https://docs.google.com/document/d/16Sv3Y-3rHPXyxT1J3zLBVq4reSPYtY2G6OSojNTm4SQ/
 = RORA 6e ;
 = RORAX 7e ;
 
-= LSR 4a ;
-= LSRZ 46 ;
-= LSRZX 56 ;
-= LSRA 4e ;
-= LSRAX 5e ;
-
 = TAX aa ;
 = TAY a8 ;
 = TSX ba ;
@@ -277,6 +270,15 @@ https://docs.google.com/document/d/16Sv3Y-3rHPXyxT1J3zLBVq4reSPYtY2G6OSojNTm4SQ/
 = ANDIX 21 ;
 = ANDIY 31 ;
 
+= ORA# 09 ;
+= ORAZ 05 ;
+= ORAZX 15 ;
+= ORAA 0d ;
+= ORAAX 1d ;
+= ORAAY 19 ;
+= ORAIX 01 ;
+= ORAIY 11 ;
+
 = EOR# 49 ;
 = EORZ 45 ;
 = EORZX 55 ;
@@ -291,7 +293,106 @@ https://docs.google.com/document/d/16Sv3Y-3rHPXyxT1J3zLBVq4reSPYtY2G6OSojNTm4SQ/
 
 = FALLTHROUGH 00 00 00 ;
 
+(--- 6502 compact dis/assember ---)
+(Any minimal dis/assembers out there?
+ Nust be native running on 6502!
+ 
+ Facts:
+ - 149 opcodes
+ - 56 mnemonics (3b each)
+ + 13 addressing modes (?)
+
+ A simple encoding of needed information:
+
+ - 56*3 => 118 (sorted string of mnemonics)
+   (suggested: pack each in a word => 112)
+
+ - 149*3 => 447 (sorted array of opcodes
+   1b, index in names 1b, addrmode 1b)
+
+   (suggested: pack 2 modes in byte
+    => 128 bytes + 256 index)
+
+   (jsk: offset have 2 bits not need use:
+    lobit=0 and hibit=0, TODO?)
+
+   (jsk: 5 columns no OPs in optable!
+    16 byte array of lo nibble array.
+    get address.lo to 16 byte column.
+    If address.lo = ff => none, do it in
+    code. (+ (* 11 16) 16) = 192 add c2)
+
+   (jsk: mode=4 bits use same
+    address.lo/2 as modes are packed:
+    (/ (* 11 16) 2) = 88 add c2
+
+    ...or...
+
+    in packed "ASLFOO,we have
+      1bit/w free => 56 bits.
+    in offset map we have 2bit/offs
+      (* 11 16 2) = 352 bits
+
+    (- (+ 352 56) (* 88 8)) = -296
+    (/ -296 8) = -37 bytes (missing)
+    )
+
+    (+ 192 88)
+
+ 615 bytes already!
+ (suggested: (+ 112 128 256) = 496 add c1)
+ (jsk: (+ 112 192 88) = 392 add c1, c2)
+
+ then add code...
+
+ we need the following functionality;
+   opcode -> 3L mnemonic
+   opcode -> valid (or not)
+   opcode -> addrmode
+   (mnemonic, addrmode) -> opcode
+
+ Nataurally, we could code it with
+ help of the tables listed above.
+ 
+ But I belive, using the inherit
+ mismatched structure of the bitpattern
+ of the opcodes one could write clever
+ code to achieve the same thing.
+
+ Has anyone seen such code?
+
+ This is of course intended to run on 6502.
+ No crosscompiles apply.
+
+ I have seen references to the existance
+ of a 1KB dis/asm monitor, not sure if it
+ included data. However, the link was
+ broken.
+
+ Any experiences?
+
+ In my case I use a SAN (Simplified
+ Assembly Notation), but that shouldn't
+ really matter:
+
+= LDA# a9 ;
+= LDAZ a5 ;
+= LDAZX b5 ;
+= LDAA ad ;
+= LDAX bd ;
+= LDAY b9 ;
+= LDAIX a1 ;
+= LDAIY b1 ;
+ 
+)
+
+
+
 (--- SYSTEM ---)
+
+
+
+
 
 : stop (loop forever)
   LDA# 00
@@ -759,6 +860,8 @@ RTS
   STAZX ZINPUTBUF
   INX
   putc
+
+(Cputc '-')
   
   JMPA &readlineloop
 ;
@@ -856,9 +959,61 @@ RTS
 
 : xdec
   DECZX 0
-  BNE 02 (possibly wrong)
+  BNE 02 (possibly wrong w carry?)
   DECZX 1
 ;
+
+(TODO: look at variants in
+ - http://6502.org/source/io/primm.htm)
+
+(mere insertion BELOW causes run error)
+(Prefix 'C' as in 'Command')
+(Prefix 'I' as in 'Indexed')
+: xxxCputc (call by Pputc 'A')
+RTS
+(
+  PLA
+  STAZ ZparamsLO
+  PLA
+  STAZ ZparamsHI
+  
+  LDY# 00
+  LDAIY params
+  putc
+  
+  (9b 13+4cyc)
+  INCZ ZparamsLO
+  BNE 02
+  INCZ ZparamsHI
+  JMPI params
+
+  (13b 23cyc)
+  LDXZ ZparamsLO
+  LDYZ ZparamsHI
+  INX
+  BNE 01
+  INY
+
+  TXA
+  PHA
+  TYA
+  PHA
+  RTS
+)
+
+(for some reason, one more RTS/NOP will BRK!?)
+RTS
+RTS
+RTS
+RTS
+RTS
+RTS
+RTS
+77
+(8 bytes ok 9 not?)
+(NOP)
+;
+(mere insertion ABOVE causes run error)
 
 : xincwA
   CLC
@@ -1117,7 +1272,7 @@ RTS
 
 : remove (all S from stack)
   PLA (it contains original S)
-  EOR# (255-A)
+  EOR# ff (255-A) (BUG? ff was missing!)
   TAY (number of entries to remove)
   FALLTHROUGH ;
 : removeloop
