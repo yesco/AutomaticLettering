@@ -12,10 +12,13 @@ for $i (0..255) {
     # NO my ($e, $s, $v) = &var8($i);
     $d = $v - $last;
     print sprintf("%3d", $i), " $e\t$s\t$v\t$d\n";
+
+    my ($e, $s, $v) = &foo8(255-$i);
+    print sprintf("%3d", $i), " $e\t$s\t$v\t$d\n";
     $last = $v;
 
     my ($e, $s, $v) = &add_foo8($i, $i);
-    print sprintf("===%3d", $i), " $e\t$s\t$v\n";
+    print sprintf("===%3d", $i), " $e\t$s\t$v\t(", $last+$last, ")\n";
 }
 
 # erronious
@@ -192,6 +195,7 @@ sub ufint8x {
 # - a single byte
 # - signed float
 # - comparable as unsigned byte
+# - negation by xor (hmmm)
 # - integer full precision -32..+32
 # - decimal smallest abs val 0.0625
 # - finally PI = 3 !
@@ -206,15 +210,21 @@ sub foo8 {
     my $eb = -1; #-1 seems good
     my ($i) = @_;
     
+    if ($i == 127 || $i == 128) {
+	return 0,0,0;
+    }
+
     my $neg = !($i & 128);
     $i = 255-$i if $neg;
     
     my $e = ($i >> 4) & 7;
     my $s = $i & 15;
-
-    $s += 16; # if $e;
+    my $ss = $s;
     
     my $ne = $e - $eb;
+
+    $s += 16;
+    
     my $n = $s / 32;
     my $v = $n * 2 ** $ne;
 
@@ -222,43 +232,50 @@ sub foo8 {
     $v += $eb;
 
     $v = -$v if $neg;
-    return $e, $s, $v;
+    return $e, $s, $v, $i, $neg, $ne, $ss;
 }
 
+# not working correctly :-(
 sub add_foo8 {
     my $eb = -1; #-1 seems good
-    my ($ia, $ib) = @_;
-    
-    my $nega = !($ia & 128);
-    $ia = 255-$ia if $neg;
-    
-    my $negb = !($ib & 128);
-    $ib = 255-$ib if $neg;
-    
-    my $nea = ($ia >> 4) & 7;
-    my $sa = $ia & 15;
 
-    my $neb = ($ib >> 4) & 7;
-    my $sb = $ib & 15;
+    my ($a, $b) = @_;
+    my ($ae, $as, $av, $ai, $aneg, $ane, $ass)= foo8($a);
+    my ($be, $bs, $bv, $bi, $bneg, $bne, $bss)= foo8($b);
 
-#    $sa += 16; # if $e;
-#    $sb += 16; # if $e;
-    
-    my $s = $sa + $sb;
-    my $e = $e;
+    # make a wish
+    my $neg = $aneg; # not correct...
+    my $rv = $av + $bv;
 
+    my $s;
+    if ($ae == $be) {
+	$s = $ass + $bss;
+    } else {
+	print "%% ERROR: not implented\n";
+	if (abs($ae-$be) >= 4) {
+	    # TODO: return biggest abs
+	} else {
+	    # TODO: shift to same dignity
+
+	    $s = $ass + $bss;
+	}
+    }
+
+    $s = 0 if $s == -32;
+    my $e = $ae;
     my $ne = $e - $eb;
+    print "(= $e $s =)";
+
+    $s += 16;
+
     my $n = $s / 32;
     my $v = $n * 2 ** $ne;
 
-    # wtf? LOL (related to $eb...
     $v += $eb;
-
-    # TODO
-    $v = -$v if $nega;
-    
-    return $e, $s, $v;
+    $v = -$v if $neg;
+    return $e, $s, $v, $i, $neg, $ne;
 }
+
 
 # errornoious no ! and big step
 sub foo8orig {
