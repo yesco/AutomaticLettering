@@ -386,18 +386,85 @@ https://docs.google.com/document/d/16Sv3Y-3rHPXyxT1J3zLBVq4reSPYtY2G6OSojNTm4SQ/
  
 )
 
-
-
 (--- SYSTEM ---)
 
+(- init method chaning -)
+( Each init method that needs to be called
+  name it init. But before do:
 
+  = OLDINIT &init ; (save previous)
+  : init (new init, override)
+    JSRA OLDINIT
+    ...
+    your init code
+   ;
+)
 
+(- ZP/Zeropage regs for params)
 
+= z0 00 ;
+= z1 01 ;
+= z2 02 ;
+= z3 03 ;
+= z4 04 ;
+= z5 05 ;
+= z6 06 ;
+= z7 07 ;
+= z8 08 ;
+= z9 09 ;
+
+( use for jmp, can't use for JSR/no rts...)
+
+= zjmpInstr 14 ;
+= zjmp 15 ; ( address for JMPA zjmp )
+= zjmpLO 15 ;
+= zjmpHI 16 ;
+
+( - 16 zp registers )
+= registers 18 ;
+= result 18 ;
+
+= zr0 18 ;
+= zr1 19 ;
+= zr2 1a ;
+= zr3 1b ;
+= zr4 1c ;
+= zr5 1d ;
+= zr6 1e ;
+= zr7 1f ;
+= zr8 20 ;
+= zr9 21 ;
+= zra 22 ;
+= zrb 23 ;
+= zrc 24 ;
+= zrd 25 ;
+= zre 26 ;
+= zrf 27 ;
+
+= registersMAX 27 ;
+
+( - TODO: find usage: screen? )
+= tmp0 28 ;
+= tmp1 29 ;
+= tmp2 2a ;
+= tmp3 2b ;
+= tmp4 2c ;
+= tmp5 2d ;
+
+= tmpLO 33 ;
+= tmpHI 34 ;
+
+( - zero page end - system functions: )
 
 : stop (loop forever)
   LDA# 00
   BEQ *stop
 ;
+
+(TODO: fix/remove change, move to
+ ZP allocation above!)
+
+
 
 = SCREENPTR 026d ; (TODO: use)
 = SCREEN bb80 ; (content)
@@ -705,6 +772,26 @@ RTS
   JMPA &putd1kd
 ;
 
+: put1k (Y hi, A lo)
+  LDX# 00
+  STXZ 00
+  FALLTHROUGH ;
+: loop
+  SEC
+  SBC# e8
+  TAX
+  TYA
+  SBC# 03
+
+  BCS 03
+  LDXZ 00
+  RTS
+
+  TAY
+  TXA
+  INCZ 00
+;
+
 : putd1k
   LDX# '0'
   putd1kd
@@ -806,6 +893,100 @@ RTS
   LDAZ ZSTR puthn
 ;
 
+( - https://codebase64.org/doku.php?id=base:tiny_.a_to_ascii_routine )
+
+: putdA (put Decimal from A => ascii Y,X,A)
+  LDY# 2f
+  LDX# 3a
+  SEC
+  FALLTHROUGH ;
+
+: putdAl100
+  INY
+  SBC# 64 (100 dec)
+  bcs *putdAl100
+  FALLTHROUGH ;
+
+: putdAl10
+  DEX
+  ADC# 0a
+  BMI *putdAl10
+
+  ADC# 2f
+
+  PHA
+  TYA putc
+  TXA putc
+  PLA putc
+;
+
+
+
+( - https://codebase64.org/doku.php?id=base:32_bit_hexadecimal_to_decimal_conversion )
+( The conversion is done by repeatedly
+  dividing the 32 bit value by 10 and
+  storing the remainder of each division
+  as decimal digits. )
+
+(WARNING: untested, just "converted")
+
+: 32div10 ( A = z0..z3 % 10)
+  LDY# 32
+  LDA# 00
+  CLC
+  FALLTHROUGH ;
+
+: div10l
+  ROL
+  CMP# 0a
+  BCC 02
+  SBC# 0a
+  ROL z0
+  ROL z1
+  ROL z2
+  ROL z3
+  DEY
+  BPL *div10l
+;
+
+: hex2dec (32 bit in z0..z3 => r0..r9)
+  LDX# 00
+  FALLTHROUGH ;
+
+: hex2decl1 
+  32div10
+  CMP# 00
+  BEQ *hex2decl1
+  BNE 03
+  FALLTHROUGH ; 
+
+: hex2decl2
+  32div10
+  STAZX result
+  INX
+  CPY# 0a
+  BNE *hex2decl2
+;
+
+: 32print
+  hex2dec
+  LDX# 09
+  FALLTHROUGH ;
+
+: 32printskip (skip leading zeros)
+  LDAX result
+  BNE 03 (goto 32printnext)
+  DEX
+  BNE *32printskip
+  FALLTHROUGH ;
+
+: 32printnext
+  LDAX result
+  ORA# 30 ('0'?)
+  putc
+  DEX
+  BPL *32printnext
+;
 
 (- keyboard )
 ( ORIC:
@@ -829,8 +1010,9 @@ RTS
   AND# 7f (clear top bit)
 ;
 
-($35-$84 Input buffer. 79 bytes)
+($35-$84 Input buffer. 80 bytes)
 = ZINPUTBUF 35 ;
+= ZINPUTBUFEND 84 ;
 = INPUTBUFLEN 4f ;
 = RETURNKEY 0d ;
 = BSKEY 8 ;
@@ -908,6 +1090,12 @@ RTS
  ZX stack is next byte to use
  ???ZX 0 points to TOP lo byte
  ???ZX 1 points to TOP hi byte)
+
+( Zeropage usage by ORIC:
+
+
+      FREE $85-$ff - 122 bytes!
+)
 
 = stack ff ; (address of stack pointer X)
 

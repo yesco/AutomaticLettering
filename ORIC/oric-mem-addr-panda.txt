@@ -15,31 +15,33 @@ RAM, relocated after loaded.
 ----------------------------------------
 Totally Free Bytes!
 
-#0400 – #04FF – not used by BASIC – reserved for use with the disk system.
-
-#BFEO – #BFFF – unused.
-
-List of "NOT free locations"
+List of FREE location in ZP
 ----------------------------
-
-FREE $00-$09
+FREE $00-$09 - 10 bytes
 FREE $14-$16
-FREE $18-$2D
+FREE $18-$2D - 21 bytes
 FREE $33-$34
-FREE $85-$ff
+?FREE $35-$84-  80 bytes (input buffer)
+FREE $85-$ff - 122 bytes!
 
-?FREE $200-$2ff ??? (BUT: used by BASIC graphics routinmes)
-?FREE $400-$4ff ??? (BUT: "reserved for use with disk system")
+(use top of ZP for data stack - 32 bytes?)
+
+(- #xff #x85)
+
+?FREE $200-$2ff - (BUT: used by BASIC graphics routinmes)
+?FREE $400-$4ff - (BUT: "reserved for use with disk system")
 
 FREE $500-$9800 FREE 37632 bytes contigious!
 
 ?FREE $9800-$b3ff ??? FREE (in TEXTMODE, BUT: used by HIRES)
+
 ?FREE $bfeo-$bfff ??? FREE (32 bytes!)
 
+List of "NOT free locations"
 --- NOT:
 
 NOT $0A-$13
-NOT $17
+NOT $17 used by Ctrl-C flag/keyboard
 NOT $2E-$32
 NOT $35-$84 input buffer (???)
 
