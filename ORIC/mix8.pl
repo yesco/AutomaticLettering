@@ -9,26 +9,126 @@
 if (1) {
     $pi = 3.141592654;
     $ee = 2.71828182845904523536;
-    $s2 = 1.07611737516463775650; #sqrt(pi/e)
+    $sqrt2 = 1.07611737516463775650;
+    $sqrt5 = sqrt(5);
+    $goldenratio = (1 + $sqrt5) / 2;
 
-    $method = 1;
-    if ($method == 1) {
+    $PIEround = 0.4; # "seems to be best"
+
+    $method = 'pie';
+    $method = 'fint16in8';
+    $method = 'double64in8';
+    $method = 'float32in8';
+    $method = 'gr';
+    $method = 'fint32in8';
+    $method = 'piesq';
+    $method = 'fib';
+
+    if ($method eq 'piesq') {
 	# 0, 10^-12, ... -1 0 1 2 3 5 8 .. 10^12
 	# this alsmost generates fib!
 	# however it's coarse
-	$base =  $pi/$ee*$s2; # 1.24
+	$base =  $pi/$ee*$sqrt2; # 1.24
 	$base *= $base;
 	$offset = 64; # 0..1
 	# NOTICE: ONLY $method=1
 	#   add,sub,mul: are optimzied for
-    } elsif ($method == 2) {
+    } elsif ($method eq 'fib') {
+	# 0, ... 0 ... 1 1 2 
+	# this alsmost generates fib!
+	# however it's coarse
+	# $piesq = 1.24369828222538;
+	$base = 1.242;
+	$base *= $base;
+	$offset = 64; # 0..1
+	# NOTICE: ONLY $method=1
+	#   add,sub,mul: are optimzied for
+    } elsif ($method eq 'pie') {
 	# 0, 10^-6 ... 10^6
 	# more dense around 0..10
-	$base =  $pi/$ee*$s2; # 1.24
+	$base =  $pi/$ee*$sqrt2; # 1.24
+	$offset = 64; # 0..1
+	# TODO: new variants of add,sub,mul?
+    } elsif ($method eq 'fint16in8') {
+	# -inf, -32K -0, +0 +32K, +inf
+	# more dense around 0..10
+	$base =  1.18058;
+	$offset = 64; # 0..1
+	# TODO: new variants of add,sub,mul?
+    } elsif ($method eq 'fint8in8') {
+	# -inf -125 -0 +0 125 +inf
+	# more dense around 0..10
+	$base =  1.081;
+	$offset = 64; # 0..1
+	# TODO: new variants of add,sub,mul?
+    } elsif ($method eq 'fint32in8') {
+	# -inf 2e-9 -0 0 1 1.4 2 2.8 2.036e9 ... 
+	# more dense around 0..10
+	$base =  1.413;
+	$offset = 64; # 0..1
+	# TODO: new variants of add,sub,mul?
+    } elsif ($method eq 'float32in8') {
+	# -inf 3.39-38 -0 ... 0 4 17 73 ..
+	# more dense around 0..10
+	$base =  4.18285;
+	$offset = 64; # 0..1
+	# TODO: new variants of add,sub,mul?
+    } elsif ($method eq 'double64in8') {
+	# -inf -9e303 .. -0 0 1 79900 ... lol
+	# more dense around 0..10
+	$base =  79900;
+	$offset = 64; # 0..1
+	# TODO: new variants of add,sub,mul?
+    } elsif ($method eq 'gr') {
+	# 
+	# 
+	$base =  $goldenratio;
 	$offset = 64; # 0..1
 	# TODO: new variants of add,sub,mul?
     }
 
+    print "======= Base-pow($base, $offset) ======\n";
+
+    # - Math of addition!
+    # b^n + b& n+x = b^ n+d
+    #      1 + b^x = b^d
+    #     ln 1+b^x = d ln b
+    #            d = ln 1+b^x / ln b
+    #
+
+    print "\n\n\n";
+    print "----------- addition algo ---------\n";
+    print "d\t\"d\"     round\tadd\trfactor real\n";
+
+    # - if a is biggest, to add b
+    #   - return hi + add
+    #   - return lo + dr
+
+    $roundingOffset = 0.4; # not obvious!
+    $equals = 0;
+    $equalsStop = 10; # when have # in row
+    $x = 0;
+    do {
+	$d = log(1 + $base ** $x) / log($base);
+	$dr = int($d + $roundingOffset);
+	$dd = $d - $dr;
+	$ddd = $dr - $x;
+	$vr = $base ** $dr;
+	$v = $base ** $d;
+
+	if ($x == $dr) {
+	    print '-' x 48, "\n" unless $equals;
+	    $equals++;
+	} else {
+	    $equals = 0;
+	}
+
+	print sprintf(
+	    "$x\t%-8g  $dr\t$ddd\t%-6g %-6g\n",
+	    $d, $vr, $v);
+
+	$x++;
+    } while ($equals < $equalsStop);
 
     # playing with the idea of exponential
     # number base... this means a floating
@@ -56,7 +156,10 @@ if (1) {
     # 128     1.15282e+06
 
 
-    #print $base; exit;
+    print "\n\n\n";
+    print "----------- number mapping check ---------\n";
+    print "i\tfloat   \trev \tagain  \t\n";
+
 
     $a = 0;
     $b = 1;
@@ -92,14 +195,15 @@ if (1) {
     for $xf (0..9) {
 	print "\n";
 	for $yf (0..9) {
+	    $f = $xf + $yf;
+
 	    $x = ftoPIE($xf);
 	    $y = ftoPIE($yf);
-	    
 	    $z = addPIE($x, $y);
-	    $zf = PIEtof($z);
-	    $pz = ftoPIE($x + $y);
 
-	    $f = $xf + $yf;
+	    $zf = PIEtof($z);
+	    $pz = ftoPIE($f);
+
 	    # seems like NOOP, but it's "roundong
 
 	    $fp = ftoPIE($f);
@@ -110,7 +214,7 @@ if (1) {
 		$zf, $ff);
 
 	    if ($z != $fp) {
-		print "  %% --- Not same z=$z pz=$pz zf=$zf f=$f ff=$ff\n";
+		print "  %% --- Not same z=$z pz=$pz zf=$zf f=$f ff=$ff\n\n";
 	    }
 	
 	}
@@ -265,7 +369,7 @@ if (1) {
     sub addPIE {
 	# NOTICE: ONLY $method=1
 	#   add,sub,mul: are optimzied for t
-	die unless $method == 1;
+	die unless $method == 'piesq';
 
 	my ($a, $b) = @_;
 	return $b if !$a;
@@ -277,23 +381,24 @@ if (1) {
 	    $b = $t;
 	}
 
-	# now $a >=  $b
-	
+	# now $a >= $b
+	my $d = $a - $b;
+	my $r = $a;
+	$r = $a+1 if $d < 4;
+
+	# check for +inf
+	return $r >= 255 ? 255 : $r;
+
+
+
+
+
 	my $af = PIEtof($a);
 	my $bf = PIEtof($b);
 	my $f = $af + $bf;
 
 	my $p = ftoPIE($f);
 
-	# LOL: $p = ($a - $b) + $a;
-	if (abs($a - $b) < 3) {
-	    # almost defintion of fib!
-	    return $a + 1;
-	} else {
-	    # too small to make a difference
-	    return $a;
-	}
-	
 	my $pf = PIEtof($p);
 	print sprintf(
 	    "add %-6g %-6g = (%-6g) => %-6g\n",
@@ -304,7 +409,7 @@ if (1) {
     sub subPIE {
 	# NOTICE: ONLY $method=1
 	#   add,sub,mul: are optimzied for
-	die unless $method == 1;
+	die unless $method == 'piesq';
 
 	my ($a, $b) = @_;
 	return $a if !$b;
@@ -322,10 +427,21 @@ if (1) {
 	return $a;
     }
 
+    sub negPIE {
+	my ($a) =@_;
+	return $a ^ 128;
+    }
+
+    sub invPIE {
+	my ($a) = @_;
+	return $a ^ 127; # really?
+    }
+
     sub mulPIE {
 	# NOTICE: ONLY $method=1
 	#   add,sub,mul: are optimzied for t
-	die unless $method == 1;
+	die unless $method == 'piesq';
+
 
 	my ($a, $b) = @_;
 	return 0 if !$a;
@@ -355,7 +471,7 @@ if (1) {
     sub divPIE {
 	# NOTICE: ONLY $method=1
 	#   add,sub,mul: are optimzied for t
-	die unless $method == 1;
+	die unless $method == 'piesq';
 
 	my ($a, $b) = @_;
 	return 0 if !$a;
@@ -379,7 +495,7 @@ if (1) {
 	# p = ln f / ln b + o
 
 	return int(log($f)/log($base)
-		   + $offset + 0.5);
+		   + $offset + $PIEround);
     }
 
     exit
