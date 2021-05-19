@@ -392,9 +392,9 @@ https://docs.google.com/document/d/16Sv3Y-3rHPXyxT1J3zLBVq4reSPYtY2G6OSojNTm4SQ/
 ( Each init method that needs to be called
   name it init. But before do:
 
-  = OLDINIT &init ; (save previous)
+  : oldinit init ; (save previous)
   : init (new init, override)
-    JSRA OLDINIT
+    oldinit
     ...
     your init code
    ;

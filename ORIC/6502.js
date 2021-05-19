@@ -1264,7 +1264,9 @@ EED7 RTS
 	n=>f=f.replace(RegExp('(?<![A-Za-z])'+n+'(?![\\w#])', 'g'), alias[n]));
     } while (fprev !== f);
 
-    // extract functions
+    // at this point no more macro substitutions!
+      
+    // extract functions (in order!)
     let nbytes = 0, nfuncs = 0;
     f = f.replace(/:\s*(\S+)([\s\S]*?);/g, (a,f,l)=>{
       console.log('FUNCTION: '+f+ ' line: '+l);
