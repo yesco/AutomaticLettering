@@ -1,6 +1,9 @@
 ( Mixed Precision 16-bit Floats
   for use by 8-bit 6502 (ORIC ATMOS)
   
+  ... or just use .... 768 bytes of
+  https://codebase64.org/doku.php?id=base:6502_6510_maths
+
   Range: -inf -- +inf, NaN (lol!)
   
   Or why not a float8!

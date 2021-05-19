@@ -658,6 +658,10 @@ RTS
   puthb
 ;
 
+( these are kind of not efficient use:
+  - https://codebase64.org/doku.php?id=base:32_bit_hexadecimal_to_decimal_conversion )
+  (js emulator doesn't have DECimal mode)
+
 : putd10kd ($2710)
   LDAZ ZSTRLO
   SEC
