@@ -1,8 +1,12 @@
 ( Mixed Precision 16-bit Floats
   for use by 8-bit 6502 (ORIC ATMOS)
   
+  ... or just use woz:
+  - http://www.easy68k.com/paulrsm/6502/WOZFPPAK.TXT
+  an overview to many formats:
+  -   
   ... or just use .... 768 bytes of
-  https://codebase64.org/doku.php?id=base:6502_6510_maths
+  - https://codebase64.org/doku.php?id=base:6502_6510_maths
 
   Range: -inf -- +inf, NaN (lol!)
   

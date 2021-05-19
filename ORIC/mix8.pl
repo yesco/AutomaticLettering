@@ -1,20 +1,411 @@
+# this is a file to test various 1 byte
+# float point representations!
+
+
+# fib - closed form
+#
+#  - https://fabiandablander.com/r/Fibonacci.html#:~:text=The%20closed-form%20expression%20of,√52)n%5D.
+
+if (1) {
+    $pi = 3.141592654;
+    $ee = 2.71828182845904523536;
+    $s2 = 1.07611737516463775650; #sqrt(pi/e)
+
+    $method = 1;
+    if ($method == 1) {
+	# 0, 10^-12, ... -1 0 1 2 3 5 8 .. 10^12
+	# this alsmost generates fib!
+	# however it's coarse
+	$base =  $pi/$ee*$s2; # 1.24
+	$base *= $base;
+	$offset = 64; # 0..1
+	# NOTICE: ONLY $method=1
+	#   add,sub,mul: are optimzied for
+    } elsif ($method == 2) {
+	# 0, 10^-6 ... 10^6
+	# more dense around 0..10
+	$base =  $pi/$ee*$s2; # 1.24
+	$offset = 64; # 0..1
+	# TODO: new variants of add,sub,mul?
+    }
+
+
+    # playing with the idea of exponential
+    # number base... this means a floating
+    # precision
+
+    # - smooth difference between clsoe numbers
+    # - multiplication becomes easy?
+    # - addition a pain, but has the advantage
+    #   of that near
+    # - subtraction, if numbers are near, the
+    #   difference can also be found!
+
+    # this almost generates fib...
+    
+    # 1 .07883e-06
+    # 2  1.34174e-0
+    # 3  1.66872e-06
+    # 4  2.07538e-06
+    # 5  2.58115e-06 
+    # ...
+
+    # ...
+    # 126     745302
+    # 127     926931
+    # 128     1.15282e+06
+
+
+    #print $base; exit;
+
+    $a = 0;
+    $b = 1;
+
+    $i = 0;
+    while ($i < 256) {
+	# fib
+	$c = $a + $b; $a = $b; $b = $c;
+
+	# expoential base!
+	$e = PIEtof($i);
+	$ii = ftoPIE($e);
+	$ee = PIEtof($ii);
+	$iii = ftoPIE($ee);
+	
+	print "$i\t",
+	    sprintf("%-8g\t", $e),
+	    $ii,
+	    sprintf("\t%-8g\t", $ee),
+	    "\n";
+
+	if ($ii != $i || $i != $iii) {
+	    print "%% ERROR: ftoPIE <=> PIEtof) not congruent!\n";
+	    print "i=$i ii=$ii i==$iii\n";
+	}
+
+	$i++;
+    }
+
+    print "\n\n\n--------------addition---------\n";
+
+    print "xf yf f\t\tzf\t$x y z\n";
+    for $xf (0..9) {
+	print "\n";
+	for $yf (0..9) {
+	    $x = ftoPIE($xf);
+	    $y = ftoPIE($yf);
+	    
+	    $z = addPIE($x, $y);
+	    $zf = PIEtof($z);
+	    $pz = ftoPIE($x + $y);
+
+	    $f = $xf + $yf;
+	    # seems like NOOP, but it's "roundong
+
+	    $fp = ftoPIE($f);
+	    $ff = PIEtof($fp);
+
+	    print sprintf(
+		"$xf*$yf=$f \t%-8g\t%-8g  $x $y:$z\n",
+		$zf, $ff);
+
+	    if ($z != $fp) {
+		print "  %% --- Not same z=$z pz=$pz zf=$zf f=$f ff=$ff\n";
+	    }
+	
+	}
+    }
+    
+    print "\n\n\n--------------multiplication---------\n";
+
+    print "xf yf f\t\tzf\t$x y z\n";
+    for $xf (0..9) {
+	print "\n";
+	for $yf (0..9) {
+	    $x = ftoPIE($xf);
+	    $y = ftoPIE($yf);
+	    
+	    $z = mulPIE($x, $y);
+	    $zf = PIEtof($z);
+	    $pz = ftoPIE($x + $y);
+
+	    $f = $xf * $yf;
+	    # seems like NOOP, but it's "roundong
+
+	    $fp = ftoPIE($f);
+	    $ff = PIEtof($fp);
+
+
+	    # seems like NOOP, but it's "roundong"
+	    print sprintf(
+		"$xf*$yf=$f \t%-8g\t%-8g  $x $y:$z\n",
+		$zf, $ff);
+
+	    if ($z != $fp) {
+		print "  %% --- Not same fi=$fi pz=$pz zf=$zf f=$f ff=$ff\n";
+	    }
+	}
+    }
+    
+    print "\n\n\n";
+
+    $last = 0;
+    for $i (0..255) {
+	$e = PIEtof($i);
+	$ii = ftoPIE($e);
+
+	$x = $a;
+	$xf = PIEtof($x);
+	
+	print sprintf("$i\t%-8g\t$ii\t$x\t%-8g\n", $e, $xf);
+	$last = $i;
+    }
+
+    for $i (0..255) {
+	$xf = int(rand(999));
+	$yf = int(rand(878));
+
+	$x = ftoPIE($xf);
+	$y = ftoPIE($yf);
+	
+	$f = $xf + $yf;
+	$z = ftoPIE($f);
+	$zf = PIEtof($z);
+	print "-- $xf + $yf = ", $f, sprintf(" ... %-8g ($z)\n", $zf);
+	$z = $a = addPIE($x, $y);
+
+
+	$f = $xf * $yf;
+	$z = ftoPIE($f);
+	$zf = PIEtof($z);
+	print "-- $xf * $yf = ", $f, sprintf(" ... %-8g ($z)\n", $zf);
+	$z = $m = mulPIE($x, $y);
+
+
+
+	$z = $s = subPIE($x, $y);
+	$z = $d = divPIE($x, $y);
+	print "\n";
+    }
+
+    #   F(n) = F(n - 1) + F(n - 2)
+    #
+    #   S(n) = S(n - 1) + F(n - 1)
+    #   S(n) = F(n + 1) - 1
+    #   S(n-1) = F(n) - 1
+    #   S(n-1) = F(n - 2) + F(n - 3) - 1
+
+    # F(a) - F(b) = S(a-1) - S(b-1)
+    
+    #  8                 -  2  =  6
+    # F(6)               - F(3)
+    # F(5)        + F(4) - F(3)
+    # F(4) + F(3) + F(4) - F(3)
+    # 2 * F(4)
+    # 2 * 3
+    #   6
+    #
+    # f10-f7 = 55-13 = 42 = 2f8 = 2*21
+    # f10-f6 =
+    #
+
+    # fn - fn-3 = 2fn-2
+
+    # fn - fn-4
+    # fn-1 + fn-2 - fn-4
+    # 2fn-2 + fn-3 - fn-4
+    # 2fn-2 - fn-3 
+
+    # g = gn = fn = f(n)
+    # g3 = g(-3) = f(n-3)
+    # g4 = g5 + g6
+    #
+    # f(n) - f(n-5)
+    # g0 - g5
+    # g1 + g2 - g5
+    # g2 + g3 + g2 - g5
+    # 2g2 + g3 - g5
+    # 2g3 + 2g4 + g3 - g5
+    # 3g3 + 2g4 - g5
+    # 3g4 + 3g5 + 2g4 - g5
+    # 5g4 + 2g5
+    # 5g5 + 5g6 + 2g5
+    # 3g5 + 5g6 = 3f5 + 5f4 = 3*5 + 5*3 = 30
+    # 3g6 + 3g7 + 5g6
+    # 8g6 + 3g7
+    #
+    # 8*f(n-6) + 3*f(n-7)
+    # f10-f5 = 55-5 = 50 = 8f(n-6)
+    # => 8*3 + 3*2 = 24+6 = 30
+
+    # f10-f5
+    # 55 | 5 = 50
+    # 21 34 | 5 = 50
+    # 13 21 21 | 5 = 50
+    # 2*21 13 | 5
+    # 2*8 2*13 13 | 5
+    # 2*8 3*13 | 5
+    # 2*8 3*5 3*8 | 5
+    # 5*8 3*5 | 5 = 50
+    # 5*8 2*5 = 50
+    # 5*3 5*5 2*5
+    # 5*3 7*5 = 50
+    # 5*3 7*3 7*2
+    # 12*3 7*2 == 12*f4 + 7*f3
+    # 12*2 12*1 7*2
+    # 19*2 12*1 == 19*f3 + 12*f2
+
+    # f(n)-f(n-5) == 19*f(n-7) + 12*f(n-8)
+
+    # fn-1 + fn-2 - fn-4
+    # fn-2
+
+    # f10-f5 = 55-5 = 50 = f8 = 13 ??? 
+    
+    sub addPIE {
+	# NOTICE: ONLY $method=1
+	#   add,sub,mul: are optimzied for t
+	die unless $method == 1;
+
+	my ($a, $b) = @_;
+	return $b if !$a;
+	return $a if !$b;
+
+	if ($a < $b) {
+	    my $t = $a;
+	    $a = $b;
+	    $b = $t;
+	}
+
+	# now $a >=  $b
+	
+	my $af = PIEtof($a);
+	my $bf = PIEtof($b);
+	my $f = $af + $bf;
+
+	my $p = ftoPIE($f);
+
+	# LOL: $p = ($a - $b) + $a;
+	if (abs($a - $b) < 3) {
+	    # almost defintion of fib!
+	    return $a + 1;
+	} else {
+	    # too small to make a difference
+	    return $a;
+	}
+	
+	my $pf = PIEtof($p);
+	print sprintf(
+	    "add %-6g %-6g = (%-6g) => %-6g\n",
+	    $af, $bf, $f, $pf); # if 0;
+	return $p, $af, $bf, $f, $pf;
+    }
+
+    sub subPIE {
+	# NOTICE: ONLY $method=1
+	#   add,sub,mul: are optimzied for
+	die unless $method == 1;
+
+	my ($a, $b) = @_;
+	return $a if !$b;
+
+	my $d = $a - $b;
+	if ($d < 0) {
+	    # neg not imlemented yet
+	    return -9999;
+	}
+	
+	# this is "correct" for "fib"
+	return 0 if !$d;
+	return $a - 2 if $d == 1;
+	return $a if $d <= 3;
+	return $a;
+    }
+
+    sub mulPIE {
+	# NOTICE: ONLY $method=1
+	#   add,sub,mul: are optimzied for t
+	die unless $method == 1;
+
+	my ($a, $b) = @_;
+	return 0 if !$a;
+	return 0 if !$b;
+
+	# - Math!
+	# x = b ^ xp-o
+	# y = b ^ yp-o
+	#
+	# x * y = b ^ xp-o  *  b ^ yp-o
+	# ln x + ln y = (xp-o + yp-o) * ln b
+        # x * y = b ^ (xp-o + xp-o);
+	
+	my $af = PIEtof($a);
+	my $bf = PIEtof($b);
+	my $f = $af * $bf;
+
+	my $pc = ftoPIE($f);
+	my $p = $a + $b - $offset;
+	my $pf = PIEtof($p);
+	print sprintf(
+	    "mul %-6g %-6g = (%-6g) => %-6g\n",
+	    $af, $bf, $f, $pf); # if 0;
+	return $p, $af, $bf, $f, $pf;
+	
+    }
+    sub divPIE {
+	# NOTICE: ONLY $method=1
+	#   add,sub,mul: are optimzied for t
+	die unless $method == 1;
+
+	my ($a, $b) = @_;
+	return 0 if !$a;
+	
+    }
+    
+    sub PIEtof {
+	my ($i) = @_;
+	return 0 if !$i;
+
+	return $base ** ($i - $offset);
+    }
+    
+    sub ftoPIE {
+	my ($f) = @_;
+	return 0 if !$f;
+
+	# - Math!
+	# f = b ^ p-o
+	# ln f = ln  b ^ p-o
+	# p = ln f / ln b + o
+
+	return int(log($f)/log($base)
+		   + $offset + 0.5);
+    }
+
+    exit
+}
+
+#########################################
+# more traditional ipmlementations
+
 # mix8
 $last = 0;
 for $i (0..255) {
-    #my ($e, $s, $v) = &mix8($i);
-    #my ($e, $s, $v) = &float8($i);
-    #my ($e, $s, $v) = &fint8($i);
-    #my ($e, $s, $v) = &ufint8x($i);
-    my ($e, $s, $v) = &foo8($i);
-    #my ($e, $s, $v) = &vint8($i);
-    #my ($e, $s, $v) = &uvfloat8($i);
+    #my ($e, $s, $v) = &mix8($i); # - crap
+    #my ($e, $s, $v) = &float8($i); # - crap
+    #my ($e, $s, $v) = &fint8($i); # 0..15K
+    my ($e, $s, $v) = &ufint8x($i); # 0..8K
+    #my ($e, $s, $v) = &foo8($i); # - good!
+    #my ($e, $s, $v) = &foo8x($i);
+    #my ($e, $s, $v) = &vint8($i); # crap
+    #my ($e, $s, $v) = &uvfloat8($i); # 0..1..490
     # NO my ($e, $s, $v) = &vfloat8($i);
     # NO my ($e, $s, $v) = &var8($i);
     $d = $v - $last;
     print sprintf("%3d", $i), " $e\t$s\t$v\t$d\n";
 
-    my ($e, $s, $v) = &foo8(255-$i);
-    print sprintf("%3d", $i), " $e\t$s\t$v\t$d\n";
+    #my ($e, $s, $v) = &foo8(255-$i); check neg
+    #print sprintf("%3d", $i), " $e\t$s\t$v\t$d\n";
     $last = $v;
 
     my ($e, $s, $v) = &add_foo8($i, $i);
@@ -192,6 +583,7 @@ sub ufint8x {
 # Floating Ordered Osigned 8-bit
 # 
 # Features:
+# - almost IEEE(1, 3, 4, -1, 1.5)
 # - a single byte
 # - signed float
 # - comparable as unsigned byte
@@ -202,10 +594,13 @@ sub ufint8x {
 # - +inf/-inf (+247/-247)
 # - signed -0 and +0
 # - range -239 -- +239
-# - 1.5 decimals precision! (LOL)
 # - 1 sign bit
 # - 3 exponent bits
+# -   -1 offset!
 # - 4 significant bits (+ 1 implied)
+# - 1.5 decimals precision! (LOL)
+# - no NaN unless waste values?
+#   (or no +0/-0 ?)
 sub foo8 {
     my $eb = -1; #-1 seems good
     my ($i) = @_;
@@ -276,6 +671,36 @@ sub add_foo8 {
     return $e, $s, $v, $i, $neg, $ne;
 }
 
+sub foo8x {
+    my $eb = -1; #-1 seems good
+    my $em = 2;
+    
+    my ($i) = @_;
+    
+#    if ($i == 127 || $i == 128) {
+#	return 0,0,0;
+#    }
+
+    my $neg = !($i & 128);
+    $i = 255-$i if $neg;
+    
+    my $e = ($i >> 4) & 7;
+    my $s = $i & 15;
+    my $ss = $s;
+    
+    my $ne = $e - $eb;
+
+    $s += 16;
+
+    my $n = $s / 32;
+    my $v = $n * 2 ** ($ne * $em);
+
+    # wtf? LOL (related to $eb...
+    $v += $eb;
+
+    $v = -$v if $neg;
+    return $e, $s, $v, $i, $neg, $ne, $ss;
+}
 
 # errornoious no ! and big step
 sub foo8orig {
@@ -314,3 +739,5 @@ sub one8 {
     $v = -$v if $neg;
     return $e, $s, $v;
 }
+
+# 0	0.000001	0.00000
