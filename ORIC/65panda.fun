@@ -576,7 +576,7 @@ NOP (won't work without the extra NOP!? wtf?)
   STAIY wA
 
 (if removed need either two NOP!)
-ADC# 01
+(ADC# 01)
 (NOP NOP)
 
   INY
@@ -743,6 +743,7 @@ ADC# 01
   CPY# 00  movy
 ;
   
+(
 : cls
 RTS
   home
@@ -769,6 +770,7 @@ RTS
 
   home
 ;
+)
 
 (- strings -)
 
@@ -2036,6 +2038,22 @@ BNE L1
   puts "--kcatS"
 ;
 
+: cls
+  (fill screen)
+
+  LDA# _SCREEN
+  STAZ z0
+  LDA# ^SCREEN
+  STAZ z1
+
+  LDA# _SCREENLEN
+  STAZ z2
+  LDA# ^SCREENLEN
+  STAZ z3
+
+  LDA# 20  fill
+;
+
 (todo: since don't have forward ref, this must be last!)
 : reset
 
@@ -2052,19 +2070,7 @@ BNE L1
   
   main
 
-  (fill screen '.')
-
-  LDA# _SCREEN
-  STAZ z0
-  LDA# ^SCREEN
-  STAZ z1
-
-  LDA# _SCREENLEN
-  STAZ z2
-  LDA# ^SCREENLEN
-  STAZ z3
-
-  LDA# '.' fill
+cls
   
 (stop)
 
