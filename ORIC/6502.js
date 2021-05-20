@@ -423,7 +423,13 @@ C	....	Carry
     try {
       f = eval(code);
     } catch(e) {
-      throw Error(e + '\n' + code);
+      throw Error(
+	'\n================' +
+	  e + '\n' + code +
+	  '\n-------\n' +
+	  "OPCODE: " + op[0] +
+	  "    IP: " + ip
+      );
     }
     // trace generated code
     //if (trace) console.log('\t', f.toString());
@@ -672,6 +678,11 @@ function ORIC(dorom) {
   cpu.setError(oricError);
 
   function oricError(e) {
+    // update screen a last time
+    // it may have something
+    if (scon)
+      updateScreen();
+
     off();
     cursorOn();
     gotorc(50, 0);
@@ -941,7 +952,7 @@ EED7 RTS
     // 126: ~ (ORIC: Shaded gray block)
     // 127: white paraenthesis (ORIC: black block)
    
-    if (c == 0) {
+    if (c == 0 || c == 128 || c == 127 || c == 255) {
       process.stdout.write(' ');
       //process.stdout.write('0');	
     } else if (c > 127) {
@@ -1466,6 +1477,13 @@ via6552: IRQ every 10ms (free running mode)
   process.stdin.setRawMode(true);
   process.stdin.on('keypress', (str, key) => {
     if (key.ctrl && key.name === 'c') {
+      // update screen a last time
+      // it may have something
+      if (scon)
+	updateScreen();
+
+      gotorc(50, 0);
+
       process.exit();
     } else {
       // assume get onle one key

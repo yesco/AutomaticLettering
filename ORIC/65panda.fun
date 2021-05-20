@@ -402,16 +402,19 @@ https://docs.google.com/document/d/16Sv3Y-3rHPXyxT1J3zLBVq4reSPYtY2G6OSojNTm4SQ/
 
 (- ZP/Zeropage regs for params)
 
-= z0 00 ;
-= z1 01 ;
-= z2 02 ;
-= z3 03 ;
-= z4 04 ;
-= z5 05 ;
-= z6 06 ;
-= z7 07 ;
-= z8 08 ;
-= z9 09 ;
+= zregisters 00 ;
+= zregisterMAX 09 ;
+= zregisterLEN 0a ;
+= z0 00 ; = wA 00 ; = wA_LO 00 ; : = Rto   00 ;
+= z1 01 ;           = wA_HI 01 ;
+= z2 02 ; = wB 02 ; = wB_LO 02 ; : = Rlen  02 ;
+= z3 03 ;           = wB_HI 03 ;
+= z4 04 ; = wC 04 ; = wC_LO 04 ; ; = Rfrom 04 ; 
+= z5 05 ;           = wC_HI 01 ;
+= z6 06 ; = wD 06 ; = wD_LO 06 ;
+= z7 07 ;           = wD_HI 01 ;
+= z8 08 ; = wE 08 ; = wE_LO 08 ;
+= z9 09 ;           = wE_HI 08 ;
 
 ( use for jmp, can't use for JSR/no rts...)
 
@@ -421,8 +424,7 @@ https://docs.google.com/document/d/16Sv3Y-3rHPXyxT1J3zLBVq4reSPYtY2G6OSojNTm4SQ/
 = zjmpHI 16 ;
 
 ( - 16 zp registers )
-= registers 18 ;
-= result 18 ;
+= Zresult 18 ;
 
 = zr0 18 ;
 = zr1 19 ;
@@ -440,8 +442,8 @@ https://docs.google.com/document/d/16Sv3Y-3rHPXyxT1J3zLBVq4reSPYtY2G6OSojNTm4SQ/
 = zrd 25 ;
 = zre 26 ;
 = zrf 27 ;
-
 = registersMAX 27 ;
+
 
 ( - TODO: find usage: screen? )
 = tmp0 28 ;
@@ -461,13 +463,50 @@ https://docs.google.com/document/d/16Sv3Y-3rHPXyxT1J3zLBVq4reSPYtY2G6OSojNTm4SQ/
   BEQ *stop
 ;
 
+(- good to haves)
+
+: fill (at wA(mod) set mem to A for wB bytes)
+  LDY# 00
+
+  LDXZ wA_LO (do wA_LO times)
+
+NOP (won't work without the extra NOP!? wtf?)
+  INCZ wB_HI (one more for X count)
+
+  FALLTHROUGH ;
+
+: fillloop (write wB bytes to wA)
+  STAIY wA
+
+(if removed need either two NOP!)
+ADC# 01
+(NOP NOP)
+
+  INY
+  BNE 02
+  INCZ wA_HI (copied 256 bytes, need inc hi)
+  
+  DEX
+  BNE *fillloop
+
+  (init to copy one more page)
+  (x is zero == 256)
+
+  DECZ wB_HI (hi count)
+  BNE *fillloop
+;
+
+( --- screen stuff ---)
+
 (TODO: fix/remove change, move to
  ZP allocation above!)
 
-
-
 = SCREENPTR 026d ; (TODO: use)
 = SCREEN bb80 ; (content)
+= SCREENLEN 0460 ;
+
+(TODO: store scren address somewhere in Z)
+
 = CURROW 0268 ;
 = CURCOL 0269 ; (or address 30)
                 (40 == address 31)
@@ -962,7 +1001,7 @@ RTS
 
 : hex2decl2
   32div10
-  STAZX result
+  STAZX Zresult
   INX
   CPY# 0a
   BNE *hex2decl2
@@ -974,14 +1013,14 @@ RTS
   FALLTHROUGH ;
 
 : 32printskip (skip leading zeros)
-  LDAX result
+  LDAX Zresult
   BNE 03 (goto 32printnext)
   DEX
   BNE *32printskip
   FALLTHROUGH ;
 
 : 32printnext
-  LDAX result
+  LDAX Zresult
   ORA# 30 ('0'?)
   putc
   DEX
@@ -1451,10 +1490,10 @@ RTS
   TXA
   FALLTHROUGH ;
 
-: fill stack
+: fillstack
   PHA
   TSX
-  BNE *fill
+  BNE *fillstack
   (reached the bottom of stack?)
   PLA
   TYA
@@ -1516,15 +1555,15 @@ RTS
 
   (fill the stack with NOP)  
   LDA# NOP (harmless op)
-: fill
+: fillstack
   PHA
   TSX
-  BNE *fill
+  BNE *fillstack
 
   PLA (drop)
   
-  LDA# 00 (lo result)
-  LDY# 00 (hi result)
+  LDA# 00 (lo Zesult)
+  LDY# 00 (hi Zesult)
   JSRA 0100 (or jmp)
 ;
 
@@ -1900,6 +1939,24 @@ BNE L1
   (prompt)
   LDY# 10   LDX# 00  gotoxy
   LDA# '>'  putc
+
+
+  (fill screen '.')
+
+  LDA# _SCREEN
+  STAZ z0
+  LDA# ^SCREEN
+  STAZ z1
+
+  LDA# _SCREENLEN
+  STAZ z2
+  LDA# ^SCREENLEN
+  STAZ z3
+
+  LDA# '.' fill
+  
+  stop
+
   FALLTHROUGH ;
 
 : readevalloop  
