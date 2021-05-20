@@ -508,6 +508,7 @@ https://docs.google.com/document/d/16Sv3Y-3rHPXyxT1J3zLBVq4reSPYtY2G6OSojNTm4SQ/
 )
 
 (
+
 : pFill (usage: LDA# 'x' pFill wADDRESS wBYTES)
   (get address from stack store in jmp/return)
   PLA
@@ -518,9 +519,11 @@ https://docs.google.com/document/d/16Sv3Y-3rHPXyxT1J3zLBVq4reSPYtY2G6OSojNTm4SQ/
   LDY# 01 (rts address points to before next)
 
   LDY# 05 (copy 4 bytes = 2 registers + 1)
-  FALLTHROUGH ;
+  FALLTHROUGH
+ ;
 
 : pFillregs (copy backwards using one less reg)
+(
   LDAIY zjmp
   DEY (decrement before to use +1 offset!)
   STAIY zregisters (not effecting Z flag!)
@@ -559,7 +562,9 @@ https://docs.google.com/document/d/16Sv3Y-3rHPXyxT1J3zLBVq4reSPYtY2G6OSojNTm4SQ/
   JMPA &fill
   (since this is can be done before,
    we can fallthrough! saving 3b + 3cyc)
+)
 ;
+
 )
 
 : fill (at wA(mod) set mem to A for wB bytes)
@@ -2038,7 +2043,31 @@ BNE L1
   puts "--kcatS"
 ;
 
+: pFill 
+  PLA
+  CLC
+  ADC# 04
+
+  BCC 06
+  TAX
+  PLA
+  ADC# 01
+  PHA
+  TXA
+
+  PHA
+
+
+
+  RTS
+;
+
 : cls
+(
+  LDA# 00  pFill SCREEN SCREENLEN
+  RTS
+)
+
   (fill screen)
 
   LDA# _SCREEN
