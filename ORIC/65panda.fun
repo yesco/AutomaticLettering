@@ -423,7 +423,7 @@ https://docs.google.com/document/d/16Sv3Y-3rHPXyxT1J3zLBVq4reSPYtY2G6OSojNTm4SQ/
 = zjmpLO 15 ;
 = zjmpHI 16 ;
 
-( - 16 zp registers )
+( - 16 zp results )
 = Zresult 18 ;
 
 = zr0 18 ;
@@ -464,6 +464,103 @@ https://docs.google.com/document/d/16Sv3Y-3rHPXyxT1J3zLBVq4reSPYtY2G6OSojNTm4SQ/
 ;
 
 (- good to haves)
+
+(--- PARAMETER CALLING ---)
+( This is the implementation support functions
+  for calling functions like this:
+
+    LDA# 00 paFill SCREEN SCREENLEN
+
+  This function is flexible in the value
+  to fill, but fixes the addresses.
+  Name it pFunctionName to make calling
+  convention clear. It only takes constant
+  parameters. The number of bytes is fixed
+  and determined by function.
+
+)
+
+(TODO: implement a pPrintf!
+ 
+  pPrintf "A num %5d and %7s string."
+    CounterAddr HelloWorldAddr
+    
+  Prefix/modifiers
+  %... - default: two byte address of value
+  %$.. - use last pointer (no numeric arg)
+  %z.. - one byte zpage address
+  %@.. - indirection using page zero address
+  %l.. - long (2x bytes from normal)
+  %U.. - unsigned (for floats)
+
+  %% - '%'
+  %c - char
+  %b - byte (jsk)
+  %[-][\d+]s  (mod: ,=printables/. , '=\n\N^c)
+  %[\d+]d/i/u/x/X/o/O
+  %[+-][0][\d+[.\d+]]f/g/e/g/e
+  %n - pointer to store chars written so far
+  %42h - hexdump 42 characters
+
+
+  %[aa[xx[yy]]]& - load register a-y and call ptr
+  
+)
+
+(
+: pFill (usage: LDA# 'x' pFill wADDRESS wBYTES)
+  (get address from stack store in jmp/return)
+  PLA
+  STAZ zjmpLO
+  PLA
+  STAZ zjmpHI
+
+  LDY# 01 (rts address points to before next)
+
+  LDY# 05 (copy 4 bytes = 2 registers + 1)
+  FALLTHROUGH ;
+
+: pFillregs (copy backwards using one less reg)
+  LDAIY zjmp
+  DEY (decrement before to use +1 offset!)
+  STAIY zregisters (not effecting Z flag!)
+  BNE pFillregs
+
+(alt1: increase return pointer)(14 bytes, 24cyc)
+  (finally we're ready to call)
+  JSRA fill
+
+  LDAZ zjmpLO
+  CLC
+  ADC# 05 (skip 4 bytes = 2 words + 1 byte!)
+  STAZ zjmpLO
+  BCC 02
+  INCZ zjmpHI
+
+  JMPI zjmp (our fake rts, +3cyc)
+
+(TODO: move to before JSR fill)
+(TODO: make JSRA fill tailrecurse push  on stack)
+       
+(alt2: alternative)(18 bytes, 26cyc!)
+  (to be called after JSR zjmp)		 
+  LDAZ zjmpLO
+  CLC
+  ADC# 04 (skip 4 bytes = 2 words)
+  TAX
+
+  LDAZ zjmpHI
+  ADC# 00
+  PHA (hi)
+
+  TXA
+  PHA (lo)
+
+  JMPA &fill
+  (since this is can be done before,
+   we can fallthrough! saving 3b + 3cyc)
+;
+)
 
 : fill (at wA(mod) set mem to A for wB bytes)
   LDY# 00
@@ -1053,9 +1150,12 @@ RTS
 = ZINPUTBUF 35 ;
 = ZINPUTBUFEND 84 ;
 = INPUTBUFLEN 4f ;
+
+= CTRLA 01 ;
+= CTRLC 03 ; (can't catch yet)
+= BSKEY 08 ;
 = RETURNKEY 0d ;
-= BSKEY 8 ;
-= CTRLA 1 ;
+= CTRLU 15 ; (clear line, go back)
 
 : readline (at ZINPUTBUF, X chars, zero terminated)
 
@@ -1071,15 +1171,31 @@ RTS
   waitkey (-> A)
 
   (- control chars)
+  CMP# BSKEY
+  BNE 07
+  ( for some reason it doesn write?)
+  LDA# '_' (40)
+  STAZX ZINPUTBUF
+  JMPA &readlineloop
+
   CMP# RETURNKEY
   BNE 01
   RTS
 
-  CPX# INPUTBUFLEN-2
+  (lol really need a nop here!)
+  NOP
+
+  CMP# CTRLU (abort)
+  BNE 03
+  LDX# 00
+  RTS
+
+  (TODO: allow cursor to move around)
+
+  CPX# INPUTBUFLEN
   BEQ *readlineloop (ignore, TODO: beep)
   
   (TODO: CTRL-A read from screen)
-  (TODO: allow cursor to move around)
 
   (- printable char)
   STAZX ZINPUTBUF
@@ -1936,11 +2052,6 @@ BNE L1
   
   main
 
-  (prompt)
-  LDY# 10   LDX# 00  gotoxy
-  LDA# '>'  putc
-
-
   (fill screen '.')
 
   LDA# _SCREEN
@@ -1955,14 +2066,19 @@ BNE L1
 
   LDA# '.' fill
   
-  stop
+(stop)
 
   FALLTHROUGH ;
 
 : readevalloop  
+
+  (prompt)
+  LDY# 10   LDX# 00  gotoxy
+  LDA# '>'  putc
+
   readline
   puts "<<<<<<<<<DONE!!!!!"
-  (JMPA &readevalloop)
+  JMPA &readevalloop
   
   stop
 ;

@@ -1088,6 +1088,7 @@ EED7 RTS
             to = parseInt(to, 16);
 	  }
 
+	  // todo: should be hex???
           b.replace(/\-(\d+)/, (_,d)=>to-=+d);
 	  b.replace(/\+(\d+)/, (_,d)=>to+=+d);
 
