@@ -393,14 +393,6 @@ https://docs.google.com/document/d/16Sv3Y-3rHPXyxT1J3zLBVq4reSPYtY2G6OSojNTm4SQ/
 = X LDX# ;
 = Y LDY# ;
 
-( convenient - but slow)
-= SAVE_REGS
-  PHP PHA TXA PHA TYA PHA
-;
-= RESTORE_REGS
-  PLA TAY PLA TAY PLA PHP
-;
-
 (- init method chaning -)
 ( Each init method that needs to be called
   name it init. But before do:
@@ -500,6 +492,14 @@ https://docs.google.com/document/d/16Sv3Y-3rHPXyxT1J3zLBVq4reSPYtY2G6OSojNTm4SQ/
 ;
 
 (- good to haves)
+
+( convenient - but slow)
+= SAVE
+  PHP PHA TXA PHA TYA PHA
+;
+= RESTORE
+  PLA TAY PLA TAY PLA PHP
+;
 
 (--- PARAMETER CALLING ---)
 ( This is the implementation support functions
@@ -2181,7 +2181,7 @@ cls
 
   readline
 
-  SAVE_REGS
+  SAVE
 
     puts "<<<<<<<<<DONE!!!!!"
 
@@ -2190,7 +2190,8 @@ cls
 
     (TODO:typed ALS and didn't get error!)
 
-  RESTORE_REGS
+  RESTORE
+
   ASL ASL (mul 4) TAX Y 03   printnso
 
   JMPA &readevalloop
