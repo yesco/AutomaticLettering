@@ -1,1 +1,1 @@
-node 6502.js 65panda.fun
+node 6502.js $* 65panda.fun

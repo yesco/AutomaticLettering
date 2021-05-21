@@ -501,6 +501,9 @@ https://docs.google.com/document/d/16Sv3Y-3rHPXyxT1J3zLBVq4reSPYtY2G6OSojNTm4SQ/
   PLA TAY PLA TAY PLA PHP
 ;
 
+= SAVEx    TXA PHA ;
+= RESTOREx PLA TAX ;
+
 (--- PARAMETER CALLING ---)
 ( This is the implementation support functions
   for calling functions like this:
@@ -2151,6 +2154,30 @@ BNE L1
   LDA# 20  fill
 ;
 
+: readeval
+
+  (prompt)
+  LDY# 10   LDX# 00   gotoxy
+  LDA# '>'  putc
+
+  readline
+
+  SAVEx
+
+    puts "<<<<<<<<<DONE!!!!!"
+
+    LDY# 09   LDX# 00   gotoxy
+    puts "NAME:::"
+
+    (TODO:typed ALS and didn't get error!)
+
+  RESTOREx
+
+  ASL ASL (mul 4) TAX Y 03   printnso
+
+  JMPA &readeval
+;
+
 (todo: since don't have forward ref, this must be last!)
 : reset
 
@@ -2164,37 +2191,15 @@ BNE L1
   SEI (interrupt off)
 
   screeninit
-  
   main
 
-cls
+  cls
+  readeval
   
-(stop)
-
-  FALLTHROUGH ;
-
-: readevalloop  
-
-  (prompt)
-  LDY# 10   LDX# 00   gotoxy
-  LDA# '>'  putc
-
-  readline
-
-  SAVE
-
-    puts "<<<<<<<<<DONE!!!!!"
-
-    LDY# 09   LDX# 00   gotoxy
-    puts "NAME:::"
-
-    (TODO:typed ALS and didn't get error!)
-
-  RESTORE
-
-  ASL ASL (mul 4) TAX Y 03   printnso
-
-  JMPA &readevalloop
+  cls
   
   stop
 ;
+
+
+
