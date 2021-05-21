@@ -52,10 +52,10 @@
 #   01v 100 00 = oVerflow flag   (BVC BVS)
 #   10v 100 00 = Carry flag      (BCC BCS)
 #   11v 100 00 = Zero flag       (BNE BEQ)
-#                            (v--- indirect)
-#   xxx mmm 00 = --- BIT JMP JMP* STY LDY CPY CPX
-#   xxx mmm 01 = ORA AND EOR ADC  STA LDA CMP SBC
-#   xxx mmm 10 = ALS ROL LSR ROR  STX LDX DEC INC
+#        mm                  (v--- indirect)
+#   xxx m11 00 = --- BIT JMP JMP* STY LDY CPY CPX
+#   xxx m11 01 = ORA AND EOR ADC  STA LDA CMP SBC
+#   xxx m11 10 = ALS ROL LSR ROR  STX LDX DEC INC
 #           11 = (not used)
 # modes summary:             (RW = shift INC DEC)
 #   xxx mmm cc               bytes cycles
