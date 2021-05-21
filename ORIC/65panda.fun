@@ -478,10 +478,61 @@ https://docs.google.com/document/d/16Sv3Y-3rHPXyxT1J3zLBVq4reSPYtY2G6OSojNTm4SQ/
 = tmp4 2c ;
 = tmp5 2d ;
 
-= tmpLO 33 ;
-= tmpHI 34 ;
+= LowHeap 33 ;
+= LowHeap_LO 33 ;
+= LowHeap_HI 34 ;
 
-( - zero page end - system functions: )
+ ( ----------- zero page end -------------)
+ ( - 85..ff FREE on zero page!
+     =123 bytes
+ 
+     Update: usage by stack:
+       $bf-$ff (- #xbf #x85) = 58 bytes 
+   )
+ 
+   ( - data stack -)
+   = STACKLOW bf ; (- 254 (* 32 2)
+   ( addr ff stores data stackpointer)
+
+
+
+ ( --- ?FREE $200-$2ff
+    - BUT: used by BASIC graphics routinmes
+ )
+
+
+
+ ( --- ?FREE $400-$4ff
+   - BUT: "reserved for use with disk system"
+ )
+
+    ( for now use it for "heap" handles )
+    = HEAP_FREE_LIST 0200 ;
+    = HEAP_HANDLES 0200 ;
+
+
+
+ ( ? FREE $500-$97ff FREE 37632 bytes contigious!
+   - TODO: use as heap growing downwards.
+ )
+ 
+    ( for now use it for heap storage
+      growing downwards )
+ 
+    = HEAP_TOP 97ff ;
+
+
+
+ ( ?FREE $9800-$b3ff
+   - ??? FREE in TEXTMODE
+   - BUT: used by HIRES
+ )
+
+ ( ?FREE $bfeo-$bfff
+   - ??? FREE 32 bytes!
+ )
+
+ ( ---------- system functions -----------)
 
 (: mysub ff ; (00 gives illegal op ff ok, NOP ok?))
 (: mysub TXA ;)
