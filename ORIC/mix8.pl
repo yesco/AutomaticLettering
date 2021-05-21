@@ -23,6 +23,7 @@ if (1) {
     $method = 'fint32in8';
     $method = 'piesq';
     $method = 'fib';
+    $method = 'twofour';
 
     if ($method eq 'piesq') {
 	# 0, 10^-12, ... -1 0 1 2 3 5 8 .. 10^12
@@ -81,8 +82,30 @@ if (1) {
 	# TODO: new variants of add,sub,mul?
     } elsif ($method eq 'gr') {
 	# 
-	# 
+	# not so special
 	$base =  $goldenratio;
+	$offset = 64; # 0..1
+	# TODO: new variants of add,sub,mul?
+    } elsif ($method eq 'twofour') {
+	# -info(=-64K) ... -32K ... -16K ...
+	# -1 .. 0 ... 1 .... 2 ... 4 ... 64K=inf
+	#
+	# 62  ...
+	# 63  0.840896     1 x ...
+	# 64  1            DEC STORE in 2 bytes
+	# 65  1.18921      2x  1.189
+	# 66  1.41421          1.414
+	# 67  1.68179          1.682
+	# 68  2                2.000
+	# 69  2.37841      4x  2.378
+	# 70  2.82843          2.828
+	# 71  3.36359          3.364
+	# 72  4 
+	# 73  4.75683      8x  4.75(6)
+	#
+	# - easy to print convert to DEC!
+	# - print 2 dec
+	$base =  2 ** (1/4);
 	$offset = 64; # 0..1
 	# TODO: new variants of add,sub,mul?
     }

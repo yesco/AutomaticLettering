@@ -5,6 +5,166 @@
 # it maps to the same both ways:
 #
 #   perl asm-modes.pl | sort -k2 | less
+#
+# Functions needed:
+# - opcode -> 3char mnemonic (21 uniq chars=
+# - opcode -> valid (or not)
+# - opcode -> addrmode
+# - (mnemonic, addrmode) -> opcode
+#
+# 63 unqiue mnemomics
+#
+# 21 unique chars in mnemomics
+# (* 21 21 21) = 9261
+# (/ 65536 9261) = 7
+#
+# Means can have 1.9 bits. lol!
+#
+#
+#
+#
+#          6502 INSTRUCTIONS BIT PATTERNS
+#                    ON ONE PAGE
+#
+#                   visualized by
+#        2021 Jonas S Karlsson (jsk@yesco.org)
+#
+#
+# ref: The 6502/65C02/65C816
+#      Instruction Set Decoded
+#      - https://llx.com/Neil/a2/opcodes.html
+# opcode:
+#   xxx mmm cc = generic structure
+#   ----------
+#   0xx 000 00 = call&stack       BRK JSR RTI RTS
+#   0xx 010 00 = stack            PHP PLP PHA PLA
+#
+#   xx0 110 00 = magic flags =0   CLC CLI*TYA CLD
+#   xx1 110 00 = magic flags =1   SEC SEI --- SED
+#
+#   1xx 010 00 = v--transfers--> *DEY TAY INY INX
+#   1xx x10 10 = TXA TXS TAX TSX  DEX --- NOP ---
+#
+#   ffv 100 00 = branch instructions:
+#   ff0 100 00 = if flag == 0     BPL BVC BCC BNE
+#   ff1 100 00 = if flag == 1     BMI BVS BCS BEQ
+#   00v 100 00 = Negative flag   (BPL BMI)
+#   01v 100 00 = oVerflow flag   (BVC BVS)
+#   10v 100 00 = Carry flag      (BCC BCS)
+#   11v 100 00 = Zero flag       (BNE BEQ)
+#                            (v--- indirect)
+#   xxx mmm 00 = --- BIT JMP JMP* STY LDY CPY CPX
+#   xxx mmm 01 = ORA AND EOR ADC  STA LDA CMP SBC
+#   xxx mmm 10 = ALS ROL LSR ROR  STX LDX DEC INC
+#           11 = (not used)
+# modes summary:             (RW = shift INC DEC)
+#   xxx mmm cc               bytes cycles
+#   --- --- --               ----- ------
+#       000  0 = #immediate     2  2
+#       000  1 = (zero page,X)  2  6
+#  (2x) 001    = zero page      2  3 +2/RW
+#       010  0 = accumulator    1  2
+#       010  1 = #immediate     2  2
+#  (2x) 011    = absolute       3  4 +2/RW JMP=3
+#       100  0 = ---
+#       100  1 = (zero page),Y  2  5 +1/STA +1/page++
+#  (2x) 101    = zero page,X    2  4 +2/RW
+#       110  0 = ---
+#       110  1 = absolute,Y     3 \4 +3/RW +1/STA
+#  (2x) 111    = absolute,X     3 / +1/page++ (cross)
+#              JMP              3  3 JMP 
+#     branch instructions       2  2 +1/true +2/cross
+#       stack: PHA/PHP          1  3 +1/PLA/PLP
+#              JSR RTS RTI      3  6 +1/BRK
+#   other implied instructions  1  2 
+
+#
+# ------------ cc = 01
+#
+# aaa	opcode
+# ============
+# 000	ORA
+# 001	AND
+# 010	EOR
+# 011	ADC
+# 100	STA
+# 101	LDA
+# 110	CMP
+# 111	SBC
+#
+# mmm	addressing mode
+# =====================
+# 000	(zero page,X)
+# 001	zero page
+# 010	#immediate
+# 011	absolute
+# 100	(zero page),Y
+# 101	zero page,X
+# 110	absolute,Y
+# 111	absolute,X
+#
+# ------------ cc = 10
+#
+# aaa	opcode
+# ============
+# 000	ASL
+# 001	ROL
+# 010	LSR
+# 011	ROR
+# 100	STX
+# 101	LDX
+# 110	DEC
+# 111	INC
+#
+# mmm	addressing mode
+# =====================
+# 000	#immediate
+# 001	zero page
+# 010	accumulator
+# 011	absolute
+# 101	zero page,X
+# 111	absolute,X
+#
+# ------------ cc = 11
+#
+# no instructions
+#
+# ------------ cc = 00
+#
+# aaa	opcode
+# ============
+# 001	BIT
+# 010	JMP
+# 011	JMP (abs)
+# 100	STY
+# 101	LDY
+# 110	CPY
+# 111	CPX
+#
+# addressing modes same as cc = 10
+#
+# ------------ cc = 00 & mmm = 100
+# op = xxy10000
+#
+# xx	flag
+# ==========
+# 00	negative
+# 01	overflow
+# 10	carry
+# 11	zero
+#
+# ------------ other instructions
+#
+# PHP PLP PHA PLA   DEY TAY INY INX
+# 08  28  48  68    88  A8  C8  E8
+#
+o# CLC SEC CLI SEI   TYA CLV CLD SED
+# 18  38  58  78    98  B8  D8  F8
+#
+#         TXA TXS TAX TSX DEX NOP
+#         8A  9A  AA  BA  CA  EA
+#
+
 
 open IN, "sort asm.opcodes |" or die "nmo file";
 

@@ -299,7 +299,7 @@ https://docs.google.com/document/d/16Sv3Y-3rHPXyxT1J3zLBVq4reSPYtY2G6OSojNTm4SQ/
  
  Facts:
  - 149 opcodes
- - 56 mnemonics (3b each)
+ - 56 mnemonics (3b each) (63??? asm-modes.pl)
  + 13 addressing modes (?)
 
  A simple encoding of needed information:
@@ -346,7 +346,7 @@ https://docs.google.com/document/d/16Sv3Y-3rHPXyxT1J3zLBVq4reSPYtY2G6OSojNTm4SQ/
  then add code...
 
  we need the following functionality;
-   opcode -> 3L mnemonic
+   opcode -> 3char mnemonic
    opcode -> valid (or not)
    opcode -> addrmode
    (mnemonic, addrmode) -> opcode
