@@ -2134,7 +2134,7 @@ BNE L1
 ;
 
 : cls
-(
+( TODO:
   LDA# 00  pFill SCREEN SCREENLEN
   RTS
 )
@@ -2154,6 +2154,76 @@ BNE L1
   LDA# 20  fill
 ;
 
+(--------------------------------------------)
+( --- Heap
+  A heap is defined in high memory (top)
+  and grows downwards. To enable compaction
+  and relocation, and since pointers is a hassle
+  to pass around anyway, we'll use a handle.
+
+  Sketch:
+  - zero page pointer to heap free list
+  - at each free location pointed to, there
+    is another pointer to the next free
+  - 0000 means at end and no more memory
+  - the byte following tells size of free element
+  - max 128 heap objects
+)
+
+(- Heap handle in A, X is wRegister, trash Y)
+(  copies the address of the Hip heap handle to
+   named register:
+
+     A 21 X wA aHipLD
+)
+
+(
+: aHipLD
+  ASL
+  (TODO: test carry == illegal)
+  TAY
+  (copy pointer to word register in zp)
+  LDAAY HEAP_HANDLES
+  STAZX 00
+  LDAAY HEAP_HANDLES+1
+  STAZX 01
+  TYA
+;
+)
+
+(
+: init_heap (reset the heap)
+  
+  LDA# _HEAP_TOP   STAZ LowHeap_LO
+  LDA# ^HEAP_TOP   STAZ LowHeap_HI
+
+  (make sure free list empty)
+  LDA# 00
+  STAA HEAP_FREE_LIST
+  STAA HEAP_FREE_LIST+1
+
+  LDA# _SCREEN     STAZ wA
+  LDA# ^SCREEN     STAZ wA+1
+
+  LDA# _SCREENLEN  STAZ wB
+  LDA# ^SCREENLEN  STAZ wB+1
+
+  LDA# 00  fill
+  
+  RTS
+;
+)
+
+(
+: malloc
+  
+;
+
+: free
+;
+)
+
+(--------------------------------------------)
 : readeval
 
   (prompt)
