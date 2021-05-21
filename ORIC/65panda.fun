@@ -328,7 +328,7 @@ https://docs.google.com/document/d/16Sv3Y-3rHPXyxT1J3zLBVq4reSPYtY2G6OSojNTm4SQ/
 
     ...or...
 
-    in packed "ASLFOO,we have
+    in packed "ASLFOO", we have
       1bit/w free => 56 bits.
     in offset map we have 2bit/offs
       (* 11 16 2) = 352 bits
@@ -430,16 +430,16 @@ https://docs.google.com/document/d/16Sv3Y-3rHPXyxT1J3zLBVq4reSPYtY2G6OSojNTm4SQ/
 = zregisters 00 ;
 = zregisterMAX 09 ;
 = zregisterLEN 0a ;
-= z0 00 ; = wA 00 ; = wA_LO 00 ; : = Rto   00 ;
-= z1 01 ;           = wA_HI 01 ;
-= z2 02 ; = wB 02 ; = wB_LO 02 ; : = Rlen  02 ;
-= z3 03 ;           = wB_HI 03 ;
-= z4 04 ; = wC 04 ; = wC_LO 04 ; ; = Rfrom 04 ; 
-= z5 05 ;           = wC_HI 01 ;
-= z6 06 ; = wD 06 ; = wD_LO 06 ;
-= z7 07 ;           = wD_HI 01 ;
-= z8 08 ; = wE 08 ; = wE_LO 08 ;
-= z9 09 ;           = wE_HI 08 ;
+= z0 00 ; = wA 00 ; = wA_LO 00 ;  = Rto      00 ;
+= z1 01 ;           = wA_HI 01 ;  = Rto_HI   01 ;
+= z2 02 ; = wB 02 ; = wB_LO 02 ;  = Rlen     02 ;
+= z3 03 ;           = wB_HI 03 ;  = Rlen_HI  03 ;
+= z4 04 ; = wC 04 ; = wC_LO 04 ;  = Rfrom    04 ;
+= z5 05 ;           = wC_HI 05 ;  = Rfrom_HI 05 ;
+= z6 06 ; = wD 06 ; = wD_LO 06 ;  = Rdata    06 ;
+= z7 07 ;           = wD_HI 07 ;  = Rdata_HI 07 ;
+= z8 08 ; = wE 08 ; = wE_LO 08 ;  = Rlink    08 ;
+= z9 09 ;           = wE_HI 08 ;  = Rlink    09 ;
 
 ( use for jmp, can't use for JSR/no rts...)
 
@@ -449,7 +449,7 @@ https://docs.google.com/document/d/16Sv3Y-3rHPXyxT1J3zLBVq4reSPYtY2G6OSojNTm4SQ/
 = zjmpHI 16 ;
 
 ( - 16 zp results )
-= Zresult 18 ;
+= Zresult 16 ;
 
 = zr0 18 ;
 = zr1 19 ;
@@ -469,70 +469,91 @@ https://docs.google.com/document/d/16Sv3Y-3rHPXyxT1J3zLBVq4reSPYtY2G6OSojNTm4SQ/
 = zrf 27 ;
 = registersMAX 27 ;
 
+( - memory management)
+= HERE 28 ;  = HERE_LO 28 ;  = HERE_HI 29 ;
+= HEAP 2a ;  = HEAP_LO 2a ;  = HEAP_HI 2b ;
+= FREE 2c ;  = FREE_LO 2c ;  = FREE_HI 2d ;
 
-( - TODO: find usage: screen? )
-= tmp0 28 ;
-= tmp1 29 ;
-= tmp2 2a ;
-= tmp3 2b ;
-= tmp4 2c ;
-= tmp5 2d ;
+( - 33-34 free ununsed)
+= xxyy 33 ; 
+= xxyy_LO 33 ;
+= xxyy_HI 34 ;
 
-= LowHeap 33 ;
-= LowHeap_LO 33 ;
-= LowHeap_HI 34 ;
-
- ( ----------- zero page end -------------)
- ( - 85..ff FREE on zero page!
-     =123 bytes
+( - 85..ff FREE on zero page!
+    =123 bytes
  
-     Update: usage by stack:
-       $bf-$ff (- #xbf #x85) = 58 bytes 
-   )
+    Update: usage by stack:
+      $bf-$ff (- #xbf #x85) = 58 bytes 
+)
  
    ( - data stack -)
-   = STACKLOW bf ; (- 254 (* 32 2)
+
+   = STACKLOW bf ; (- 254 (* 32 2))
+
    ( addr ff stores data stackpointer)
 
+( ----------- zero page end -------------)
+ 
 
-
- ( --- ?FREE $200-$2ff
+( --- ?FREE $200-$2ff
     - BUT: used by BASIC graphics routinmes
- )
+)
 
 
 
- ( --- ?FREE $400-$4ff
+( --- ?FREE $400-$4ff
    - BUT: "reserved for use with disk system"
- )
-
-    ( for now use it for "heap" handles )
-    = HEAP_FREE_LIST 0200 ;
-    = HEAP_HANDLES 0200 ;
+)
 
 
-
- ( ? FREE $500-$97ff FREE 37632 bytes contigious!
-   - TODO: use as heap growing downwards.
- )
+( ? FREE $500-$97ff FREE 37632 bytes contigious!
+  - TODO: use as heap growing downwards.
+)
  
-    ( for now use it for heap storage
-      growing downwards )
- 
-    = HEAP_TOP 97ff ;
+   ( for now use it for heap storage
+     growing downwards )
 
+   = HEAP_TOP 97ff ;
 
+( ?FREE $9800-$b3ff
+  - ??? FREE in TEXTMODE
+  - BUT: used by HIRES
+)
 
- ( ?FREE $9800-$b3ff
-   - ??? FREE in TEXTMODE
-   - BUT: used by HIRES
- )
+( ?FREE $bfeo-$bfff
+ - ??? FREE 32 bytes!
+ (really?)
+)
 
- ( ?FREE $bfeo-$bfff
-   - ??? FREE 32 bytes!
- )
+(?FREE #9800-#98FF - in HIRES (32 chardef 256b)
+       #9C00-#9CFF - in HIRES (32 alt chardef 256b)
+)
 
- ( ---------- system functions -----------)
+  = HIRES a000 ;
+  = HIRES_END bfdf ;
+  = HIRES_LEN 1fe0 ;
+
+  = SCREENPTR 026d ; (TODO: use)
+  = SCREEN bb80 ; (content)
+  ( = SCREEN_END xxxx ; )
+  = SCREEN_LEN 0460 ;
+     
+(?FREE #b400-#b4ff - TEXTMODE: first 32 chardefs
+  The first 256 bytes of each character set are
+  unused, so programs can be put at #B400-#B4FF
+
+  Although the Reset button on the Oric causes
+  the character set to be regenerated these
+  areas are not affected.
+)
+(?FREE #B800-#B8FF - TEXTMODE: 32 alt charsdfs 256 b)
+
+(?FREE #B800-#BB7F - TEXTMODE:
+  Since the alternate character set is rarely
+  used the entire area between #B800 and #BB7F.
+)
+
+( ---------- system functions -----------)
 
 (: mysub ff ; (00 gives illegal op ff ok, NOP ok?))
 (: mysub TXA ;)
@@ -559,7 +580,7 @@ https://docs.google.com/document/d/16Sv3Y-3rHPXyxT1J3zLBVq4reSPYtY2G6OSojNTm4SQ/
 ( This is the implementation support functions
   for calling functions like this:
 
-    LDA# 00 paFill SCREEN SCREENLEN
+    LDA# 00 paFill SCREEN SCREEN_LEN
 
   This function is flexible in the value
   to fill, but fixes the addresses.
@@ -689,13 +710,6 @@ NOP (won't work without the extra NOP!? wtf?)
 ;
 
 ( --- screen stuff ---)
-
-(TODO: fix/remove change, move to
- ZP allocation above!)
-
-= SCREENPTR 026d ; (TODO: use)
-= SCREEN bb80 ; (content)
-= SCREENLEN 0460 ;
 
 (TODO: store scren address somewhere in Z)
 
@@ -1517,7 +1531,7 @@ RTS
   INX2
 ;
 
-; xpush (2 bytes after)
+: xpush (2 bytes after)
   (value address is at RTS position)
   PLA
   CLC
@@ -1534,11 +1548,12 @@ RTS
   (generate return address)
   INY (lo)
   BNE 01
-  INC (hi)
-
+  CLC
+  ADC# 01
   PHA (hi)
 
   TYA (lo)
+  ADC# 00
   PHA 
   RTS (jumps back 2 bytes call)
 ;
@@ -1722,7 +1737,7 @@ RTS
 : removeloop
   PLA
   TSX
-  BNE *removeloop ;
+  BNE *removeloop
 
   PLA (get the original A)
 
@@ -1764,10 +1779,11 @@ RTS
   (here Y is untouched)
   LDXA 0100 (get)
 
-  FALLTHROUGH;
-
   (fill the stack with NOP)  
   LDA# NOP (harmless op)
+
+  FALLTHROUGH;
+
 : fillstack
   PHA
   TSX
@@ -2055,12 +2071,14 @@ BNE L1
   (TODO: page boundary alignment!)
   (TODO: ...by @ffff: directive?)
 
+(TODO: some corruption happens here????)
 : regular_NMEMs
 "BIT.JMP.JMP.STY.LDY.CPY.CPX.ORA.AND.EOR.ADC.STA.LDA.CMP.SBC.ASL.ROL.LSR.ROR.STX.LDX.DEC.INC." (ends w 0)
 ;
 
 : printnso (print Y characters from offset X)
-  STYZ tmp0 (store count)
+  STYZ zr0 (store count)
+
   FALLTHROUGH ;
 
 : printnsloop
@@ -2068,7 +2086,7 @@ BNE L1
   putc
 
   INX
-  DECZ tmp0
+  DECZ zr0
   BNE *printnsloop
 ;
 
@@ -2150,7 +2168,7 @@ BNE L1
   LDA# _printA
   STAZ ZtocontHI
 
-  panda002
+(  panda002)
 
   addtest
 
@@ -2186,7 +2204,7 @@ BNE L1
 
 : cls
 ( TODO:
-  LDA# 00  pFill SCREEN SCREENLEN
+  LDA# 00  pFill SCREEN SCREEN_LEN
   RTS
 )
 
@@ -2197,9 +2215,9 @@ BNE L1
   LDA# ^SCREEN
   STAZ z1
 
-  LDA# _SCREENLEN
+  LDA# _SCREEN_LEN
   STAZ z2
-  LDA# ^SCREENLEN
+  LDA# ^SCREEN_LEN
   STAZ z3
 
   LDA# 20  fill
@@ -2213,12 +2231,30 @@ BNE L1
   to pass around anyway, we'll use a handle.
 
   Sketch:
+  - pointer at HEAP
+
   - zero page pointer to heap free list
   - at each free location pointed to, there
     is another pointer to the next free
   - 0000 means at end and no more memory
   - the byte following tells size of free element
   - max 128 heap objects
+  - if free lowest: reclaim the memory upping LOW
+
+  Consider:
+  - since most pointers will need to use zero page
+    anyway, just consider it's the users problem
+    to not loose the handle, or move the pointer?
+    (dangerous if a rearrangment happens when
+     having copied the pointer)
+  - store location of pointer to make it movable
+  - have one free list
+  - have one allocated list
+  - allocated data is prefixed by:
+    BE EF (or A1 10, or FE EE for free)
+  - 2 byte owner address
+  - 1 byte size (len) // PASCAL-string!
+  - len bytes of data
 )
 
 (- Heap handle in A, X is wRegister, trash Y)
@@ -2229,7 +2265,7 @@ BNE L1
 )
 
 (
-: aHipLD
+: LDaHip
   ASL
   (TODO: test carry == illegal)
   TAY
@@ -2242,11 +2278,12 @@ BNE L1
 ;
 )
 
+
 (
 : init_heap (reset the heap)
-  
-  LDA# _HEAP_TOP   STAZ LowHeap_LO
-  LDA# ^HEAP_TOP   STAZ LowHeap_HI
+RTS
+  LDA# _HEAP_TOP   STAZ HEAP_LO
+  LDA# ^HEAP_TOP   STAZ HEAP_HI
 
   (make sure free list empty)
   LDA# 00
@@ -2254,12 +2291,14 @@ BNE L1
   STAA HEAP_FREE_LIST+1
 
   LDA# _SCREEN     STAZ wA
+(TODO: BUG, CRASH: 00+1 => 0000 ??? fix 6502.js)
   LDA# ^SCREEN     STAZ wA+1
 
-  LDA# _SCREENLEN  STAZ wB
-  LDA# ^SCREENLEN  STAZ wB+1
+  LDA# _SCREEN_LEN  STAZ wB
+  LDA# ^SCREEN_LEN  STAZ wB+1
 
   LDA# 00  fill
+(stop)
   
   RTS
 ;
@@ -2267,12 +2306,37 @@ BNE L1
 
 (
 : malloc
-  
 ;
 
 : free
 ;
 )
+
+
+(--------------------------------------------)
+(
+: aAllocate (A bytes alloc, store in X zp word)
+  CLC
+  ADCZ HERE_LO   STAZ HERE_LO   STAZX 00
+  ADCZ HERE_HI   STAZ HERE_HI	STAZX 01
+  (TODO: check if run out of memory
+         use: HEAP_LOW)
+
+;
+)
+
+(- Linked list (dictionary)
+   A linked list has the following layout:
+   - Rlink (wD) contains current node
+   - to traverse load Rlink with start address
+   - 0000 means end of list
+   - directly after the link
+     - 2 bytes next link
+     - data
+)  
+
+
+
 
 (--------------------------------------------)
 : readeval
@@ -2288,7 +2352,7 @@ BNE L1
     puts "<<<<<<<<<DONE!!!!!"
 
     LDY# 09   LDX# 00   gotoxy
-    puts "NAME:::"
+    puts "NAME>>>"
 
     (TODO:typed ALS and didn't get error!)
 
@@ -2302,19 +2366,26 @@ BNE L1
 (todo: since don't have forward ref, this must be last!)
 : reset
 
+  (interrupt off)
+  SEI 
+
   (init stack)
   LDX# ff
   TXS
+
   (data stack)
   DEX
   endstack
 
-  SEI (interrupt off)
+  (init_heap) (will crash...)
 
   screeninit
-  main
 
-  cls
+(main cls)
+
+  (panda001)
+  (panda002) (crashes)
+
   readeval
   
   cls

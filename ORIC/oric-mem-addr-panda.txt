@@ -33,7 +33,24 @@ FREE $85-$ff - 122 bytes!
 
 FREE $500-$9800 FREE 37632 bytes contigious!
 
+
+(?FREE #b400-#b4ff - TEXTMODE: first 32 chardefs
+  The first 256 bytes of each character set are
+  unused, so programs can be put at #B400-#B4FF
+
+  Although the Reset button on the Oric causes
+  the character set to be regenerated these
+  areas are not affected.
+)
+(?FREE #B800-#B8FF - TEXTMODE: 32 alt charsdfs 256 b)
+
+(?FREE #B800-#BB7F - TEXTMODE:
+  Since the alternate character set is rarely
+  used the entire area between #B800 and #BB7F.
+)
+
 ?FREE $9800-$b3ff ??? FREE (in TEXTMODE, BUT: used by HIRES)
+
 
 ?FREE $bfeo-$bfff ??? FREE (32 bytes!)
 
@@ -45,13 +62,13 @@ NOT $17 used by Ctrl-C flag/keyboard
 NOT $2E-$32
 NOT $35-$84 input buffer (???)
 
-NOT $100-$1ff hardware stack!
-NOT $200-$2ff NOT used by BASIC graphics/music
-NOT $300-$3ff NOT even RAM (IO - 6522)
-NOT $400-$fff reserved for use with disk system
+NOT $100-$1ff NOT - hardware stack!
+NOT $200-$2ff NOT - used by BASIC graphics/music
+NOT $300-$3ff NOT - even RAM (IO - 6522)
+NOT $400-$fff NOT - reserved for use with disk system
 
-NOT $9800-$9fff character sets in HIRES (38192)
-NOT $a000-$bfdf graphics screen
+NOT $9800-$9fff NOT - character sets in HIRES (38192)
+NOT $a000-$bfdf NOT - graphics screen
 
 NOT $c000-$ffff (ROM)
 

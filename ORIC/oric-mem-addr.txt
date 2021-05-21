@@ -57,7 +57,7 @@ same for the Oric-1 and Atmos unless otherwise indicated. This is done by indica
 version of the computer to which the description is applicable. The version number is written at the 
 top of the screen on power up.
 ----------------------------------------
-$00-$0B 
+$00-$0B scratch area (?)
 $0C,$0D Indirect pointer for screen and Hex number construction area. 
 $0E,$0F Indirect pointer for the screen. 
 $10,$11 Address of hires cursor. 
@@ -290,3 +290,18 @@ $2F9,$2FA
 $2FB-$2FD Jump to '&' routine. 
 $2FE-$2FF
 ----------------------------------------
+
+(?FREE #b400-#b4ff - TEXTMODE: first 32 chardefs
+  The first 256 bytes of each character set are
+  unused, so programs can be put at #B400-#B4FF
+
+  Although the Reset button on the Oric causes
+  the character set to be regenerated these
+  areas are not affected.
+)
+(?FREE #B800-#B8FF - TEXTMODE: 32 alt charsdfs 256 b)
+
+(?FREE #B800-#BB7F - TEXTMODE:
+  Since the alternate character set is rarely
+  used the entire area between #B800 and #BB7F.
+)

@@ -64,6 +64,9 @@ function hex(n,x) {
   return r;
 }
 
+// TOOD: is this the right place?
+let trace = false; // use -t
+
 // var is faster than let! about 5%! 20200730
 function cpu6502() {
   // Note: special read/write only works for LDA/STA absolute
@@ -452,7 +455,6 @@ C	....	Carry
   let RESET_VECTOR = 0xfffc;
   let IRQ_VECTOR   = 0xfffe;
 
-  let trace = false;
   let error = defaultError;
 
   function defaultError(e) {
@@ -659,6 +661,12 @@ function ORIC(dorom) {
     process.argv.shift();
   }
 
+  // set flag to trace
+  if (process.argv[2] === '-t') {
+    trace = true;
+    process.argv.shift();
+  }
+
   let startAddr; // if not set, RESET
 
   let fs = require('fs');
@@ -672,8 +680,13 @@ function ORIC(dorom) {
   function oricError(e) {
     // update screen a last time
     // it may have something
-    if (scon)
+    if (scon) {
+      // move to end
+      gotorc(70, 0);
+      // scroll
+      console.log('\n'.repeat(50));
       updateScreen();
+    }
 
     off();
     cursorOn();
@@ -1034,25 +1047,8 @@ EED7 RTS
 	// TOOD: require $ prefix for hex?
 	if (v.toString(16) !== b.toLowerCase() && b[0] != '0')
 	  v = undefined;
-	// TODO: spaces inside strings...
-	if (b[0] === '"') {
-          // zero terminated string
-	  // TODO: bug can't handle space!!!
-	  let i = 0;
-          while(i<b.length && (m[a++] = b.charCodeAt(++i)) !== 777) {
-            // TODO: obviously 777 is not right!, if set to 34 " then it skips last char
-            console.log('= '+hex(2, m[a-1]));
-	  }
-	      
-	  // make sure string is terminated
-          if (b.charAt(b.length-1)!='"') {
-            throw "%% Bug! Can't handle space in strings! LOL >"+ b +"<";
-          }
 
-	  a--;
-	  m[a-1] = 0;
-	  console.log('= '+hex(2, m[a-1]));
-	} else if (b[0] === "'") {
+	if (b[0] === "'") { // && b.length === 3) {
 	  // char code (7 bit)
 	  m[a++] = b.charCodeAt(1);
 	} else if (b.length === 4 && v > 0) {
@@ -1065,13 +1061,18 @@ EED7 RTS
 	  console.log('= '+hex(2, v));
 	  m[a++] = v;
 	} else {
-	  // symbol/name (make jsr)
+console.log('\nFISH>'+b+'<\n');
+	  // - modify address / constant
+	  // - symbol/name (make jsr)
 	  let to = b, op;
 	  if ('*^&_'.indexOf(b[0]) >= 0) {
 	    op = b[0];
             to = b.substr(1);
   	  }
           to = to.replace(/[\+\-].*$/, '');
+
+          let hexlen = to.length;
+	  let origto = to;
 
 	  // make integer
           if (deffun[to]) {
@@ -1080,11 +1081,24 @@ EED7 RTS
             to = parseInt(to, 16);
 	  }
 
-	  // todo: should be hex???
-          b.replace(/\-(\d+)/, (_,d)=>to-=+d);
-	  b.replace(/\+(\d+)/, (_,d)=>to+=+d);
+	  console.log("FISH.1:", to);
 
-	  if (!to) throw Error('In "'+name+'" do not know "'+b+'"');
+	  if (typeof to != 'number' || Number.isNaN(to)) {
+	    console.log("%% Error: undefined name: '"+origto + "' got: "+to)
+	    throw "%% Error: undefined name: '"+origto + "' got: "+to;
+	  }
+
+	  // do + and - offset
+          b.replace(/\-(\d+)/, (_,d)=>{
+	      to-=+d; op='-'});
+          b.replace(/\+(\d+)/, (_,d)=>{
+	      to+=+d; op='+'});
+
+	  if (typeof to !== 'number')
+	    throw Error(
+	      'In "'+name+
+		'" do not know "'+b+'"'+
+	    ' to='+to+' '+(typeof to));
 
 	  switch(op) {
 	  case '*': { // relative
@@ -1108,6 +1122,7 @@ EED7 RTS
 	    m[a++] = to;
 	    break;
 	  case undefined: // default
+	    // TOOD: hmmm? undefined
 	    process.stdout.write(' JSR ');
 	    m[a++] = 0x20; // jsr
 	    // fall through
@@ -1115,6 +1130,14 @@ EED7 RTS
 	    console.log('= '+hex(4, to));
 	    m[a++] = to % 256
 	    m[a++] = to >> 8;
+	    break;
+	  case '+': case '-':
+	    // generate same length
+	    console.log('(origto>'+origto+'<hexlen='+hexlen+' = '+hex(hexlen, to));
+	    m[a++] = to % 256
+            if (hexlen > 2) {
+              m[a++] = to >> 8;
+	    }
 	    break;
 	  default:
 	    throw Error("Unknown op='"+op+"' of '"+b+"' to='"+to+"' ...");
@@ -1246,9 +1269,60 @@ EED7 RTS
     // remove comments in () nesting ok
     let ff;
     do {
+
       ff = f;
-      f = f.replace(/\([^\(\)]*?\)/g, ' ');
+      f = f.replace(/\([^\(\)]*?\)/g, (a)=>{
+	// keep newlines! (for error reporting....)
+	return a.replace(/[^\n]/g, '');
+      });
+
     } while (ff != f);
+
+    // replace "strings" with hex bytes
+    do {
+
+      ff = f;
+      f = f.replace(/\"(([^\"]|\\")*?)\"/g, (a,s)=>{
+	//console.log("ORIG.a>"+a+"<");
+	//console.log("ORIG.s>"+s+"<");
+
+        // generate bytes of zero terminated string
+	let str = s.replace(/([^\"]|\\")/g, (a,c,i)=>{
+	  let r = '';
+
+	  // TODO: handle other escaped characters
+	  if (c === '\\n"')
+	    c = '\n';
+	  else if (c === '\\t')
+	    c = '\t';
+	  else if (c === '\\"')
+	    c = '"';
+	  else if (c[0] === '\\')
+	    throw "%% String withou unsupported \\";
+
+	  //console.log("CHAR>"+c+"< i="+i);
+          r += ' ' + hex(2, c.charCodeAt(0));
+
+	  // dont'a allow newline
+	  // => no runaway unterminated strings
+	  if (c === '\n')
+	    throw "No newline allowed in string: please quote it using \\n >>>"+s+"<<<";
+
+	  return r;
+	});
+
+	console.log("STRING.s >"+s+"<");
+	console.log("STRING.r >"+str+" 00 <<<");
+	console.log("STRING");
+
+	// zero termination
+	return str + ' 00 ';
+      });
+
+    } while (ff != f);
+
+
+
 
     // extract '=' alias
     let alias = {};
@@ -1256,11 +1330,14 @@ EED7 RTS
       //console.log('SUBST: '+f+ ' line: '+l);
       // call last fun defined
       alias[f] = l.trim();;
-      return '';
+
+      // keep newlines! (for error reporting....)
+      return a.replace(/[^\n]/g, '');
     });
 
     // replace now (now subst inside?)
     // (reverse to match longest first1
+    // rinse and repeat until no more subst
     let fprev;
     do {
       fprev = f;
@@ -1268,18 +1345,43 @@ EED7 RTS
 	n=>f=f.replace(RegExp('(?<![A-Za-z])'+n+'(?![\\w#])', 'g'), alias[n]));
     } while (fprev !== f);
 
+    // DEBUG: uncomment to see what you got
+    //console.log(f);process.exit(44);
+
     // at this point no more macro substitutions!
       
     // extract functions (in order!)
     let nbytes = 0, nfuncs = 0;
-    f = f.replace(/:\s*(\S+)([\s\S]*?);/g, (a,f,l)=>{
+    f = f.replace(/:\s*(\S+)([^:;]*?)\s*;/g, (a,f,l)=>{
       console.log('FUNCTION: '+f+ ' line: '+l);
       // call last fun defined
       nbytes += deffun(f, l.trim().split(/\s+/));
       nfuncs++;
-      return '';
+
+      // keep newlines! (for error reporting....)
+      return a.replace(/[^\n]/g, '');
     });
     
+    // any remaining stuff in f means there
+    // was unmatched paren or something...
+    let no = 0;
+    let flno = ('\n'+f).replace(/((\n\s*)+)/g, (nlsp)=>{
+      let n = nlsp.match(/\n/g).length;
+      no += n; return '\n'+no+'>>> ... '; });
+
+    f = f.replace(/\n/g, '').replace(/\s+/g, ' ');
+
+    if (f.match(/\S/)) {
+      console.log("REMAINING f================== (error)===\n", flno);
+      console.log("<<<<<<<<<<<<<<<<<<<<<\n");
+      console.log("NOTE: only fragment of the line remains!\n");
+      console.log("NOTE: the error may be on the line before (like one too mnay ')' or ';' !\n");
+      //console.error('f.length = ', f.length);
+      console.error("Terminated as something remains:\n", f, "\n\n");
+      process.exit(77);
+    }
+
+
     console.log('----Total bytes used: '+nbytes+ ' for '+nfuncs+' functions');
     startAddr = deffun.reset || deffun.main;
     //process.exit(33);
@@ -1313,7 +1415,10 @@ EED7 RTS
     }
   }
 
-  if (compileOnly) process.exit(0);
+  if (compileOnly) {
+    console.log("\nCompilation completed - no errors!!\n");
+    process.exit(0);
+  }
 
   // --- run!
 
@@ -1472,8 +1577,13 @@ via6552: IRQ every 10ms (free running mode)
     if (key.ctrl && key.name === 'c') {
       // update screen a last time
       // it may have something
-      if (scon)
+      if (scon) {
+	// move to end
+	gotorc(70, 0);
+	// scroll
+	console.log('\n'.repeat(50));
 	updateScreen();
+      }
 
       gotorc(50, 0);
 
