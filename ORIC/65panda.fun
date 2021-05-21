@@ -110,8 +110,8 @@ https://docs.google.com/document/d/16Sv3Y-3rHPXyxT1J3zLBVq4reSPYtY2G6OSojNTm4SQ/
 = LDAZ a5 ;
 = LDAZX b5 ;
 = LDAA ad ;
-= LDAX bd ;
-= LDAY b9 ;
+= LDAAX bd ;
+= LDAAY b9 ;
 = LDAIX a1 ;
 = LDAIY b1 ;
 
@@ -119,7 +119,7 @@ https://docs.google.com/document/d/16Sv3Y-3rHPXyxT1J3zLBVq4reSPYtY2G6OSojNTm4SQ/
 = STAZX 95 ;
 = STAA 8d ;
 = STAAX 9d ;
-= STAY 99 ;
+= STAAY 99 ;
 = STAIX 81 ;
 = STAIY 91 ;
 
@@ -379,14 +379,27 @@ https://docs.google.com/document/d/16Sv3Y-3rHPXyxT1J3zLBVq4reSPYtY2G6OSojNTm4SQ/
 = LDAZ a5 ;
 = LDAZX b5 ;
 = LDAA ad ;
-= LDAX bd ;
-= LDAY b9 ;
+= LDAAX bd ;
+= LDAAY b9 ;
 = LDAIX a1 ;
 = LDAIY b1 ;
  
 )
 
 (--- SYSTEM ---)
+
+( Y 12 X 15 gotoxy! )
+= A LDA# ;
+= X LDX# ;
+= Y LDY# ;
+
+( convenient - but slow)
+= SAVE_REGS
+  PHP PHA TXA PHA TYA PHA
+;
+= RESTORE_REGS
+  PLA TAY PLA TAY PLA PHP
+;
 
 (- init method chaning -)
 ( Each init method that needs to be called
@@ -398,6 +411,26 @@ https://docs.google.com/document/d/16Sv3Y-3rHPXyxT1J3zLBVq4reSPYtY2G6OSojNTm4SQ/
     ...
     your init code
    ;
+
+
+  TODO: idea
+
+  ALT 1:
+  - when :CHAIN: label redefining existing label
+    if it exists, insert JSRA &idea, to call it.
+  - caveat: this will use lots of stack so no more
+    than 128 routines.
+  ALT 2:
+  -  It could change RTS at end to JMPA &idea,
+     however, other RTSs in the routine may screw
+     it up.
+  - and shouldn't they be done in source order?
+
+
+  :CHAIN: init
+    (automatically inserts call to previous init!)
+  ;
+
 )
 
 (- ZP/Zeropage regs for params)
@@ -457,6 +490,9 @@ https://docs.google.com/document/d/16Sv3Y-3rHPXyxT1J3zLBVq4reSPYtY2G6OSojNTm4SQ/
 = tmpHI 34 ;
 
 ( - zero page end - system functions: )
+
+(: mysub ff ; (00 gives illegal op ff ok, NOP ok?))
+(: mysub TXA ;)
 
 : stop (loop forever)
   LDA# 00
@@ -1117,14 +1153,14 @@ RTS
   FALLTHROUGH ;
 
 : 32printskip (skip leading zeros)
-  LDAX Zresult
+  LDAAX Zresult
   BNE 03 (goto 32printnext)
   DEX
   BNE *32printskip
   FALLTHROUGH ;
 
 : 32printnext
-  LDAX Zresult
+  LDAAX Zresult
   ORA# 30 ('0'?)
   putc
   DEX
@@ -1180,8 +1216,8 @@ RTS
   (- control chars)
   CMP# BSKEY
   BNE 07
-  ( for some reason it doesn write?)
-  LDA# '_' (40)
+  ( TODO: )
+  LDA# 00 (40)
   STAZX ZINPUTBUF
   JMPA &readlineloop
 
@@ -1235,8 +1271,8 @@ RTS
  STXZY LDXZY INY DEY
  STYZX LDYZX INX DEX
  - using fixed position = static vars
- STAX LDAX INX DEX
- STAY LDAY INY DEY
+ STAAX LDAAX INX DEX
+ STAAY LDAAY INY DEY
  - using a changable "stack base" pointer
  STAIY LDAIY INY DEY
 
@@ -1719,7 +1755,7 @@ RTS
   BNE *mulstackloop
 
   TAY
-  LDAX 0100
+  LDAAX 0100
 ;
 
 ( - https://llx.com/Neil/a2/mult.html )
@@ -1951,6 +1987,38 @@ BNE L1
   xprint
 ;
 
+( from asm-modes.pl:
+#   xxx m11 00 = --- BIT JMP JMP* STY LDY CPY CPX
+#   xxx m11 01 = ORA AND EOR ADC  STA LDA CMP SBC
+#   xxx m11 10 = ASL ROL LSR ROR  STX LDX DEC INC
+#           11 = (not used)
+)
+
+(for now stupid encoding as 4 chars w space)
+  (TODO: pack 3 chars into 15 bits...)
+  (TODO: LDA# count printPacked Addr)
+  (TODO: a non-zero string type + pascal string?)
+  (TODO: page boundary alignment!)
+  (TODO: ...by @ffff: directive?)
+
+: regular_NMEMs
+"BIT.JMP.JMP.STY.LDY.CPY.CPX.ORA.AND.EOR.ADC.STA.LDA.CMP.SBC.ASL.ROL.LSR.ROR.STX.LDX.DEC.INC." (ends w 0)
+;
+
+: printnso (print Y characters from offset X)
+  STYZ tmp0 (store count)
+  FALLTHROUGH ;
+
+: printnsloop
+  LDAAX &regular_NMEMs     (don't forget & lol)
+  putc
+
+  INX
+  DECZ tmp0
+  BNE *printnsloop
+;
+
+
 : main
   pandoric
   spandoric
@@ -2108,11 +2176,23 @@ cls
 : readevalloop  
 
   (prompt)
-  LDY# 10   LDX# 00  gotoxy
+  LDY# 10   LDX# 00   gotoxy
   LDA# '>'  putc
 
   readline
-  puts "<<<<<<<<<DONE!!!!!"
+
+  SAVE_REGS
+
+    puts "<<<<<<<<<DONE!!!!!"
+
+    LDY# 09   LDX# 00   gotoxy
+    puts "NAME:::"
+
+    (TODO:typed ALS and didn't get error!)
+
+  RESTORE_REGS
+  ASL ASL (mul 4) TAX Y 03   printnso
+
   JMPA &readevalloop
   
   stop
