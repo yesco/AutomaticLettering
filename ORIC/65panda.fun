@@ -2315,7 +2315,7 @@ RTS
 
 (--------------------------------------------)
 (
-: aAllocate (A bytes alloc, store in X zp word)
+: aGrabMem (A bytes alloc, store in X zp word)
   CLC
   ADCZ HERE_LO   STAZ HERE_LO   STAZX 00
   ADCZ HERE_HI   STAZ HERE_HI	STAZX 01
@@ -2363,7 +2363,6 @@ RTS
   JMPA &readeval
 ;
 
-(todo: since don't have forward ref, this must be last!)
 : reset
 
   (interrupt off)
@@ -2394,4 +2393,33 @@ RTS
 ;
 
 
+( OK, don't ever call this one! )
+: HERE_INIT
+  (See HERE / GrabMem for usage)
+  
+  (Two bytes used to verify that it's the
+   correct routine: DEADBEEF)
+  DE AD BE EF
 
+  (The address of HERE_ADDRESS will be
+   stored at the following zero page address,
+   and address+1 (hi) by the assembler)
+  HERE
+;
+
+(-----------------  END ----------------)
+
+
+   ( DO NOT PUT ANYTHING AFTER HERE )
+
+
+       ( IT WILL BE OVERWRITTEN! )
+
+
+            ( NOW GO AWAY! )
+
+
+                 ( YES )
+
+
+		    ()

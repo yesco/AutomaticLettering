@@ -1381,6 +1381,31 @@ console.log('\nFISH>'+b+'<\n');
       process.exit(77);
     }
 
+    let HERE_INIT = deffun.HERE_INIT;
+    let HERE = m[HERE_INIT+4];
+
+    // print out for debugging
+    for(let i=0; i<=5; i++) {
+      let ha = (HERE_INIT+i).toString(16);
+      let h = m[HERE_INIT+i].toString(16);
+      console.log(ha + " HERE_INIT +"+i+" = " + h);
+    }
+
+    // if correct, then store it
+    if (typeof HERE_INIT === 'number' &&
+	m[HERE_INIT+0] === 0xDE &&
+	m[HERE_INIT+1] === 0xAD &&
+	m[HERE_INIT+2] === 0xBE &&
+	m[HERE_INIT+3] === 0xEF) {
+      // those locations will be overwritten
+      // HERE is a zero page address where
+      // to store HERE_INIT
+      m[HERE+0] = HERE_INIT % 256;
+      m[HERE+1] = HERE_INIT >>> 8;
+    } else {
+      console.log("%% ERROR: HERE_INIT not defined or not a number ("+HERE_INIT+")");
+      process.exit(99);
+    }
 
     console.log('----Total bytes used: '+nbytes+ ' for '+nfuncs+' functions');
     startAddr = deffun.reset || deffun.main;
@@ -1518,11 +1543,10 @@ via6552: IRQ every 10ms (free running mode)
 
   }, 10); // call "every 10ms"
 
-
   // don't set more time than 10ms!
   //setTickms(ms, stp, mxstp, dly)
   //cpu.setTickms(10, 1, 1, 1);
-  cpu.start(startAddr); 
+  cpu.start(startAddr);
 
   // simple monitor
   setInterval(function(){
