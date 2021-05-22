@@ -1320,9 +1320,9 @@ RTS
 
 (- Convenience -)
 
-: screeninit
+: init_screen
 (cls)
-  LDY# 00  LDX# 24  gotoxy
+  Y 00 X 24  gotoxy
   puts "CAPS"
   puts "Ready" (TODO: too BASICy)
   (- TODO: blinking cursor -)
@@ -2365,22 +2365,24 @@ RTS
 
 : reset
 
-  (interrupt off)
-  SEI 
+  (CPU stuff)
+    (interrupt off)
+    SEI 
 
-  (init stack)
-  LDX# ff
-  TXS
+    (init stack)
+    LDX# ff
+    TXS
 
-  (data stack)
-  DEX
-  endstack
+  init_screen (doesn't seem to write?)
 
-  (init_heap) (will crash...)
+  (panda system stuff)
+    (data stack)
+    DEX
+    endstack
 
-  screeninit
+    (init_heap) (will crash...)
 
-(main cls)
+  (main)
 
   (panda001)
   (panda002) (crashes)
