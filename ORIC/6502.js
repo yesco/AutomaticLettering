@@ -1421,6 +1421,8 @@ console.log('\nFISH>'+b+'<\n');
 
     Object.keys(deffun).sort().forEach(n=>{
       if (typeof deffun[n] === 'number') {
+	if (n.endsWith('_')) // local label
+	  n = '('+n+')';
 	let len = deffun.len[n];
 	len = (typeof len === 'number') ? len.toString() : '';
 	console.log(

@@ -54,6 +54,15 @@ referred to automatically generates
 JSR label, that's why I call them
 functions.
 
+If a label ends with a '_', then it's
+"local" to the file and will not be
+stored in the runtime dictionary.
+This will make debugging more difficult,
+so if you have space don't use this feature
+until your code works. When addresses are
+printer, labels and JSR/JMP and other addresses
+are identified in printed by name! (TODO:)
+
 Notice, how, below, it doesn't matter
 if INX2 is a "function" or a macro;
 that is the benefit of this way.
@@ -688,7 +697,7 @@ NOP (won't work without the extra NOP!? wtf?)
 
   FALLTHROUGH ;
 
-: fillloop (write wB bytes to wA)
+: fill_ (write wB bytes to wA)
   STAIY wA
 
 (if removed need either two NOP!)
@@ -700,13 +709,13 @@ NOP (won't work without the extra NOP!? wtf?)
   INCZ wA_HI (copied 256 bytes, need inc hi)
   
   DEX
-  BNE *fillloop
+  BNE *fill_
 
   (init to copy one more page)
   (x is zero == 256)
 
   DECZ wB_HI (hi count)
-  BNE *fillloop
+  BNE *fill_
 ;
 
 ( --- screen stuff ---)
@@ -861,10 +870,10 @@ RTS
 
   LDY# 1c (28 rows)
   FALLTHROUGH ;
-: clsyloop  
+: clsy_
   LDX# 28 (40 cols)
   FALLTRHOUGH ;
-: clsxloop  
+: clsx_
 
   TXA PHA
   TYA PHA
@@ -873,9 +882,9 @@ RTS
   PLA TAX
 
   DEX
-  BNE *clsxloop
+  BNE *clsxloop_
   DEY
-  BNE *clsyloop
+  BNE *clsyloop_
 
   home
 ;
@@ -976,7 +985,7 @@ RTS
   - https://codebase64.org/doku.php?id=base:32_bit_hexadecimal_to_decimal_conversion )
   (js emulator doesn't have DECimal mode)
 
-: putd10kd ($2710)
+: putd10kd_ ($2710)
   LDAZ ZSTRLO
   SEC
   SBC# 10
@@ -991,17 +1000,17 @@ RTS
   STAZ ZSTRLO
 
   INX
-  JMPA &putd10kd
+  JMPA &putd10kd_
 ;
 
-: putd10k
+: putd10k_
   LDX# '0'
-  putd10kd
+  putd10kd_
   TXA
   putc
 ;
 
-: putd1kd ($03e8)
+: putd1kd_ ($03e8)
   LDAZ ZSTRLO
   SEC
   SBC# e8
@@ -1016,14 +1025,13 @@ RTS
   STAZ ZSTRLO
 
   INX
-  JMPA &putd1kd
+  JMPA &putd1kd_
 ;
 
-: put1k (Y hi, A lo)
+(TODO: what is this? used?)
+: put1k_ (Y hi, A lo)
   LDX# 00
   STXZ 00
-  FALLTHROUGH ;
-: loop
   SEC
   SBC# e8
   TAX
@@ -1039,14 +1047,14 @@ RTS
   INCZ 00
 ;
 
-: putd1k
+: putd1k_
   LDX# '0'
-  putd1kd
+  putd1kd_
   TXA
   putc
 ;
 
-: putd100d (64)
+: putd100d_ (64)
   LDAZ ZSTRLO
   SEC
   SBC# 64
@@ -1061,17 +1069,17 @@ RTS
   STAZ ZSTRLO
 
   INX
-  JMPA &putd100d
+  JMPA &putd100d_
 ;
 
-: putd100
+: putd100_
   LDX# '0'
-  putd100d
+  putd100d_
   TXA
   putc
 ;
 
-: putd10d (0a) (can be simplified but...)
+: putd10d_ (0a) (can be simplified but...)
   LDAZ ZSTRLO
   SEC
   SBC# 0a
@@ -1086,12 +1094,12 @@ RTS
   STAZ ZSTRLO
 
   INX
-  JMPA &putd10d (== jsr+rts)
+  JMPA &putd10d_ (== jsr+rts)
 ;
 
-: putd10
+: putd10_
   LDX# '0'
-  putd10d
+  putd10d_
   TXA
   putc
 ;
@@ -1101,25 +1109,25 @@ RTS
   LDA# 'x' putc
   puth
   putspc
-  putd10k
+  putd10k_
   putspc
   
   LDA# 'x' putc
   puth
   putspc
-  putd1k
+  putd1k_
   putspc
   
   LDA# 'x' putc
   puth
   putspc
-  putd100
+  putd100_
   putspc
   
   LDA# 'x' putc
   puth
   putspc
-  putd10
+  putd10_
   putspc
   
   LDA# 'x' putc
@@ -1133,10 +1141,10 @@ RTS
 
   putspc
   (todo: refector to call same!)
-  putd10k
-  putd1k
-  putd100
-  putd10
+  putd10k_
+  putd1k_
+  putd100_
+  putd10_
   LDAZ ZSTR puthn
 ;
 
@@ -1148,16 +1156,16 @@ RTS
   SEC
   FALLTHROUGH ;
 
-: putdAl100
+: putdAl100_
   INY
   SBC# 64 (100 dec)
-  bcs *putdAl100
+  bcs *putdAl100_
   FALLTHROUGH ;
 
-: putdAl10
+: putdAl10_
   DEX
   ADC# 0a
-  BMI *putdAl10
+  BMI *putdAl10_
 
   ADC# 2f
 
@@ -1166,7 +1174,6 @@ RTS
   TXA putc
   PLA putc
 ;
-
 
 
 ( - https://codebase64.org/doku.php?id=base:32_bit_hexadecimal_to_decimal_conversion )
@@ -1183,7 +1190,7 @@ RTS
   CLC
   FALLTHROUGH ;
 
-: div10l
+: div10_
   ROL
   CMP# 0a
   BCC 02
@@ -1193,26 +1200,26 @@ RTS
   ROL z2
   ROL z3
   DEY
-  BPL *div10l
+  BPL *div10_
 ;
 
 : hex2dec (32 bit in z0..z3 => r0..r9)
   LDX# 00
   FALLTHROUGH ;
 
-: hex2decl1 
+: hex2decl1_
   32div10
   CMP# 00
-  BEQ *hex2decl1
+  BEQ *hex2decl1_
   BNE 03
   FALLTHROUGH ; 
 
-: hex2decl2
+: hex2decl2_
   32div10
   STAZX Zresult
   INX
   CPY# 0a
-  BNE *hex2decl2
+  BNE *hex2decl2_
 ;
 
 : 32print
@@ -1220,19 +1227,19 @@ RTS
   LDX# 09
   FALLTHROUGH ;
 
-: 32printskip (skip leading zeros)
+: 32printskip_ (skip leading zeros)
   LDAAX Zresult
   BNE 03 (goto 32printnext)
   DEX
-  BNE *32printskip
+  BNE *32printskip_
   FALLTHROUGH ;
 
-: 32printnext
+: 32printnext_
   LDAAX Zresult
   ORA# 30 ('0'?)
   putc
   DEX
-  BPL *32printnext
+  BPL *32printnext_
 ;
 
 (- keyboard )
@@ -1251,9 +1258,9 @@ RTS
   LSRA KEYADDR (hi bit indicate new char)
   FALLTHROUGH ;
 
-: waitkeyloop  
+: waitkeyloop_
   LDAA KEYADDR
-  BPL *waitkeyloop
+  BPL *waitkeyloop_
   AND# 7f (clear top bit)
 ;
 
@@ -1273,7 +1280,7 @@ RTS
   LDX# 00 (how many chars read?)
   FALLTHROUGH ;
 
-: readlineloop  
+: readlineloop_
 
   (zero terminate)
   LDA# 00
@@ -1287,7 +1294,7 @@ RTS
   ( TODO: )
   LDA# 00 (40)
   STAZX ZINPUTBUF
-  JMPA &readlineloop
+  JMPA &readlineloop_
 
   CMP# RETURNKEY
   BNE 01
@@ -1304,7 +1311,7 @@ RTS
   (TODO: allow cursor to move around)
 
   CPX# INPUTBUFLEN
-  BEQ *readlineloop (ignore, TODO: beep)
+  BEQ *readlineloop_ (ignore, TODO: beep)
   
   (TODO: CTRL-A read from screen)
 
@@ -1315,7 +1322,7 @@ RTS
 
 (Cputc '-')
   
-  JMPA &readlineloop
+  JMPA &readlineloop_
 ;
 
 (- Convenience -)
@@ -1729,15 +1736,15 @@ RTS
   (now the $0100 contains original Y)
   FALLTHROUGH;
 
-: remove (all S from stack)
+: remove_ (all S from stack)
   PLA (it contains original S)
   EOR# ff (255-A) (BUG? ff was missing!)
   TAY (number of entries to remove)
   FALLTHROUGH ;
-: removeloop
+: removeloop_
   PLA
   TSX
-  BNE *removeloop
+  BNE *removeloop_
 
   PLA (get the original A)
 
@@ -1745,6 +1752,7 @@ RTS
 ;  
 
 
+(WTF?)
 : mul7 (handgen)
   FALLTHROUGH;
 
@@ -1983,7 +1991,7 @@ BNE L1
   LDA# 1
   STAZ Zto
   FALLTHROUGH ;
-: panda002a (test)
+: panda002a_ (test)
   LDAZ Zto
   CMP# 0f (15)
 
@@ -1992,38 +2000,38 @@ BNE L1
   BCC 07
 
   ( fail/end - implicit rts) ;
-: panda002to
+: panda002to_
   INCZ Zto
-  JMPA &panda002a ;
+  JMPA &panda002a_ ;
 
 (next with relative jump!)
-: panda002sqr
+: panda002sqr_
   sqrA
   FALLTHROUGH ;
 
 (next)
-: panda002lt ( lt 30 )
+: panda002lt_ ( lt 30 )
   CMP# b4 ( 180 )
   BCC 03
   (fail)
-  JMPA &panda002to
+  JMPA &panda002to_
 
   FALLTHROUGH ;
 
 (next)
-: panda002emit (call continuation)
-  ( printA JMPA &panda002to )
+: panda002emit_ (call continuation)
+  ( printA JMPA &panda002to_ )
 
   (-fake a return address below JMPI)
   TAY
 
-  LDA# _panda002emit
+  LDA# _panda002emit_
   CLC
 
   ADC# 11
   TAX
 
-  LDA# ^panda002emit
+  LDA# ^panda002emit_
   ADC# 00
   PHA
   TXA PHA
@@ -2041,7 +2049,7 @@ BNE L1
   JMPA tocontJMP      ( NOT )
 
   (-it'll do RTS back to here!)
-  JMPA &panda002to
+  JMPA &panda002to_
 ;
 
 
