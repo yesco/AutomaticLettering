@@ -1030,6 +1030,10 @@ EED7 RTS
   // --- PandOric Simple Assembler Names
 
   // define function, return #bytes used
+  // Usage:
+  //   deffun(name, body) -> length
+  //   deffun[name] => addr
+  //   deffun[addr] => name
   function deffun(name, body) {
     // lol, "funny" bug
     if (name.match(/^[0-9a-f]{2,}$/)) {
@@ -1165,8 +1169,10 @@ console.log('\nFISH>'+b+'<\n');
 
     // leave no gap for next function
     deffun.nextAddr += len;
+    deffun.len[name] = len;
     return len;
   }
+  deffun.len = {};
 
   // TODO: change
   deffun.nextAddr = 0x601; // after basic
@@ -1406,6 +1412,23 @@ console.log('\nFISH>'+b+'<\n');
       console.log("%% ERROR: HERE_INIT not defined or not a number ("+HERE_INIT+")");
       process.exit(99);
     }
+
+    // dump aliases and functions/labels
+    Object.keys(alias).sort().forEach(n=>{
+      console.log("A: ", n.padEnd(16),
+		  ' = ', alias[n]);
+    })
+
+    Object.keys(deffun).sort().forEach(n=>{
+      if (typeof deffun[n] === 'number') {
+	let len = deffun.len[n];
+	len = (typeof len === 'number') ? len.toString() : '';
+	console.log(
+	  "L: ", n.padEnd(16),
+	  " @ ", hex(4, deffun[n]),
+	  " # ", len.padStart(3));
+      }
+    })
 
     console.log('----Total bytes used: '+nbytes+ ' for '+nfuncs+' functions');
     startAddr = deffun.reset || deffun.main;
