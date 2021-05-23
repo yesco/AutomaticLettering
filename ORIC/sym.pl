@@ -13,8 +13,9 @@ elsif (0) {    open IN, "./run -c | grep 'L:' | cut -c5-21 |tr -s ' ' |" or die 
 elsif (0) {    open IN, "forth.lst";}
 elsif (0) {    open IN, "4th-asm.lst";}
 elsif (0) {    open IN, "asm.lst";}
-elsif (1) {    open IN, "amsterdam.lst";}
+elsif (0) {    open IN, "amsterdam.lst";}
 elsif (0) {    open IN, "lisp.lst";}
+elsif (1) {    open IN, "lisp2.lst";}
 
 $c = 0;
 # sama as pascal! extra byte

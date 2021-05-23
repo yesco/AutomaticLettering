@@ -1,0 +1,176 @@
+61 adc zpxi
+65 adc zp
+69 adc imm
+6D adc abs_
+71 adc zpiy
+72 adc zpi
+75 adc zpx
+79 adc absy
+7D adc absx
+21 and zpxi
+25 and zp
+29 and imm
+2D and abs_
+31 and zpiy
+32 and zpi
+35 and zpx
+39 and absy
+3D and absx
+06 asl zp
+0A asl_a
+0E asl abs_
+16 asl zpx
+1E asl absx
+24 bit zp
+2C bit abs_
+34 bit zpx
+3C bit absx
+00 brk
+10 bpl imm
+30 bmi imm
+50 bvc imm
+70 bvs imm
+80 bra imm
+90 bcc imm
+B0 bcs imm
+D0 bne imm
+F0 beq imm
+18 clc
+58 cli
+B8 clv
+D8 cld
+C1 cmp zpxi
+C5 cmp zp
+C9 cmp imm
+CD cmp abs_
+D1 cmp zpiy
+D2 cmp zpi
+D5 cmp zpx
+D9 cmp absy
+DD cmp absx
+E0 cpx imm
+E4 cpx zp
+EC cpx abs_
+C0 cpy imm
+C4 cpy zp
+CC cpy abs_
+C6 dec zp
+CE dec abs_
+D6 dec zpx
+DE dec absx
+3A dea
+CA dex
+88 dey
+41 eor zpxi
+45 eor zp
+49 eor imm
+4D eor abs_
+51 eor zpiy
+52 eor zpi
+55 eor zpx
+59 eor absy
+5D eor absx
+E6 inc zp
+EE inc abs_
+F6 inc zpx
+FE inc absx
+1A ina
+E8 inx
+C8 iny
+4C jmp abs_
+6C jmp_i abs_
+20 jsr abs_
+A1 lda zpxi
+A5 lda zp
+A9 lda imm
+AD lda abs_
+B1 lda zpiy
+B2 lda zpi
+B5 lda zpx
+B9 lda absy
+BD lda absx
+A2 ldx imm
+A6 ldx zp
+AE ldx abs_
+B6 ldx zpy
+BE ldx absy
+A0 ldy imm
+A4 ldy zp
+AC ldy abs_
+B4 ldy zpx
+BC ldy absx
+46 lsr zp
+4A lsr_a
+4E lsr abs_
+56 lsr zpx
+5E lsr absx
+EA nop
+01 ora zpxi
+05 ora zp
+09 ora imm
+0D ora abs_
+11 ora zpiy
+12 ora zpi
+15 ora zpx
+19 ora absy
+1D ora absx
+08 php
+48 pha
+DA phx
+5A phy
+28 plp
+68 pla
+FA plx
+7A ply
+26 rol zp
+2A rol_a
+2E rol abs_
+36 rol zpx
+3E rol absx
+66 ror zp
+6A ror_a
+6E ror abs_
+76 ror zpx
+7E ror absx
+40 rti
+60 rts
+E1 sbc zpxi
+E5 sbc zp
+E9 sbc imm
+ED sbc abs_
+F1 sbc zpiy
+F2 sbc zpi
+F5 sbc zpx
+F9 sbc absy
+FD sbc absx
+38 sec
+78 sei
+F8 sed
+81 sta zpxi
+85 sta zp
+8D sta abs_
+91 sta zpiy
+92 sta zpi
+95 sta zpx
+99 sta absy
+9D sta absx
+86 stx zp
+8E stx abs_
+96 stx zpy
+84 sty zp
+8C sty abs_
+94 sty zpx
+64 stz zp
+74 stz zpx
+9C stz abs_
+9E stz absx
+14 trb zp
+1C trb abs_
+04 tsb zp
+0C trb abs_
+8A txa
+98 tya
+9A txs
+A8 tay
+AA tax
+BA tsx
