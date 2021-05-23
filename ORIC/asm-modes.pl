@@ -61,16 +61,14 @@
 #   xxx mmm cc             | bytes cycles
 #   --- --- --              \----- ------
 #       000  0 = #immediate     2  2
-#       000  1 = (zero page,X)  2  6
+#       000  1 = (zero page,X)  2  6 (STA="xpy")
 #  (2x) 001    = zero page      2  3 +2/RW
 #       010  0 = accumulator    1  2
 #       010  1 = #immediate     2  2
 #  (2x) 011    = absolute       3  4 +2/RW JMP=3
-#       100  0 = ---
-#       100  1 = (zero page),Y  2  5 +1/STA +1/p
+#       100    = (zero page),Y  2  5 +1/STA +1/p
 #  (2x) 101    = zero page,X    2  4 +2/RW
-#       110  0 = ---
-#       110  1 = absolute,Y     3 \4 +3/RW +1/STA
+#       110    = absolute,Y     3 \4 +3/RW +1/STA
 #  (2x) 111    = absolute,X     3 / +1/p
 #              JMP              3  3 JMP 
 #     branch instructions       2  2 +1/true +2/p

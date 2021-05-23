@@ -12,8 +12,9 @@
 %modes = (
     'imm', 'pc++',
     'zp',  'm[pc++]',
+    # zpy is zpx but for STX it's senseless
     'zpx', '(m[pc++] + x) & 0xff',
-    'zpy', '(m[pc++] + y) & 0xff',
+    'zpy', '(m[pc++] + y) & 0xff', 
     'abs_', 'w((pc+=2)-2)',
     'absx', 'w((pc+=2)-2) + x',
     'absy', 'w((pc+=2)-2) + y',
@@ -52,8 +53,8 @@
 #
 #  regs.p.c = result > 255;
     'cmp', 'v= n(z(c( a - MEM )))',
-    'cmx', 'v= n(z(c( x - MEM )))',
-    'cmy', 'v= n(z(c( y - MEM )))',
+    'cpx', 'v= n(z(c( x - MEM )))',
+    'cpy', 'v= n(z(c( y - MEM )))',
 
     'asl',   'v= m[ADDR]= n(z(c( m[ADDR] << 1 )))',
     'asl_a', 'v= a      = n(z(c( a       << 1 )))',
@@ -155,11 +156,9 @@ print "
 //
 //       jsk@yesco.org
 
-function CPU6502() {
+function CPU6502() { // generates one instance
 
-const NMI_VECTOR   = 0xfffa;
-const RESET_VECTOR = 0xfffc;
-const IRQ_VECTOR   = 0xfffe;
+const NMI = 0xfffa, RESET = 0xfffc, IRQ   = 0xfffe;
 
 // registers & memory
 let a = 0, x = 0, y = 0, p = 0, s = 0, pc = 0;
@@ -170,22 +169,22 @@ w      = (a) => m[a] + m[a+1]<<8;
 wrap = (a) => m[a] + m[(a+1] & 0xff]<<8;
 // TODO: why not always use wraparound?
 
-push   = (v) => m[0x100 + s--] = v;
-pop    = ( ) => m[0x100 + ++s];
+push = (v) => m[0x100 + s--] = v;
+pop  = ( ) => m[0x100 + ++s];
 
 let C = 0x01, Z = 0x02, I = 0x04, D = 0x08;
 let B = 0x10, Q = 0x20, V = 0x40, N = 0x80;
 
 // set flag depending on value
-z = (v)=> (p ^= Z & (p ^ (v ? 0 : Z)), v);
-n = (v)=> (p ^= N & (p ^ v)          , v);
-c = (v)=> (p ^= C & (p ^ (v > 255))  , v & 0xff);
-i = (v)=> (p ^= I & (p ^ (v * I)     , v);
-b = (v)=> (p ^= B & (p ^ (v * B)     , v);
-v = (v)=> (p ^= V & (p ^ (v * V)     , v);
+z = (v)=> (p^= Z & (p^(v&0xff?0:Z)), v);
+n = (v)=> (p^= N & (p^ v)          , v);
+c = (v)=> (p^= C & (p^ (v > 255))  , v & 0xff);
+i = (v)=> (p^= I & (p^ (v * I)     , v);
+b = (v)=> (p^= B & (p^ (v * B)     , v);
+v = (v)=> (p^= V & (p^ (v * V)     , v);
 
 // set carry if low bit set (=C!)
-sc = (v)=> (p ^= C & (p ^ v),        , v);
+sc =(v)=> (p^= C & (p^ v),         , v);
 
 function adc(v) {
     let oa = a;
@@ -217,35 +216,28 @@ function run(count = -1, trace = 0) {
 
 
 my @modes = (
-    'zpxi', 'zp', 'imm', 'abs',
-    'zpiy', 'zpx', 'absy', 'absx');
+#    'zpxi', 'zp', 'imm', 'abs',
+#    'zpiy', 'zpx', 'absy', 'absx');
+    'imm/zpx', 'zp', 'acc/imm', 'abs', 
+    'zpiy', 'zpx', 'absy', 'absx',
+);
 
 my %mod2i = ();
 
 $i = 0;
 for $m (@modes) {
-    $mod2i{$m} = $i;
+    $mod2i{$m} = $i++;
 }
 
 # - Excepton modes
 
-# op  mnemomic   cc  mmm ref  generated
-# --  --------   --  --- ---  ---------
-# A0 ldy # ldy 5 0     0 imm    zpxi
-# A2 ldx # ldx 5 2     0 imm    zpxi
-# C0 cpy # cpy 6 0     0 imm    zpxi
-# E0 cpx # cpx 7 0     0 imm    zpxi
-# 10 bpl # bpl 0 0     4 imm    absx
-# 30 bmi # bmi 1 0     4 imm    absx
-# 50 bvc # bvc 2 0     4 imm    absx
-# 70 bvs # bvs 3 0     4 imm    absx
-# 90 bcc # bcc 4 0     4 imm    absx
-# B0 bcs # bcs 5 0     4 imm    absx
-# D0 bne # bne 6 0     4 imm    absx
-# F0 beq # beq 7 0     4 imm    absx
-# 96 stx # stx 4 2     5 zpy    zpx
-# B6 ldx # ldx 5 2     5 zpy    zpx
-# BE ldx # ldx 5 2     7 absy    absx
+# 96 stx = stx 4 2      zpy    zpxi
+# 20 jsr = jsr 1 0     0 abs    -
+# A2 ldx = ldx 5 2     0 imm    zpxi
+# B6 ldx = ldx 5 2     5 zpy    zpx
+# BE ldx = ldx 5 2     7 absy    absx
+
+# * = done
 
 
 # maping from op code to instruction name
@@ -258,7 +250,7 @@ sub decode {
     my $cc = ($v & 3);
     my @arr;
 
-    my $x, $n, $m;
+    my $x, $n, $m = '-';;
 
     
 #   0xx 000 00 = call&stack       BRK JSR RTI RTS
@@ -266,6 +258,7 @@ if ((0b10011111 & $v) == 0b00000000) {
     @arr = ('brk', 'jsr', 'rti', 'rts');
     die "Already have x:$x<!" if defined($x);
     $x = $iii;
+    $m = 'abs';
 }
 
 #   0xx 010 00 = stack            PHP PLP PHA PLA
@@ -307,12 +300,10 @@ elsif ((0b00011111 & $v) == 0b00010000) {
     @arr = ('bpl','bmi','bvc','bvs','bcc','bcs','bne','beq');
     die "Already have x:$x<!" if defined($x);
     $x = $iii;
+    $m = 'imm';
+    $mmm = $mod2i{$m};
 }
 
-#   00v 100 00 = Negative flag   (BPL BMI)
-#   01v 100 00 = oVerflow flag   (BVC BVS)
-#   10v 100 00 = Carry flag      (BCC BCS)
-#   11v 100 00 = Zero flag       (BNE BEQ)
 #                            (v--- indirect)
 #   xxx mmm 00 = --- BIT JMP JMP* STY LDY CPY CPX
 #   xxx mmm 01 = ORA AND EOR ADC  STA LDA CMP SBC
@@ -329,6 +320,20 @@ elsif ((0b00000000 & $v) == 0b00000000) {
 
     $x = ($cc << 3) + $iii;
     $m = $modes[$mmm];
+
+    #print "x op=$op  iii=$iii mmm=$mmm cc=$cc   m=$m\n";
+
+    # exceptions
+    $mmm = $mod2i{'absy'} if $op eq 'BE';
+
+    # name it
+    $m = $modes[$mmm];
+    #   use cc to clarify
+    $m = $cc & 1 ? 'zpxi' : 'imm' if $mmm == 0;
+    $m = $cc & 1 ? 'imm'  : 'acc' if $mmm == 2;
+    $m = 'zpy' if $op =~ /(96|B6)/;
+
+    #print "x op=$op  iii=$iii mmm=$mmm cc=$cc   m=$m\n";
 
 # FAIL
 } else {
@@ -377,7 +382,10 @@ while (<IN>) {
 	my ($v, $iii, $mmm, $cc, $x, $n, $m) = &decode($op); 
 	my $neq = ($mnc eq $n) ? '=' : ' ';
 	my $meq = ($mod eq $m) ? '==' : '  ';
-	print "= $op $mnc $neq $n $iii $cc     $mmm $mod $meq $m\n";
+	if (!$neq || !$meq) {
+	    print "Decoding error!\n";
+	    print "= $op $mnc $neq $n $iii $cc     $mmm $mod $meq $m\n";
+	}
     }
 
     # address stuff
