@@ -1,7 +1,7 @@
 61 adc zpxi
 65 adc zp
 69 adc imm
-6D adc abs_
+6D adc abs
 71 adc zpiy
 72 adc zpi
 75 adc zpx
@@ -10,7 +10,7 @@
 21 and zpxi
 25 and zp
 29 and imm
-2D and abs_
+2D and abs
 31 and zpiy
 32 and zpi
 35 and zpx
@@ -18,11 +18,11 @@
 3D and absx
 06 asl zp
 0A asl_a
-0E asl abs_
+0E asl abs
 16 asl zpx
 1E asl absx
 24 bit zp
-2C bit abs_
+2C bit abs
 34 bit zpx
 3C bit absx
 00 brk
@@ -42,7 +42,7 @@ D8 cld
 C1 cmp zpxi
 C5 cmp zp
 C9 cmp imm
-CD cmp abs_
+CD cmp abs
 D1 cmp zpiy
 D2 cmp zpi
 D5 cmp zpx
@@ -50,12 +50,12 @@ D9 cmp absy
 DD cmp absx
 E0 cpx imm
 E4 cpx zp
-EC cpx abs_
+EC cpx abs
 C0 cpy imm
 C4 cpy zp
-CC cpy abs_
+CC cpy abs
 C6 dec zp
-CE dec abs_
+CE dec abs
 D6 dec zpx
 DE dec absx
 3A dea
@@ -64,26 +64,26 @@ CA dex
 41 eor zpxi
 45 eor zp
 49 eor imm
-4D eor abs_
+4D eor abs
 51 eor zpiy
 52 eor zpi
 55 eor zpx
 59 eor absy
 5D eor absx
 E6 inc zp
-EE inc abs_
+EE inc abs
 F6 inc zpx
 FE inc absx
 1A ina
 E8 inx
 C8 iny
-4C jmp abs_
-6C jmp_i abs_
-20 jsr abs_
+4C jmp abs
+6C jmpi abs
+20 jsr abs
 A1 lda zpxi
 A5 lda zp
 A9 lda imm
-AD lda abs_
+AD lda abs
 B1 lda zpiy
 B2 lda zpi
 B5 lda zpx
@@ -91,24 +91,24 @@ B9 lda absy
 BD lda absx
 A2 ldx imm
 A6 ldx zp
-AE ldx abs_
+AE ldx abs
 B6 ldx zpy
 BE ldx absy
 A0 ldy imm
 A4 ldy zp
-AC ldy abs_
+AC ldy abs
 B4 ldy zpx
 BC ldy absx
 46 lsr zp
 4A lsr_a
-4E lsr abs_
+4E lsr abs
 56 lsr zpx
 5E lsr absx
 EA nop
 01 ora zpxi
 05 ora zp
 09 ora imm
-0D ora abs_
+0D ora abs
 11 ora zpiy
 12 ora zpi
 15 ora zpx
@@ -124,12 +124,12 @@ FA plx
 7A ply
 26 rol zp
 2A rol_a
-2E rol abs_
+2E rol abs
 36 rol zpx
 3E rol absx
 66 ror zp
 6A ror_a
-6E ror abs_
+6E ror abs
 76 ror zpx
 7E ror absx
 40 rti
@@ -137,7 +137,7 @@ FA plx
 E1 sbc zpxi
 E5 sbc zp
 E9 sbc imm
-ED sbc abs_
+ED sbc abs
 F1 sbc zpiy
 F2 sbc zpi
 F5 sbc zpx
@@ -148,26 +148,26 @@ FD sbc absx
 F8 sed
 81 sta zpxi
 85 sta zp
-8D sta abs_
+8D sta abs
 91 sta zpiy
 92 sta zpi
 95 sta zpx
 99 sta absy
 9D sta absx
 86 stx zp
-8E stx abs_
+8E stx abs
 96 stx zpy
 84 sty zp
-8C sty abs_
+8C sty abs
 94 sty zpx
 64 stz zp
 74 stz zpx
-9C stz abs_
+9C stz abs
 9E stz absx
 14 trb zp
-1C trb abs_
+1C trb abs
 04 tsb zp
-0C trb abs_
+0C trb abs
 8A txa
 98 tya
 9A txs

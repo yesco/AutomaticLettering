@@ -215,6 +215,152 @@ function run(count = -1, trace = 0) {
     switch( op=m[pc++] ) {
 ";
 
+
+my @modes = (
+    'zpxi', 'zp', 'imm', 'abs',
+    'zpiy', 'zpx', 'absy', 'absx');
+
+my %mod2i = ();
+
+$i = 0;
+for $m (@modes) {
+    $mod2i{$m} = $i;
+}
+
+# - Excepton modes
+
+# op  mnemomic   cc  mmm ref  generated
+# --  --------   --  --- ---  ---------
+# A0 ldy # ldy 5 0     0 imm    zpxi
+# A2 ldx # ldx 5 2     0 imm    zpxi
+# C0 cpy # cpy 6 0     0 imm    zpxi
+# E0 cpx # cpx 7 0     0 imm    zpxi
+# 10 bpl # bpl 0 0     4 imm    absx
+# 30 bmi # bmi 1 0     4 imm    absx
+# 50 bvc # bvc 2 0     4 imm    absx
+# 70 bvs # bvs 3 0     4 imm    absx
+# 90 bcc # bcc 4 0     4 imm    absx
+# B0 bcs # bcs 5 0     4 imm    absx
+# D0 bne # bne 6 0     4 imm    absx
+# F0 beq # beq 7 0     4 imm    absx
+# 96 stx # stx 4 2     5 zpy    zpx
+# B6 ldx # ldx 5 2     5 zpy    zpx
+# BE ldx # ldx 5 2     7 absy    absx
+
+
+# maping from op code to instruction name
+sub decode {
+    my ($op, $mnc, $mod) = @_;
+
+    my $v = hex($op);
+    my $mmm = ($v >> 2) & 7;
+    my $iii = ($v >> 5);
+    my $cc = ($v & 3);
+    my @arr;
+
+    my $x, $n, $m;
+
+    
+#   0xx 000 00 = call&stack       BRK JSR RTI RTS
+if ((0b10011111 & $v) == 0b00000000) {
+    @arr = ('brk', 'jsr', 'rti', 'rts');
+    die "Already have x:$x<!" if defined($x);
+    $x = $iii;
+}
+
+#   0xx 010 00 = stack            PHP PLP PHA PLA
+elsif ((0b10011111 & $v) == 0b00001000) {
+    @arr = ('php', 'plp', 'pha', 'pla');
+    die "Already have x:$x<!" if defined($x);
+    $x = $iii;
+}
+
+#
+#   xx0 110 00 = magic flags =0   CLC CLI*TYA CLD
+#   xx1 110 00 = magic flags =1   SEC SEI --- SED
+elsif ((0b00011111 & $v) == 0b00011000) {
+    @clc = ('clc','sec','cli','sei','tya','---','cld','sed');
+    die "Already have x:$x<!" if defined($x);
+    $x = $iii;
+}
+
+#
+#   1xx 010 00 = v--transfers--> *DEY TAY INY INX
+elsif ((0b10011111 & $v) == 0b10001000) {
+    @dey = ('dey', 'tay', 'iny', 'inx');
+    die "Already have x:$x<!" if defined($x);
+    $x = $iii;
+}
+
+#   1xx x10 10 = TXA TXS TAX TSX  DEX --- NOP ---
+elsif ((0b10001111 & $v) == 0b10001010) {
+    @arr = ('tsa', 'txs', 'tax', 'tsx', 'dex', '---', 'nop', '---');
+    die "Already have x:$x<!" if defined($x);
+    $x = ($v >> 4) & 7;;
+}
+
+#
+#   ffv 100 00 = branch instructions:
+#   ff0 100 00 = if flag == 0     BPL BVC BCC BNE
+#   ff1 100 00 = if flag == 1     BMI BVS BCS BEQ
+elsif ((0b00011111 & $v) == 0b00010000) {
+    @arr = ('bpl','bmi','bvc','bvs','bcc','bcs','bne','beq');
+    die "Already have x:$x<!" if defined($x);
+    $x = $iii;
+}
+
+#   00v 100 00 = Negative flag   (BPL BMI)
+#   01v 100 00 = oVerflow flag   (BVC BVS)
+#   10v 100 00 = Carry flag      (BCC BCS)
+#   11v 100 00 = Zero flag       (BNE BEQ)
+#                            (v--- indirect)
+#   xxx mmm 00 = --- BIT JMP JMP* STY LDY CPY CPX
+#   xxx mmm 01 = ORA AND EOR ADC  STA LDA CMP SBC
+#   xxx mmm 10 = ASL ROL LSR ROR  STX LDX DEC INC
+elsif ((0b00000000 & $v) == 0b00000000) {
+    @arr = (
+  '---','bit','jmp','jmpi', 'sty','ldy','cpy','cpx',
+  'ora','and','eor','adc',  'sta','lda','cmp','sbc',
+  'asl','rol','lsr','ror',  'stx','ldx','dec','inc');
+    die "Already have x:$x<!" if defined($x);
+
+    # 61         = ADC ($44,X)
+    # 011 000 01 
+
+    $x = ($cc << 3) + $iii;
+    $m = $modes[$mmm];
+
+# FAIL
+} else {
+    die "No found x!";
+}
+
+    my $n = $arr[$x];
+
+    return ($v, $iii, $mmm, $cc, $x, $n, $m);
+}
+
+# 6502C ? ignore...
+
+# 72 adc   ror 3 2  19     4 zpi
+# 32 and   rol 1 2  17     4 zpi
+# 80 bra   sty 4 0  4     0 imm
+# D2 cmp   dec 6 2  22     4 zpi
+# 52 eor   lsr 2 2  18     4 zpi
+# B2 lda   ldx 5 2  21     4 zpi
+# 12 ora   asl 0 2  16     4 zpi
+# F2 sbc   inc 7 2  23     4 zpi
+# 92 sta   stx 4 2  20     4 zpi
+# 64 stz   jmpi 3 0  3     1 zp
+# 74 stz   jmpi 3 0  3     5 zpx
+# 9C stz   sty 4 0  4     7 abs
+# 9E stz   stx 4 2  20     7 absx
+# 14 trb   --- 0 0  0     5 zp
+# 1C trb   --- 0 0  0     7 abs
+# 04 tsb   --- 0 0  0     1 zp
+# 0C trb   --- 0 0  0     3 abs
+$c6502 = ' 72 32 80 D2 52 B2 12 F2 92 64 74 9C 9E 14 1C 04 0C ';
+
 # generate instructions
 open IN, "op-mnc-mod.lst" or die "bad file";
 my @ops, %mnc, %mod;
@@ -222,10 +368,16 @@ while (<IN>) {
     my ($op, $mnc, $mod) =/^(..) (\w+) ?(|\w*)$/;
     die "no op: $_" unless $op;
 
-    # TODO: test if mod aggrees w mmm bits?
+    next if $c6502 =~ /$op/;
+
     my $line = "    case 0x$op: ";
 
+    # TODO: test if mod aggrees w mmm bits?
     if ($mod =~ /\w/) {
+	my ($v, $iii, $mmm, $cc, $x, $n, $m) = &decode($op); 
+	my $neq = ($mnc eq $n) ? '=' : ' ';
+	my $meq = ($mod eq $m) ? '==' : '  ';
+	print "= $op $mnc $neq $n $iii $cc     $mmm $mod $meq $m\n";
     }
 
     # address stuff
