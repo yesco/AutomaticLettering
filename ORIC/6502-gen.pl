@@ -202,7 +202,7 @@ function adc(v) {
     }
 }
 
-let op, ipc, cpu, d, n, v, q; // Dutch joke?
+let op, mode, ipc, cpu, d, n, v, q; // Dutch joke?
 
 function tracer() {
 }
@@ -210,7 +210,7 @@ function tracer() {
 function run(count = -1, trace = 0) {
   trace = 1==trace ? tracer : trace;
   while(count--) {
-    ipc = pc; addr = arg = undefined; 
+    ipc = pc; mode = addr = arg = undefined; 
     switch( op=m[pc++] ) {
 ";
 
@@ -250,7 +250,7 @@ sub decode {
     my $cc = ($v & 3);
     my @arr;
 
-    my $x, $n, $m = '-';;
+    my $x, $n, $m = '-', $exception;;
 
     
 #   0xx 000 00 = call&stack       BRK JSR RTI RTS
@@ -367,17 +367,22 @@ elsif ((0b00000000 & $v) == 0b00000000) {
 $c6502 = ' 72 32 80 D2 52 B2 12 F2 92 64 74 9C 9E 14 1C 04 0C ';
 
 # generate instructions
+my $shortercode = 1;
+
 open IN, "op-mnc-mod.lst" or die "bad file";
-my @ops, %mnc, %mod;
+my @ops, %mnc, %mod, %saved;
 while (<IN>) {
     my ($op, $mnc, $mod) =/^(..) (\w+) ?(|\w*)$/;
     die "no op: $_" unless $op;
 
     next if $c6502 =~ /$op/;
 
+
     my $line = "    case 0x$op: ";
 
+
     # TODO: test if mod aggrees w mmm bits?
+    my $node = '';
     if ($mod =~ /\w/) {
 	my ($v, $iii, $mmm, $cc, $x, $n, $m) = &decode($op); 
 	my $neq = ($mnc eq $n) ? '=' : ' ';
@@ -386,18 +391,33 @@ while (<IN>) {
 	    print "Decoding error!\n";
 	    print "= $op $mnc $neq $n $iii $cc     $mmm $mod $meq $m\n";
 	}
+	if ($shortercode && !($op =~ /(96|B6)/)) {
+	    #$saved{$mnc} .= " $op,$mnc,$mod ";
+	    $saved_m{$mnc} |= 1 << $mmm;
+	    $saved_x{$mnc} = $x;
+	    $saved{$mnc} .= "case 0x$op: ";
+	    next;
+	}
+; #($shortercode && $mod
+	unless ($mod eq $modes[$mmm]) {
+	    print "    // MODE $mod instead of of mod[mmm] $mod[$mmm]\n";
+	}
+
     }
 
     # address stuff
     my $i = $impl{$mnc};
+    #print "/y $op $i\n";
     $i =~ s/RMEM/MEM -128/;
     $i =~ s/MEM/m[$modes{$mod}]/;
     if ($i =~ /ADDR/) {
-	$i = 'd='.$modes{$mod}.'; ';
+	$i = 'd='.$modes{$mod}."; $i";
 	$i =~ s/ADDR/d/g;
     }
     die "MEM:only use once:$i" if $i =~ /MEM/;
     $i =~ s/ +/ /g;
+    #print "\\y $op $i\n";
+
     $line .= $i.'; ';
 
     my $wid = 55;
@@ -414,8 +434,47 @@ while (<IN>) {
     print "\n";
 }
 
-# prelude
+# LATER!
+if ($shortercode) {
+    print "    default:\n";
+
+    # first generate mode stuff
+    print "      switch(mod= (op>>2) & 7) {\n";
+
+    for $m (keys %modes) {
+	print "      case $m: d= $modes{$m}; break; // $m\n";
+    }
+
+    print "      }\n";
+
+    # print generic instructions
+    print "      switch(i= (op>>5) + ((op&3)<<3)) {\n";
+
+    foreach $inst (keys %saved) {
+	my $iiiii = $saved_x{$inst};
+	my $mod = $saved{$inst};
+
+	# instruction
+	my $i = $impl{$mnc};
+	$i =~ s/MEM/v/;
+	if ($i =~ /ADDR/) {
+	    $i =~ s/ADDR/d/g;
+	    die "MEM:only use once:$i" if $i =~ /MEM/;
+	    $i =~ s/ +/ /g;
+	}
+	print "      // $saved{$inst}\n";
+	print sprintf("      // if (%#2x & mod) {...\n", $saved_m{$inst});
+	print "      case $iiiii: $i; break;\n";
+    }
+
+#    print "      }\n";
+    print "      }\n";
+
+}
+
+# postlude
 print "    }
+
     trace && trace(cpu, { count, ipc, op, mnc, mod, addr, g, v} );
   }
   
