@@ -189,16 +189,16 @@ function adc(v) {
   sc(1);
 }
 
-let op /* Dutch! */, count, ipc, cpu, d, mnc, g, q;
+let op /* Dutch! */, ic = 0, ipc, cpu, d, mnc, g, q;
 
 function tracer() {
 }
 
-function run(n = -1, trace = 0) {
+function run(count = -1, trace = 0) {
   trace = 1==trace ? tracer : trace;
   let t = count;
   while(t--) {
-    ipc = pc; mod = d = g = undefined;
+    ic++; ipc = pc; mod = d = g = undefined;
     switch(op= m[pc++]) {
 ";
 
@@ -489,13 +489,13 @@ if ($shortercode) {
 # postlude
 print "    }
 
-    trace && trace(cpu, { count, ipc, op, f, mod, add: dr, val: g} );
+    trace && trace(cpu, { ic, ipc, op, f, mod, add: dr, val: g} );
   }
 }
   
 return cpu = {
   run, // dis
-  state() { return { a, x, y, p, pc, s, m}},
+  state() { return { a, x, y, p, pc, s, m, ic}},
   last() { return { pc, op, addr: d, arg: g, val: g}},
   reg(n, v) { return eval(n+(typeof a?'':'='+v))},
   consts() { return { NMI,RESET,IRQ, C,Z,I,D, B,Q,V,N}}
@@ -510,11 +510,14 @@ if (1) {
 
 // testing
 let cpu = CPU6502();
-console.log('cpu= ', cpu);
-console.log('state= ', cpu.state());
-console.log('state= ', cpu.last());
-console.log('consts= ', cpu.consts());
-
+let n = 3;
+while (n--) {
+  console.log('cpu= ', cpu);
+  console.log('state= ', cpu.state());
+  console.log('state= ', cpu.last());
+  console.log('consts= ', cpu.consts());
+  console.log(cpu.run(1));
+}
 ";
 }
 
