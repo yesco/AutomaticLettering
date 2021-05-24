@@ -7,7 +7,7 @@ function CPU6502() { // generates one instance
 
 // registers & memory
 var a = 0, x = 0, y = 0, p = 0, s = 0, pc = 0;
-let m = new Uint8Array(0xffff + 1);
+var m = new Uint8Array(0xffff + 1);
 const NMI = 0xfffa, RESET = 0xfffc, IRQ   = 0xfffe;
 
 function reset(a) { pc = w(a || RESET) }          
@@ -15,8 +15,7 @@ function nmi(a) { PH(p); PH(pc >> 8); PH(pc & 0xff); reset(a || NMI) }
 function irq() { nmi(IRQ) }
 
 let w  = (a) => m[a] + m[(a+1) & 0xff]<<8,
-    PH = (v) =>{console.log("MEM=", m, "a=", a);
-m[0x100 + s]= v; s= (s-1) & 0xff},
+    PH = (v) =>{m[0x100 + s]= v; s= (s-1) & 0xff},
     PL = ( ) => m[0x100 + (s= (s+1) & pxff)];
 
 let C = 0x01, Z = 0x02, I = 0x04, D = 0x08;
@@ -30,6 +29,9 @@ let z= (x)=> (p^= Z & (p^(x&0xff?0:Z)), x),
     // set carry if low bit set (=C!)
     sc=(x)=> (p^= C & (p^ x)          , x);
 
+let flags=(i=7,v=128,r='')=>{for(;r+=p&v?'CZIDBQVN'[i]:' ',i--;v/=2);return r};
+let hex=(n,x,r='')=>{for(;n--;x>>=4)r='0123456789ABCDEF'[x&0xf]+r;return r};
+
 function adc(v) {
   let oa = a;
   a = c(a + v + (p & C));
@@ -41,7 +43,7 @@ function adc(v) {
   sc(1);
 }
 
-let op /* Dutch! */, ic = 0, f, ipc, cpu, d, g, q;
+let op /* Dutch! */, ic = 0, f, ipc, cpu, d, g, mode;
 // name2function (missing those with memory nodes)
 var n2f = {
 ASL_A(){ g= a= n(z(c( a << 1 ))) },   ROL_A(){ g= a= n(z(c(a<<1 + (p&C)))) },
@@ -138,13 +140,27 @@ if (1) {
   // 2 missing?
 }
 
-function tracer() {
-    console.log('TRACE', hex(4,ipc), 'op='+hex(2,op), f?f.name:'???',
-		mod?mod.name:'---', d?'d='+d:'', g?'g='+g:'');
+function tracer(a,b) {
+  let line;
+  if (b == 'head') {
+    line = '= pc    op mnemmomic  flags  a  x  y  s';
+  } else {
+    line = '= '+hex(4,ipc)+'  '+hex(2,op)+' '+
+      ((f?f.name:'???')+(mode?mode.name:'---')).padEnd(8, ' ')+
+      flags()+' '+hex(2,a)+' '+hex(2,x)+' '+hex(2,y)+' '+hex(2,s)+
+      ' '+(d?'d='+d:'')+(g?'g='+g:'');
+  }
+
+  if (a == 'string') {
+    return line;
+  } else {
+    console.log(line);
+  }
 }
 
 function run(count = -1, trace = 0) {
   trace = 1==trace ? tracer : trace;
+  trace('print', 'head');
   let t = count;
   while(t--) {
     ic++; ipc = pc; mod = d = g = undefined;
@@ -152,8 +168,8 @@ function run(count = -1, trace = 0) {
     // process one instruction
     op  = m[pc++];
     // get memory mode and run
-    mod = o2m[op];
-    mod && mod();
+    mode = o2m[op];
+    mode && mode();
     // get implementation and run
     f = o2f[op];
     f && f();
@@ -163,12 +179,12 @@ function run(count = -1, trace = 0) {
 }
 
 return cpu = {
-  run, // dis
+  run, flags, tracer, hex,
   state() { return { a, x, y, p, pc, s, m, ic}},
   last() { return { ipc, op, inst: f, addr: d, val: g}},
-  reg(n, v) { return eval(n+(typeof a?'':'='+v))},
+  reg(n,v='') { return eval(n+(v!=''?'='+v:''))},
   consts() { return { NMI,RESET,IRQ, C,Z,I,D, B,Q,V,N}}
-
+  
 }
 
 }
@@ -178,9 +194,7 @@ return cpu = {
 // testing
 let cpu = CPU6502();
 let m = cpu.state().m;
-
-let hex=(n,x,r='')=>{for(;n--;x>>=4)r='0123456789ABCDEF'[x&0xf]+r;return r};
-let PS=(i=7,v=128,r='')=>{for(;r+=p&v?'CZIDBQVN'[i]:' ',i--;v/=2);return r};
+let hex = cpu.hex;
 
 let dump=(a=0,n=8,l=1,i=0,r='',p='',v)=>{
   for(;i<n*l;i++){
@@ -200,3 +214,17 @@ while (nn--) {
   console.log('consts= ', cpu.consts());
   console.log(cpu.run(3, 1));
 }
+
+console.log('"--------------');
+console.log('state= ', cpu.state());
+cpu.reg('a', 3);
+console.log('state= ', cpu.state());
+
+console.log('a=', cpu.reg('a'));
+console.log('p=', cpu.reg('p'));
+console.log('pc=', cpu.reg('pc'));
+console.log('sc=', cpu.reg('s'));
+console.log('flags=', cpu.flags());
+
+dump(0);
+console.log(cpu.run(3, 1));

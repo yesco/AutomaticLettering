@@ -195,6 +195,9 @@ function adc(v) {
 
 let op /* Dutch! */, ic = 0, f, ipc, cpu, d, g, q;
 
+let hex=(n,x,r='')=>{for(;n--;x>>=4)r='0123456789ABCDEF'[x&0xf]+r;return r};
+let flags=(i=7,v=128,r='')=>{for(;r+=p&v?'CZIDBQVN'[i]:' ',i--;v/=2);return r};
+
 function tracer() {
   console.log(hex(4, ic), ' ', /*dump pc-ipc*/
     f, q, d, g, statu());
@@ -516,7 +519,7 @@ print "    }
 }
   
 return cpu = {
-  run, // dis
+  run, flags, tracer, hex,
   state() { return { a, x, y, p, pc, s, m, ic}},
   last() { return { ipc, op, inst: f, addr: d, val: g}},
   reg(n, v) { return eval(n+(typeof a?'':'='+v))},
@@ -533,9 +536,6 @@ if (1) {
 // testing
 let cpu = CPU6502();
 let m = cpu.state().m;
-
-let hex=(n,x,r='')=>{for(;n--;x>>=4)r='0123456789ABCDEF'[x&0xf]+r;return r};
-let PS=(i=7,v=128,r='')=>{for(;r+=p&v?'CZIDBQVN'[i]:' ',i--;v/=2);return r};
 
 let dump=(a=0,n=8,l=1,i=0,r='',p='',v)=>{
   for(;i<n*l;i++){
