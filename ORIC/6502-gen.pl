@@ -114,9 +114,9 @@
     'phy', 'PH(g= y)', # 6502C
     
     'plp', 'g= p= PL()',
-    'pla', 'g= a= PL()',
-    'plx', 'g= x= PL()', # 6502C
-    'ply', 'g= y= PL()', # 6502C
+    'pla', 'n(z(g= a= PL()))',
+    'plx', 'n(z(g= x= PL()))', # 6502C
+    'ply', 'n(z(g= y= PL()))', # 6502C
 
     # cleverly (a=777) returns 777,
     # even if a is byte from byte array
