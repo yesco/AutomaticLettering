@@ -103,7 +103,7 @@
     'jmpi',  'pc= w(ADDR)',
     'jsr', 'pc--; PH(pc >> 8); PH(pc & 0xff); pc= ADDR',
 
-    'brk', 'PH(p); PH(pc >> 8); PH(pc & 0xff); p|= B; pc = w(0xfffe)',
+    'brk', 'irq() p|= B',
     'rts', 'pc = PL(); pc += PL()<<8',
     'rti', 'pc = PL(); pc += PL()<<8; p = PL()',
 
@@ -163,6 +163,10 @@ var a = 0, x = 0, y = 0, p = 0, s = 0, pc = 0;
 let m = new Uint8Array(0xffff + 1);
 const NMI = 0xfffa, RESET = 0xfffc, IRQ   = 0xfffe;
 
+function reset(a) { pc = w(a || RESET) }          
+function nmi(a) { PH(p); PH(pc >> 8); PH(pc & 0xff); reset(a || NMI) }
+function irq() { nmi(IRQ) }
+
 let w  = (a) => m[a] + m[(a+1) & 0xff]<<8,
     PH = (v) =>{m[0x100 + s]= v; s= (s-1) & 0xff},
     PL = ( ) => m[0x100 + (s= (s+1) & pxff)];
@@ -188,6 +192,7 @@ function adc(v) {
   a += 0x60;
   sc(1);
 }
+
 let op /* Dutch! */, ic = 0, f, ipc, cpu, d, g, q;
 
 function tracer() {

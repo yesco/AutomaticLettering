@@ -10,6 +10,10 @@ var a = 0, x = 0, y = 0, p = 0, s = 0, pc = 0;
 let m = new Uint8Array(0xffff + 1);
 const NMI = 0xfffa, RESET = 0xfffc, IRQ   = 0xfffe;
 
+function reset(a) { pc = w(a || RESET) }          
+function nmi(a) { PH(p); PH(pc >> 8); PH(pc & 0xff); reset(a || NMI) }
+function irq() { nmi(IRQ) }
+
 let w  = (a) => m[a] + m[(a+1) & 0xff]<<8,
     PH = (v) =>{console.log("MEM=", m, "a=", a);
 m[0x100 + s]= v; s= (s-1) & 0xff},
@@ -56,7 +60,7 @@ DEY(){ g= n(z(y= (y-1) & 0xff)) },      JNY(){ g= n(z(y = (y+1) & 0xff)) },
 JMP(){ d=w((pc+=2)-2); pc= d },         JMPI(){ d=w((pc+=2)-2); pc= w(d) },
 RTS(){ pc = PL(); pc += PL()<<8 },      RTI(){ RTS(); p = PL() },
 JSR(){ d=w((pc+=2)-2); pc--; PH(pc >> 8); PH(pc & 0xff); pc= d },
-BRK(){ PH(p); PH(pc >> 8); PH(pc & 0xff); p|= B; pc = w(0xfffe) },
+BRK(){ irq(); p|= B },
 PHP(){ PH(g= p | 0x30) },               PLP(){ g= p= PL() },
 PHA(){ PH(g= a) },                      PLA(){ g= a= PL() },
 PHX(){ PH(g= x) },                      PLX(){ g= x= PL() },
@@ -135,8 +139,8 @@ if (1) {
 }
 
 function tracer() {
-  console.log(hex(4, ic), ' ', /*dump pc-ipc*/
-    f, q, d, g, statu());
+    console.log('TRACE', hex(4,ipc), 'op='+hex(2,op), f?f.name:'???',
+		mod?mod.name:'---', d?'d='+d:'', g?'g='+g:'');
 }
 
 function run(count = -1, trace = 0) {
@@ -144,6 +148,8 @@ function run(count = -1, trace = 0) {
   let t = count;
   while(t--) {
     ic++; ipc = pc; mod = d = g = undefined;
+
+    // process one instruction
     op  = m[pc++];
     // get memory mode and run
     mod = o2m[op];
@@ -152,8 +158,7 @@ function run(count = -1, trace = 0) {
     f = o2f[op];
     f && f();
 
-    console.log(ipc, 'op='+op, f ? f.name:'', m ? m.name:'', 'd='+d, 'g='+g, 'v='+v);
-    trace && trace(cpu, { ic, ipc, op, f, mod, add: dr, val: g} );
+    trace && trace(cpu, { ic, ipc, op, f, mod, add: d, val: g} );
   }
 }
 
@@ -193,5 +198,5 @@ while (nn--) {
   console.log('state= ', cpu.state());
   console.log('last= ', cpu.last());
   console.log('consts= ', cpu.consts());
-  console.log(cpu.run(1));
+  console.log(cpu.run(3, 1));
 }
