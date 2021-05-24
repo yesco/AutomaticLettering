@@ -16,7 +16,7 @@ function irq() { nmi(IRQ) }
 
 let w  = (a) => m[a] + m[(a+1) & 0xff]<<8,
     PH = (v) =>{m[0x100 + s]= v; s= (s-1) & 0xff},
-    PL = ( ) => m[0x100 + (s= (s+1) & pxff)];
+    PL = ( ) => m[0x100 + (s= (s+1) & 0xff)];
 
 let C = 0x01, Z = 0x02, I = 0x04, D = 0x08;
 let B = 0x10, Q = 0x20, V = 0x40, N = 0x80;
@@ -64,11 +64,11 @@ RTS(){ pc = PL(); pc += PL()<<8 },      RTI(){ RTS(); p = PL() },
 JSR(){ d=w((pc+=2)-2); pc--; PH(pc >> 8); PH(pc & 0xff); pc= d },
 BRK(){ irq(); p|= B },
 PHP(){ PH(g= p | 0x30) },               PLP(){ g= p= PL() },
-PHA(){ PH(g= a) },                      PLA(){ g= a= PL() },
-PHX(){ PH(g= x) },                      PLX(){ g= x= PL() },
-PHY(){ PH(g= y) },                      PLY(){ g= y= PL() },
+PHA(){ PH(g= a) },                      PLA(){ n(z(g= a= PL())) },
+PHX(){ PH(g= x) },                      PLX(){ n(z(g= x= PL())) },
+PHY(){ PH(g= y) },                      PLY(){ n(z(g= y= PL())) },
 TXA(){ z(g= a= x) },       TYA(){ z(g= a= y) },        TXS(){ z(g= s= x) },
-TAX(){ z(g= a= x) },       TAY(){ z(g= y= a) },        TSX(){ z(g= x= s) },};
+TAX(){ z(g= x= a) },       TAY(){ z(g= y= a) },        TSX(){ z(g= x= s) },};
 // Opcode to Mode mapping, and Opcode to Function (not yet complet)
 var _ = n2f, o2m=Array(256), o2f=[_.BRK,,,,,,,,_.PHP,,_.ASL_A,,,,,,_.BPL,,,,,,
 ,,_.CLC,,,,,,,,_.JSR,,,,,,,,_.PLP,,_.ROL_A,,,,,,_.BMI,,,,,,,,_.SEC,,,,,,,,
@@ -140,18 +140,18 @@ if (1) {
   // 2 missing?
 }
 
-function tracer(a,b) {
+function tracer(how,what) {
   let line;
-  if (b == 'head') {
+  if (what == 'head') {
     line = '= pc    op mnemmomic  flags  a  x  y  s';
   } else {
     line = '= '+hex(4,ipc)+'  '+hex(2,op)+' '+
       ((f?f.name:'???')+(mode?mode.name:'---')).padEnd(8, ' ')+
       flags()+' '+hex(2,a)+' '+hex(2,x)+' '+hex(2,y)+' '+hex(2,s)+
-      ' '+(d?'d='+d:'')+(g?'g='+g:'');
+      +(d?' d='+d:'')+(g?' g='+g:'')
   }
 
-  if (a == 'string') {
+  if (how == 'string') {
     return line;
   } else {
     console.log(line);
@@ -160,7 +160,7 @@ function tracer(a,b) {
 
 function run(count = -1, trace = 0) {
   trace = 1==trace ? tracer : trace;
-  trace('print', 'head');
+  trace && trace('print', 'head');
   let t = count;
   while(t--) {
     ic++; ipc = pc; mod = d = g = undefined;
@@ -215,7 +215,7 @@ while (nn--) {
   console.log(cpu.run(3, 1));
 }
 
-console.log('"--------------');
+console.log('--------------');
 console.log('state= ', cpu.state());
 cpu.reg('a', 3);
 console.log('state= ', cpu.state());
@@ -228,3 +228,51 @@ console.log('flags=', cpu.flags());
 
 dump(0);
 console.log(cpu.run(3, 1));
+
+if (0) {
+console.log('=======================');
+let start = 0x501, p = start;
+m[p++] = 0xa9; // LDA# 42
+m[p++] = 0x42;
+m[p++] = 0xa2; // LDX# fe
+m[p++] = 0xfe;
+m[p++] = 0xe8; // INX
+m[p++] = 0xd0; // BNE -1
+m[p++] = 0xff;
+m[p++] = 0xad; // LDY# 17
+m[p++] = 0x17;
+m[p++] = 0xad; // STYZP 07
+m[p++] = 0x07;
+m[p++] = 0x00; // BRK
+cpu.reg('pc', start);
+
+console.log('state= ', cpu.state());
+
+console.log(cpu.run(10, 1));
+
+dump(0);
+} else {
+console.log('=======================');
+cpu.reg('a', 0x42);
+cpu.reg('x', 0x00);
+cpu.reg('y', 0x69);
+cpu.reg('p', 0);
+console.log('state= ', cpu.state());
+
+let start = 0x501, p = start;
+m[p++] = 0x48; // PHA
+m[p++] = 0x8a; // TXA
+m[p++] = 0x48; // PHA
+m[p++] = 0x98; // TYA
+m[p++] = 0xaa; // TAX
+m[p++] = 0x68; // PLA
+m[p++] = 0xa8; // TAY
+m[p++] = 0x68; // PLA
+m[p++] = 0x00; // BRK
+
+cpu.reg('pc', start);
+console.log('state= ', cpu.state());
+
+console.log(cpu.run(10, 1));
+dump(0);
+}

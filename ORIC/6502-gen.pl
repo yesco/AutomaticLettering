@@ -143,7 +143,7 @@
     'tya', 'z(g= a= y)',
     'txs', 'z(g= s= x)',
     'tay', 'z(g= y= a)',
-    'tax', 'z(g= a= x)',
+    'tax', 'z(g= x= a)',
     'tsx', 'z(g= x= s)',
 );
 
