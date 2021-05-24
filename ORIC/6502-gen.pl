@@ -188,8 +188,7 @@ function adc(v) {
   a += 0x60;
   sc(1);
 }
-
-let op /* Dutch! */, ic = 0, ipc, cpu, d, mnc, g, q;
+let op /* Dutch! */, ic = 0, f, ipc, cpu, d, mnc, g, q;
 
 function tracer() {
 }
@@ -496,7 +495,7 @@ print "    }
 return cpu = {
   run, // dis
   state() { return { a, x, y, p, pc, s, m, ic}},
-  last() { return { pc, op, addr: d, arg: g, val: g}},
+  last() { return { ipc, op, inst: f, addr: d, val: g}},
   reg(n, v) { return eval(n+(typeof a?'':'='+v))},
   consts() { return { NMI,RESET,IRQ, C,Z,I,D, B,Q,V,N}}
 
@@ -514,7 +513,7 @@ let n = 3;
 while (n--) {
   console.log('cpu= ', cpu);
   console.log('state= ', cpu.state());
-  console.log('state= ', cpu.last());
+  console.log('last= ', cpu.last());
   console.log('consts= ', cpu.consts());
   console.log(cpu.run(1));
 }
