@@ -164,8 +164,8 @@ let m = new Uint8Array(0xffff + 1);
 const NMI = 0xfffa, RESET = 0xfffc, IRQ   = 0xfffe;
 
 let w    = (a) => m[a] + m[(a+1) & 0xff]<<8,
-    push = (v) => m[0x100 + s--]= v,
-    pop  = ( ) => m[0x100 + ++s];
+    push = (v) =>{m[0x100 + s]= v; s= (s-1) & 0xff},
+    pop  = ( ) => m[0x100 + (s= (s+1) & pxff)];
 
 let C = 0x01, Z = 0x02, I = 0x04, D = 0x08;
 let B = 0x10, Q = 0x20, V = 0x40, N = 0x80;
@@ -188,9 +188,11 @@ function adc(v) {
   a += 0x60;
   sc(1);
 }
-let op /* Dutch! */, ic = 0, f, ipc, cpu, d, mnc, g, q;
+let op /* Dutch! */, ic = 0, f, ipc, cpu, d, g, q;
 
 function tracer() {
+  console.log(hex(4, ic), ' ', /*dump pc-ipc*/
+    f, q, d, g, statu());
 }
 
 function run(count = -1, trace = 0) {
@@ -509,7 +511,23 @@ if (1) {
 
 // testing
 let cpu = CPU6502();
+let m = cpu.state().m;
+
+let hex=(n,x,r='')=>{for(;n--;x>>=4)r='0123456789ABCDEF'[x&0xf]+r;return r};
+let PS=(i=7,v=128,r='')=>{for(;r+=p&v?'CZIDBQVN'[i]:' ',i--;v/=2);return r};
+
+let dump=(a=0,n=8,l=1,i=0,r='',p='',v)=>{
+  for(;i<n*l;i++){
+    if (i%n==0) r += (r?'  '+p+'\\n':'') + hex(4,a+i)+': ', p='';
+    r+= hex(2,v=m[a++]) + ' ';
+    p+= (v >= 32 && v < 128) ? String.fromCharCode(v) : '.';
+  }
+  return r+'  '+p;
+}
+
+
 let n = 3;
+
 while (n--) {
   console.log('cpu= ', cpu);
   console.log('state= ', cpu.state());
