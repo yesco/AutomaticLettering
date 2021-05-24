@@ -101,22 +101,22 @@
 
     'jmp',   'pc= ADDR',
     'jmpi',  'pc= w(ADDR)',
-    'jsr', 'pc--; push(pc >> 8); push(pc & 0xff); pc= ADDR',
+    'jsr', 'pc--; PH(pc >> 8); PH(pc & 0xff); pc= ADDR',
 
-    'brk', 'push(p); push(pc >> 8); push(pc & 0xff); p|= B; pc = w(0xfffe)',
-    'rts', 'pc = pop(); pc += pop()<<8',
-    'rti', 'pc = pop(); pc += pop()<<8; p = pop()',
+    'brk', 'PH(p); PH(pc >> 8); PH(pc & 0xff); p|= B; pc = w(0xfffe)',
+    'rts', 'pc = PL(); pc += PL()<<8',
+    'rti', 'pc = PL(); pc += PL()<<8; p = PL()',
 
-    'php', 'push(g= p | 0x30)',
-    'pha', 'push(g= a)',
+    'php', 'PH(g= p | 0x30)',
+    'pha', 'PH(g= a)',
 
-    'phx', 'push(g= x)', # 6502C
-    'phy', 'push(g= y)', # 6502C
+    'phx', 'PH(g= x)', # 6502C
+    'phy', 'PH(g= y)', # 6502C
     
-    'plp', 'g= p= pop()',
-    'pla', 'g= a= pop()',
-    'plx', 'g= x= pop()', # 6502C
-    'ply', 'g= y= pop()', # 6502C
+    'plp', 'g= p= PL()',
+    'pla', 'g= a= PL()',
+    'plx', 'g= x= PL()', # 6502C
+    'ply', 'g= y= PL()', # 6502C
 
     # cleverly (a=777) returns 777,
     # even if a is byte from byte array
@@ -163,9 +163,9 @@ var a = 0, x = 0, y = 0, p = 0, s = 0, pc = 0;
 let m = new Uint8Array(0xffff + 1);
 const NMI = 0xfffa, RESET = 0xfffc, IRQ   = 0xfffe;
 
-let w    = (a) => m[a] + m[(a+1) & 0xff]<<8,
-    push = (v) =>{m[0x100 + s]= v; s= (s-1) & 0xff},
-    pop  = ( ) => m[0x100 + (s= (s+1) & pxff)];
+let w  = (a) => m[a] + m[(a+1) & 0xff]<<8,
+    PH = (v) =>{m[0x100 + s]= v; s= (s-1) & 0xff},
+    PL = ( ) => m[0x100 + (s= (s+1) & pxff)];
 
 let C = 0x01, Z = 0x02, I = 0x04, D = 0x08;
 let B = 0x10, Q = 0x20, V = 0x40, N = 0x80;
@@ -356,6 +356,7 @@ $c6502 = ' 72 32 80 D2 52 B2 12 F2 92 64 74 9C 9E 14 1C 04 0C 3A 1A ';
 # generate instructions
 my $shortercode = 1;
 my $debuginfo = 1;
+my $genfun = 1;
 
 open IN, "op-mnc-mod.lst" or die "bad file";
 my @ops, %mnc, %mod, %saved;
@@ -411,6 +412,13 @@ while (<IN>) {
 
     $line .= $i.'; ';
 
+    if ($genfun) {
+	my $r = sprintf("%s(){ $i }\n", uc $mnc);
+	print ",$r";
+	$gendata{$op} = uc $mnc;
+    }
+
+
     my $wid = 55;
 
     if (0) { # format
@@ -428,6 +436,7 @@ while (<IN>) {
 	print "break;// $mnc $mod\n";
     }
     print "\n";
+
 }
 
 # LATER!
@@ -446,7 +455,7 @@ if ($shortercode) {
 
     print "    default:
       switch(mod= (op >> 2) & 7) {
-      case 0: d= op&1 ? (m[pc++] + x)& 0xff : pc++; break; q='imm/zpx';break;
+      case 0: d= op&1 ? (m[pc++] + x)& 0xff; pc++; break; q='imm/zpx';break;
       case 1: d= m[pc++]; q='zp';break; // zp
       case 2: d= op&1 ? pc++ : 0; q='acc/imm';break; // 1=imm 0=acc
       case 3: d= pc; pc+= 2; q='abs';break; // abs
@@ -466,7 +475,7 @@ if ($shortercode) {
 
 	# instruction
 	my $i = $impl{$inst};
-	$i =~ s/MEM/v/;
+	$i =~ s/MEM/m[d]/;
 	if ($i =~ /ADDR/) {
 	    $i =~ s/ADDR/d/g;
 	    die "MEM:only use once:$i" if $i =~ /MEM/;
@@ -480,6 +489,13 @@ if ($shortercode) {
 	} else {
 	    print "      case $iiiii: $i; break; // $inst\n";
 	}
+
+	if ($genfun) {
+	    my $r = sprintf("%s(){ $i }\n", uc $inst);
+	    print ",,$r";
+	    $gendata{$op} = uc $mnc;
+	}
+
     }
 
 #    print "      }\n";
@@ -538,4 +554,15 @@ while (n--) {
 ";
 }
 
-    
+if ($genfun) {
+    for $i (0..255) {
+	my $h = sprintf('%02X', $i);
+	my $f = $gendata{$h};
+	print $f ? "$f" : "";
+	print ",";
+    }
+}
+
+# (* 4 256) = 1024 = 13 lines  ASM
+# (* 49 5) = 245 = 4 lines     #  a3ASM
+# (* 49 9) = 441 = 6 lines     #  0xA3:ASM,
