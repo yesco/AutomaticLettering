@@ -58,7 +58,7 @@ C6 dec zp
 CE dec abs
 D6 dec zpx
 DE dec absx
-3A dea
+3A dea_a
 CA dex
 88 dey
 41 eor zpxi
@@ -74,7 +74,7 @@ E6 inc zp
 EE inc abs
 F6 inc zpx
 FE inc absx
-1A ina
+1A inc_a_
 E8 inx
 C8 iny
 4C jmp abs

@@ -12,15 +12,15 @@
 %modes = (
     'imm', 'pc++',
     'zp',  'm[pc++]',
-    # zpy is zpx but for STX it's senseless
-    'zpx', '(m[pc++] + x) & 0xff',
-    'zpy', '(m[pc++] + y) & 0xff', 
-    'abs_', 'w((pc+=2)-2)',
+     #zpy is zpx but for STX it's senseless
+    'zpx', '((m[pc++] + x) & 0xff)',
+    'zpy', '((m[pc++] + y) & 0xff)', 
+    'abs', 'w((pc+=2)-2)',
     'absx', 'w((pc+=2)-2) + x',
     'absy', 'w((pc+=2)-2) + y',
-    'zpi',  'wrap(m[pc++])',
-    'zpxi', 'wrap(m[pc++ + (x & 0xff)])',
-    'zpiy', 'wrap(m[pc++] + y)',
+    'zpi',  'w(m[pc++])', # 6502C?
+    'zpxi', 'w(m[pc++ + (x & 0xff)])',
+    'zpiy', 'w(m[pc++] + y)',
 );
 
 # instructions to generated code
@@ -34,39 +34,39 @@
 #     (b    = byte value
 #      w    = word value)
 %impl = (
-    'lda', 'z(v= a= MEM])',
-    'ldx', 'z(v= a= MEM])',
-    'ldy', 'z(v= a= MEM])',
+    'lda', 'z(g= a= MEM)',
+    'ldx', 'z(g= a= MEM)',
+    'ldy', 'z(g= a= MEM)',
 
-    'sta', 'v= MEM= a',
-    'stx', 'v= MEM= x',
-    'sty', 'v= MEM= y',
-    'stz', 'v= MEM= 0', # 6502C
+    'sta', 'g= MEM= a',
+    'stx', 'g= MEM= x',
+    'sty', 'g= MEM= y',
+    'stz', 'g= MEM= 0', # 6502C
 
-    'and', 'v= n(z(a &= MEM))',
-    'eor', 'v= n(z(a ^= MEM))',
-    'ora', 'v= n(z(a |= MEM))',
+    'and', 'g= n(z(a &= MEM))',
+    'eor', 'g= n(z(a ^= MEM))',
+    'ora', 'g= n(z(a |= MEM))',
 
 # TODO: check how c() is implemented!
 # C	Carry Flag	Set if A >= M
 #  uint16_t result = regs.y - mem_read(addr);
 #
 #  regs.p.c = result > 255;
-    'cmp', 'v= n(z(c( a - MEM )))',
-    'cpx', 'v= n(z(c( x - MEM )))',
-    'cpy', 'v= n(z(c( y - MEM )))',
+    'cmp', 'g= n(z(c( a - MEM )))',
+    'cpx', 'g= n(z(c( x - MEM )))',
+    'cpy', 'g= n(z(c( y - MEM )))',
 
-    'asl',   'v= m[ADDR]= n(z(c( m[ADDR] << 1 )))',
-    'asl_a', 'v= a      = n(z(c( a       << 1 )))',
+    'asl',   'g= m[ADDR]= n(z(c( m[ADDR] << 1 )))',
+    'asl_a', 'g= a      = n(z(c( a       << 1 )))',
 
-    'lsr',   'v= n(z( m[ADDR] = sc(m[ADDR]) >> 1))',
-    'lsr_a', 'v= n(z(       a = sc(a)       >> 1 ))',
+    'lsr',   'g= n(z( m[ADDR] = sc(m[ADDR]) >> 1))',
+    'lsr_a', 'g= n(z(       a = sc(a)       >> 1 ))',
 
-    'rol',   'v= m[ADDR] = n(z(c(m[ADDR]<<1 + (p&C))))',
-    'rol_a', 'v= a       = n(z(c(      a<<1 + (p&C))))',
+    'rol',   'g= m[ADDR] = n(z(c(m[ADDR]<<1 + (p&C))))',
+    'rol_a', 'g= a       = n(z(c(      a<<1 + (p&C))))',
 
-    'ror',    'v= m[ADDR] = n(z( sc( m[ADDR] | ((p&C)<<8) ))',
-    'ror_a',  'v= a       = n(z( sc( a       | ((p&C)<<8) ))',
+    'ror',    'g= m[ADDR] = n(z( sc( m[ADDR] | ((p&C)<<8) )));',
+    'ror_a',  'g= a       = n(z( sc( a       | ((p&C)<<8) )))',
 
     'adc', 'adc(MEM)',
     'sbc', 'adc(~MEM)', # lol
@@ -74,15 +74,15 @@
     # notice B.. uses signed byte!
     'bra', '              pc += RMEM', # 6502C
 
-    'bpl', 'if (~p & N ) pc += RMEM',
-    'bvc', 'if (~p & V ) pc += RMEM',
-    'bcc', 'if (~p & C ) pc += RMEM',
-    'bne', 'if (~p & Z ) pc += RMEM',
+    'bpl', 'if (~p & N) pc += RMEM',
+    'bvc', 'if (~p & V) pc += RMEM',
+    'bcc', 'if (~p & C) pc += RMEM',
+    'bne', 'if (~p & Z) pc += RMEM',
 
-    'bmi', 'if ( p & N ) pc += RMEM',
-    'bvs', 'if ( p & V ) pc += RMEM',
-    'bcs', 'if ( p & C ) pc += RMEM',
-    'beq', 'if ( p & Z ) pc += RMEM',
+    'bmi', 'if (p & N) pc += RMEM',
+    'bvs', 'if (p & V) pc += RMEM',
+    'bcs', 'if (p & C) pc += RMEM',
+    'beq', 'if (p & Z) pc += RMEM',
     
 # BIT - Bit Test
 # A & M, N = M7, V = M6
@@ -91,60 +91,60 @@
 #
 # jsk: not clear: 76 from memory are copied or from the combined result?
 
-    'bit', 'v= z( m6v(n(m[ADDR])) & a)',
-#    'bit', 'v= m6m7(n(z(m[ADDR])))',
+    'bit', 'g= z( m6v(n(m[ADDR])) & a)',
+#    'bit', 'g= m6m7(n(z(m[ADDR])))',
 
     'nop', '',
 
     # it seems assumed pc points to next memory
     # location. Hmmm. Maybe change that???
 
-    'jmp',   'pc = ADDR',
-    'jmp_i', 'pc = w(ADDR)',
-    'jsr', 'pc--; push( pc >> 8); push( pc & 0xff); pc = ADDR',
+    'jmp',   'pc= ADDR',
+    'jmpi',  'pc= w(ADDR)',
+    'jsr', 'pc--; push(pc >> 8); push(pc & 0xff); pc= ADDR',
 
-    'brk', 'push(pc >> 8); push(pc & 0xff); b(1); pc = w(0xfffe)',
+    'brk', 'push(p); push(pc >> 8); push(pc & 0xff); p|= B; pc = w(0xfffe)',
     'rts', 'pc = pop(); pc += pop()<<8',
     'rti', 'pc = pop(); pc += pop()<<8; p = pop()',
 
-    'php', 'v= push(p | 0x30)',
-    'pha', 'v= push(a)',
+    'php', 'push(g= p | 0x30)',
+    'pha', 'push(g= a)',
 
-    'phx', 'v= push(x)', # 6502C
-    'phy', 'v= push(y)', # 6502C
+    'phx', 'push(g= x)', # 6502C
+    'phy', 'push(g= y)', # 6502C
     
-    'plp', 'v= p= pop()',
-    'pla', 'v= a= pop()',
-    'plx', 'v= x= pop()', # 6502C
-    'ply', 'v= y= pop()', # 6502C
+    'plp', 'g= p= pop()',
+    'pla', 'g= a= pop()',
+    'plx', 'g= x= pop()', # 6502C
+    'ply', 'g= y= pop()', # 6502C
 
     # cleverly (a=777) returns 777,
     # even if a is byte from byte array
-    'dec', 'v= n(z( --m[ADDR] ))',
-    'dea', 'v= n(z( --a ))', # 6502C
-    'dex', 'v= n(z( --x ))',
-    'dey', 'v= n(z( --y ))',
+    'dec', 'g= n(z(--m[ADDR]))',
+    'dea', 'g= n(z(a= (a-1) & 0xff))', # 6502C
+    'dex', 'g= n(z(x= (x-1) & 0xff))',
+    'dey', 'g= n(z(y= (y-1) & 0xff))',
 
-    'inc', 'v= n(z( ++m[ADDR] ))',
-    'ina', 'v= n(z( ++a ))', # 6502C
-    'inx', 'v= n(z( ++x ))',
-    'iny', 'v= n(z( ++y ))',
+    'inc', 'g= n(z(++m[ADDR]))',
+    'ina', 'g= n(z(a = (a+1) & 0xff))', # 6502C
+    'inx', 'g= n(z(x = (x+1) & 0xff))',
+    'iny', 'g= n(z(y = (y+1) & 0xff))',
 
-    'clc', 'v= p &= ~C',
-    'cli', 'v= p &= ~I',
-    'clv', 'v= p &= ~V',
-    'cld', 'v= p &= ~D',
+    'clc', 'g= p &= ~C',
+    'cli', 'g= p &= ~I',
+    'clv', 'g= p &= ~V',
+    'cld', 'g= p &= ~D',
 
-    'sec', 'v= p |= C',
-    'sei', 'v= p |= I',
-    'sed', 'v= p |= D',
+    'sec', 'g= p |= C',
+    'sei', 'g= p |= I',
+    'sed', 'g= p |= D',
 
-    'txa', 'z(v= a= x)',
-    'tya', 'z(v= a= y)',
-    'txs', 'z(v= s= x)',
-    'tay', 'z(v= y= a)',
-    'tax', 'z(v= a= x)',
-    'tsx', 'z(v= x= s)',
+    'txa', 'z(g= a= x)',
+    'tya', 'z(g= a= y)',
+    'txs', 'z(g= s= x)',
+    'tay', 'z(g= y= a)',
+    'tax', 'z(g= a= x)',
+    'tsx', 'z(g= x= s)',
 );
 
 # prelude w wrappings
@@ -158,66 +158,52 @@ print "
 
 function CPU6502() { // generates one instance
 
+// registers & memory
+var a = 0, x = 0, y = 0, p = 0, s = 0, pc = 0;
+let m = new Uint8Array(0xffff + 1);
 const NMI = 0xfffa, RESET = 0xfffc, IRQ   = 0xfffe;
 
-// registers & memory
-let a = 0, x = 0, y = 0, p = 0, s = 0, pc = 0;
-let m = uint8array(0xffff + 1);
-
-// w() - read a word 
-w      = (a) => m[a] + m[a+1]<<8;
-wrap = (a) => m[a] + m[(a+1] & 0xff]<<8;
-// TODO: why not always use wraparound?
-
-push = (v) => m[0x100 + s--] = v;
-pop  = ( ) => m[0x100 + ++s];
+let w    = (a) => m[a] + m[(a+1) & 0xff]<<8,
+    push = (v) => m[0x100 + s--]= v,
+    pop  = ( ) => m[0x100 + ++s];
 
 let C = 0x01, Z = 0x02, I = 0x04, D = 0x08;
 let B = 0x10, Q = 0x20, V = 0x40, N = 0x80;
 
-// set flag depending on value
-z = (v)=> (p^= Z & (p^(v&0xff?0:Z)), v);
-n = (v)=> (p^= N & (p^ v)          , v);
-c = (v)=> (p^= C & (p^ (v > 255))  , v & 0xff);
-i = (v)=> (p^= I & (p^ (v * I)     , v);
-b = (v)=> (p^= B & (p^ (v * B)     , v);
-v = (v)=> (p^= V & (p^ (v * V)     , v);
-
-// set carry if low bit set (=C!)
-sc =(v)=> (p^= C & (p^ v),         , v);
+// set flag depending on value (slow?)
+let z= (x)=> (p^= Z & (p^(x&0xff?0:Z)), x),
+    n= (x)=> (p^= N & (p^ x)          , x),
+    c= (x)=> (p^= C & (p^ (x > 255))  , x & 0xff),
+    v= (x)=> (p^= V & (p^ (x * V))    , x),
+    // set carry if low bit set (=C!)
+    sc=(x)=> (p^= C & (p^ x)          , x);
 
 function adc(v) {
-    let oa = a;
-    c(a += v + (p & C));
-    v((oa^a) & (v^a));
-    if (p & D) {
-	c(0);
-	if ((a & 0x0f) > 0x09) {
-	    a += 0x06;
-	}
-	if ((a & 0xf0) > 0x90) {
-	    a += 0x60;
-	    sc(1);
-	}
-    }
+  let oa = a;
+  a = c(a + v + (p & C));
+  v((oa^a) & (v^a));
+  if (~p & D) return; else c(0);
+  if ((a & 0x0f) > 0x09) a += 0x06;
+  if ((a & 0xf0) <= 0x90) return;
+  a += 0x60;
+  sc(1);
 }
 
-let op, mode, ipc, cpu, d, n, v, q; // Dutch joke?
+let op /* Dutch! */, count, ipc, cpu, d, mnc, g, q;
 
 function tracer() {
 }
 
-function run(count = -1, trace = 0) {
+function run(n = -1, trace = 0) {
   trace = 1==trace ? tracer : trace;
-  while(count--) {
-    ipc = pc; mode = addr = arg = undefined; 
-    switch( op=m[pc++] ) {
+  let t = count;
+  while(t--) {
+    ipc = pc; mod = d = g = undefined;
+    switch(op= m[pc++]) {
 ";
 
 
 my @modes = (
-#    'zpxi', 'zp', 'imm', 'abs',
-#    'zpiy', 'zpx', 'absy', 'absx');
     'imm/zpx', 'zp', 'acc/imm', 'abs', 
     'zpiy', 'zpx', 'absy', 'absx',
 );
@@ -364,10 +350,11 @@ elsif ((0b00000000 & $v) == 0b00000000) {
 # 1C trb   --- 0 0  0     7 abs
 # 04 tsb   --- 0 0  0     1 zp
 # 0C trb   --- 0 0  0     3 abs
-$c6502 = ' 72 32 80 D2 52 B2 12 F2 92 64 74 9C 9E 14 1C 04 0C ';
+$c6502 = ' 72 32 80 D2 52 B2 12 F2 92 64 74 9C 9E 14 1C 04 0C 3A 1A ';
 
 # generate instructions
 my $shortercode = 1;
+my $debuginfo = 1;
 
 open IN, "op-mnc-mod.lst" or die "bad file";
 my @ops, %mnc, %mod, %saved;
@@ -391,7 +378,10 @@ while (<IN>) {
 	    print "Decoding error!\n";
 	    print "= $op $mnc $neq $n $iii $cc     $mmm $mod $meq $m\n";
 	}
-	if ($shortercode && !($op =~ /(96|B6)/)) {
+	if ($shortercode && !($op =~ /(86|8E|96|B6|BE|4C|6C|20)/)
+	    && !((0b00011111 & $v) == 0b00010000)) # no branch
+	{
+
 	    #$saved{$mnc} .= " $op,$mnc,$mod ";
 	    $saved_m{$mnc} |= 1 << $mmm;
 	    $saved_x{$mnc} = $x;
@@ -421,11 +411,16 @@ while (<IN>) {
     $line .= $i.'; ';
 
     my $wid = 55;
-    print sprintf("%-${wid}s", $line);
+
+    if (0) { # format
+	print sprintf("%-${wid}s", $line);
+    } else { # plain
+	print $line;
+    }
     #print '----LINE TOO LONG: ', length($line), "\n" if length($line) > $wid;
 
-    if (1) {
-	print "n='$mnc';";
+    if ($debuginfo) {
+	print "f='$mnc';";
 	print "q='$mod';" if $mod;
 	print "break;"
     } else {
@@ -436,35 +431,54 @@ while (<IN>) {
 
 # LATER!
 if ($shortercode) {
-    print "    default:\n";
 
     # first generate mode stuff
-    print "      switch(mod= (op>>2) & 7) {\n";
 
-    for $m (keys %modes) {
-	print "      case $m: d= $modes{$m}; break; // $m\n";
-    }
+    # trouble instructions
+    # avoid in generic code
+    # /(86|8E|96|B6|BE)/
+    # zpy is zpx but for STX it's senseless
+    #
+    # 'zpy', '(m[pc++] + y) & 0xff', 
+    # 'zpi',  'wrap(m[pc++])', # 6502C?
+    # 'zpxi', 'wrap(m[pc++ + (x & 0xff)])',
 
-    print "      }\n";
+    print "    default:
+      switch(mod= (op >> 2) & 7) {
+      case 0: d= op&1 ? (m[pc++] + x)& 0xff : pc++; break; q='imm/zpx';break;
+      case 1: d= m[pc++]; q='zp';break; // zp
+      case 2: d= op&1 ? pc++ : 0; q='acc/imm';break; // 1=imm 0=acc
+      case 3: d= pc; pc+= 2; q='abs';break; // abs
+      case 4: d= w(m[pc++] + y); q='zpiy';break; // zpiy
+      case 5: d= (m[pc++] + x) & 0xff; q='zpx';break; // zpx
+      case 6: d= w(pc) + y; pc+= 2; q='absy';break; // absy
+      case 7: d= w(pc) + x; pc+= 2; q='absx';break; // absx
+      }
+";
 
     # print generic instructions
     print "      switch(i= (op>>5) + ((op&3)<<3)) {\n";
 
-    foreach $inst (keys %saved) {
-	my $iiiii = $saved_x{$inst};
+    foreach $inst (sort { $saved_x{$a} <=> $saved_x{$b} } keys %saved) {
+	my $iiiii = sprintf("0x%02x", $saved_x{$inst});
 	my $mod = $saved{$inst};
 
 	# instruction
-	my $i = $impl{$mnc};
+	my $i = $impl{$inst};
 	$i =~ s/MEM/v/;
 	if ($i =~ /ADDR/) {
 	    $i =~ s/ADDR/d/g;
 	    die "MEM:only use once:$i" if $i =~ /MEM/;
 	    $i =~ s/ +/ /g;
 	}
-	print "      // $saved{$inst}\n";
-	print sprintf("      // if (%#2x & mod) {...\n", $saved_m{$inst});
-	print "      case $iiiii: $i; break;\n";
+#	print "      // IMPL: $impl{$inst}\n";
+#	print "      // $saved{$inst}\n";
+#	print sprintf("      // if (%#2x & mod) {...\n", $saved_m{$inst});
+	if ($debuginfo) {
+	    print "      case $iiiii: $i; f='$inst'; break;\n";
+	} else {
+	    print "      case $iiiii: $i; break; // $inst\n";
+	}
     }
 
 #    print "      }\n";
@@ -475,16 +489,33 @@ if ($shortercode) {
 # postlude
 print "    }
 
-    trace && trace(cpu, { count, ipc, op, mnc, mod, addr, g, v} );
-  }
-  
-  return cpu = {
-    run,
-    state() { return { a, x, y, p, pc, s, m } },
-    last() { return { pc, op, addr, arg } },
-    reg(n, v) { return eval(n+(typeof a?'':'='+v))},
-    consts() { return { NMI,RESET,IRQ, C,Z,I,D, B,Q,V,N } },
-    dis,
+    trace && trace(cpu, { count, ipc, op, f, mod, add: dr, val: g} );
   }
 }
+  
+return cpu = {
+  run, // dis
+  state() { return { a, x, y, p, pc, s, m}},
+  last() { return { pc, op, addr: d, arg: g, val: g}},
+  reg(n, v) { return eval(n+(typeof a?'':'='+v))},
+  consts() { return { NMI,RESET,IRQ, C,Z,I,D, B,Q,V,N}}
+
+}
+}
+
 ";
+
+if (1) {
+    print "
+
+// testing
+let cpu = CPU6502();
+console.log('cpu= ', cpu);
+console.log('state= ', cpu.state());
+console.log('state= ', cpu.last());
+console.log('consts= ', cpu.consts());
+
+";
+}
+
+    
