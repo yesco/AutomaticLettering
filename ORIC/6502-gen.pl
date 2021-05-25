@@ -9,12 +9,15 @@
 # - https://github.com/pmonta
 
 # address calculation of argument
+# (this is intended to be used inline, so cannot have second expression
+#  there (pc+=2)-2: there is no post add 2... (pc++++)
+#
 %modes = (
     'imm', 'pc++',
     'zp',  'm[pc++]',
      #zpy is zpx but for STX it's senseless
-    'zpx', '((m[pc++] + x) & 0xff)',
-    'zpy', '((m[pc++] + y) & 0xff)', 
+    'zpx', '((m[pc++] + x)& 0xff)',
+    'zpy', '((m[pc++] + y)& 0xff)', 
     'abs', 'w((pc+=2)-2)',
     'absx', 'w((pc+=2)-2) + x',
     'absy', 'w((pc+=2)-2) + y',
@@ -34,9 +37,9 @@
 #     (b    = byte value
 #      w    = word value)
 %impl = (
-    'lda', 'z(g= a= MEM)',
-    'ldx', 'z(g= a= MEM)',
-    'ldy', 'z(g= a= MEM)',
+    'lda', 'g= z(a= MEM)',
+    'ldx', 'g= z(a= MEM)',
+    'ldy', 'g= z(a= MEM)',
 
     'sta', 'g= MEM= a',
     'stx', 'g= MEM= x',
@@ -52,37 +55,37 @@
 #  uint16_t result = regs.y - mem_read(addr);
 #
 #  regs.p.c = result > 255;
-    'cmp', 'g= n(z(c( a - MEM )))',
-    'cpx', 'g= n(z(c( x - MEM )))',
-    'cpy', 'g= n(z(c( y - MEM )))',
+    'cmp', 'g= n(z(c( a - MEM)))',
+    'cpx', 'g= n(z(c( x - MEM)))',
+    'cpy', 'g= n(z(c( y - MEM)))',
 
-    'asl',   'g= m[ADDR]= n(z(c( m[ADDR] << 1 )))',
-    'asl_a', 'g= a      = n(z(c( a       << 1 )))',
+    'asl',   'g= m[ADDR]= n(z(c( m[ADDR] << 1)))',
+    'asl_a', 'g=       a= n(z(c(       a << 1)))',
 
-    'lsr',   'g= n(z( m[ADDR] = sc(m[ADDR]) >> 1))',
-    'lsr_a', 'g= n(z(       a = sc(a)       >> 1 ))',
+    'lsr',   'g= n(z( m[ADDR]= sc(m[ADDR]) >> 1))',
+    'lsr_a', 'g= n(z(       a=       sc(a) >> 1))',
 
-    'rol',   'g= m[ADDR] = n(z(c(m[ADDR]<<1 + (p&C))))',
-    'rol_a', 'g= a       = n(z(c(      a<<1 + (p&C))))',
+    'rol',   'g= m[ADDR]= n(z(c(m[ADDR]<<1 + (p&C))))',
+    'rol_a', 'g=       a= n(z(c(      a<<1 + (p&C))))',
 
-    'ror',    'g= m[ADDR] = n(z( sc( m[ADDR] | ((p&C)<<8) )));',
-    'ror_a',  'g= a       = n(z( sc( a       | ((p&C)<<8) )))',
+    'ror',    'g= m[ADDR]= n(z( sc( m[ADDR] | ((p&C)<<8))));',
+    'ror_a',  'g=       a= n(z( sc(       a | ((p&C)<<8))))',
 
     'adc', 'adc(MEM)',
     'sbc', 'adc(~MEM)', # lol
 
     # notice B.. uses signed byte!
-    'bra', '              pc += RMEM', # 6502C
+    'bra', 'pc += RMEM', # 6502C
 
-    'bpl', 'if (~p & N) pc += RMEM',
-    'bvc', 'if (~p & V) pc += RMEM',
-    'bcc', 'if (~p & C) pc += RMEM',
-    'bne', 'if (~p & Z) pc += RMEM',
+    'bpl', 'if (~p & N) pc+= RMEM',
+    'bvc', 'if (~p & V) pc+= RMEM',
+    'bcc', 'if (~p & C) pc+= RMEM',
+    'bne', 'if (~p & Z) pc+= RMEM',
 
-    'bmi', 'if (p & N) pc += RMEM',
-    'bvs', 'if (p & V) pc += RMEM',
-    'bcs', 'if (p & C) pc += RMEM',
-    'beq', 'if (p & Z) pc += RMEM',
+    'bmi', 'if (p & N) pc+= RMEM',
+    'bvs', 'if (p & V) pc+= RMEM',
+    'bcs', 'if (p & C) pc+= RMEM',
+    'beq', 'if (p & Z) pc+= RMEM',
     
 # BIT - Bit Test
 # A & M, N = M7, V = M6
@@ -92,20 +95,20 @@
 # jsk: not clear: 76 from memory are copied or from the combined result?
 
     'bit', 'g= z( m6v(n(m[ADDR])) & a)',
-#    'bit', 'g= m6m7(n(z(m[ADDR])))',
+#   'bit', 'g= m6m7(n(z(m[ADDR])))',
 
     'nop', '',
 
     # it seems assumed pc points to next memory
     # location. Hmmm. Maybe change that???
 
-    'jmp',   'pc= ADDR',
-    'jmpi',  'pc= w(ADDR)',
-    'jsr', 'pc--; PH(pc >> 8); PH(pc & 0xff); pc= ADDR',
+    'jmp',   'pc= w(pc)',
+    'jmpi',  'pc= w(w(pc))',
+    'jsr',   'pc--; PH(pc >> 8); PH(pc & 0xff); pc= w(pc+1)',
 
-    'brk', 'irq() p|= B',
-    'rts', 'pc = PL(); pc += PL()<<8',
-    'rti', 'pc = PL(); pc += PL()<<8; p = PL()',
+    'brk', 'irq(); p|= B',
+    'rts', 'pc= PL(); pc+= PL()<<8',
+    'rti', 'pc= PL(); pc+= PL()<<8; p= PL()',
 
     'php', 'PH(g= p | 0x30)',
     'pha', 'PH(g= a)',
@@ -114,9 +117,9 @@
     'phy', 'PH(g= y)', # 6502C
     
     'plp', 'g= p= PL()',
-    'pla', 'n(z(g= a= PL()))',
-    'plx', 'n(z(g= x= PL()))', # 6502C
-    'ply', 'n(z(g= y= PL()))', # 6502C
+    'pla', 'g= n(z(a= PL()))',
+    'plx', 'g= n(z(x= PL()))', # 6502C
+    'ply', 'g= n(z(y= PL()))', # 6502C
 
     # cleverly (a=777) returns 777,
     # even if a is byte from byte array
@@ -126,53 +129,51 @@
     'dey', 'g= n(z(y= (y-1) & 0xff))',
 
     'inc', 'g= n(z(++m[ADDR]))',
-    'ina', 'g= n(z(a = (a+1) & 0xff))', # 6502C
-    'inx', 'g= n(z(x = (x+1) & 0xff))',
-    'iny', 'g= n(z(y = (y+1) & 0xff))',
+    'ina', 'g= n(z(a= (a+1) & 0xff))', # 6502C
+    'inx', 'g= n(z(x= (x+1) & 0xff))',
+    'iny', 'g= n(z(y= (y+1) & 0xff))',
 
     'clc', 'g= p &= ~C',
     'cli', 'g= p &= ~I',
     'clv', 'g= p &= ~V',
     'cld', 'g= p &= ~D',
 
-    'sec', 'g= p |= C',
-    'sei', 'g= p |= I',
-    'sed', 'g= p |= D',
+    'sec', 'g= p|= C',
+    'sei', 'g= p|= I',
+    'sed', 'g= p|= D',
 
-    'txa', 'z(g= a= x)',
-    'tya', 'z(g= a= y)',
-    'txs', 'z(g= s= x)',
-    'tay', 'z(g= y= a)',
-    'tax', 'z(g= x= a)',
-    'tsx', 'z(g= x= s)',
+    'txa', 'g= z(a= x)',
+    'tya', 'g= z(a= y)',
+    'txs', 'g= z(s= x)',
+    'tay', 'g= z(y= a)',
+    'tax', 'g= z(x= a)',
+    'tsx', 'g= z(x= s)',
 );
 
 # prelude w wrappings
 
-print "
-// Generated 6502(C) simulator
-//
-// (\"C\") 2021 Jonas S Karlsson
-//
-//       jsk@yesco.org
+print <<'PRELUDE';
+//    ____   ______   ____    ____         Generated 6502(C) simulator
+//   /    \  |       /    \  /    \   
+//   |____   -----,  |    |   ____/        ("C") 2021 Jonas S Karlsson
+//   |    \       |  |    |  /
+//   \____/  \____/  \____/  |_____                  jsk.org
 
 function CPU6502() { // generates one instance
 
 // registers & memory
-var a = 0, x = 0, y = 0, p = 0, s = 0, pc = 0;
-let m = new Uint8Array(0xffff + 1);
-const NMI = 0xfffa, RESET = 0xfffc, IRQ   = 0xfffe;
+var a= 0, x= 0, y= 0, p= 0, s= 0, pc= 0, m= new Uint8Array(0xffff + 1);
+const NMI= 0xfffa, RESET= 0xfffc, IRQ= 0xfffe;
 
-function reset(a) { pc = w(a || RESET) }          
+function reset(a) { pc= w(a || RESET) }
 function nmi(a) { PH(p); PH(pc >> 8); PH(pc & 0xff); reset(a || NMI) }
 function irq() { nmi(IRQ) }
 
-let w  = (a) => m[a] + m[(a+1) & 0xff]<<8,
-    PH = (v) =>{m[0x100 + s]= v; s= (s-1) & 0xff},
-    PL = ( ) => m[0x100 + (s= (s+1) & pxff)];
+let w = (a) => m[a] + m[(a+1) & 0xff]<<8,
+    PH= (v) =>{m[0x100 + s]= v; s= (s-1) & 0xff},
+    PL= ( ) => m[0x100 + (s= (s+1) & 0xff)];
 
-let C = 0x01, Z = 0x02, I = 0x04, D = 0x08;
-let B = 0x10, Q = 0x20, V = 0x40, N = 0x80;
+let C= 0x01, Z= 0x02, I= 0x04, D= 0x08, B= 0x10, Q= 0x20, V= 0x40, N= 0x80;
 
 // set flag depending on value (slow?)
 let z= (x)=> (p^= Z & (p^(x&0xff?0:Z)), x),
@@ -183,34 +184,26 @@ let z= (x)=> (p^= Z & (p^(x&0xff?0:Z)), x),
     sc=(x)=> (p^= C & (p^ x)          , x);
 
 function adc(v) {
-  let oa = a;
-  a = c(a + v + (p & C));
+  let oa= a;
+  a= c(a + v + (p & C));
   v((oa^a) & (v^a));
   if (~p & D) return; else c(0);
-  if ((a & 0x0f) > 0x09) a += 0x06;
+  if ((a & 0x0f) > 0x09) a+= 0x06;
   if ((a & 0xf0) <= 0x90) return;
-  a += 0x60;
+  a+= 0x60;
   sc(1);
 }
 
-let op /* Dutch! */, ic = 0, f, ipc, cpu, d, g, q;
+let op /* Dutch! */, ic= 0, f, ipc, cpu, d, g, q;
 
-let hex=(n,x,r='')=>{for(;n--;x>>=4)r='0123456789ABCDEF'[x&0xf]+r;return r};
-let flags=(i=7,v=128,r='')=>{for(;r+=p&v?'CZIDBQVN'[i]:' ',i--;v/=2);return r};
-
-function tracer() {
-  console.log(hex(4, ic), ' ', /*dump pc-ipc*/
-    f, q, d, g, statu());
-}
-
-function run(count = -1, trace = 0) {
-  trace = 1==trace ? tracer : trace;
-  let t = count;
+function run(count= -1, trace= 0) {
+  trace= 1==trace ? tracer : trace;
+  trace && trace('print', 'head');
+  let t= count;
   while(t--) {
-    ic++; ipc = pc; mod = d = g = undefined;
+    ic++; ipc= pc; mod= d= g= undefined;
     switch(op= m[pc++]) {
-";
-
+PRELUDE
 
 my @modes = (
     'imm/zpx', 'zp', 'acc/imm', 'abs', 
@@ -364,13 +357,12 @@ $c6502 = ' 72 32 80 D2 52 B2 12 F2 92 64 74 9C 9E 14 1C 04 0C 3A 1A ';
 # generate instructions
 my $shortercode = 1;
 my $debuginfo = 1;
-my $genfun = 1;
+my $genfun = 0;
 
 open IN, "op-mnc-mod.lst" or die "bad file";
 my @ops, %mnc, %mod, %saved;
 while (<IN>) {
-    my ($op, $mnc, $mod) =/^(..) (\w+) ?(|\w*)$/;
-    die "no op: $_" unless $op;
+    my ($op, $mnc, $mod) =/^(..) (\w+) ?(|\w*)$/;    die "no op: $_" unless $op;
 
     next if $c6502 =~ /$op/;
 
@@ -391,7 +383,6 @@ while (<IN>) {
 	if ($shortercode && !($op =~ /(86|8E|96|B6|BE|4C|6C|20)/)
 	    && !((0b00011111 & $v) == 0b00010000)) # no branch
 	{
-
 	    #$saved{$mnc} .= " $op,$mnc,$mod ";
 	    $saved_m{$mnc} |= 1 << $mmm;
 	    $saved_x{$mnc} = $x;
@@ -399,10 +390,19 @@ while (<IN>) {
 	    next;
 	}
 ; #($shortercode && $mod
+	my $comment = '';
+#	unless (($mod eq $modes[$mmm]) || ($mnc =~ /^b../)) {
 	unless ($mod eq $modes[$mmm]) {
-	    print "    // MODE $mod instead of of mod[mmm] $mod[$mmm]\n";
+	    # print "------foobar\n"; print works
+	    # doesn't seem to want to add this?
+	    $comment = " // MODE $mod instead of mmm";
 	}
 
+    }
+
+    if ($debuginfo) {
+	$line .= "f='".(uc $mnc)."';";
+	$line .= "q='$mod';" if $mod;
     }
 
     # address stuff
@@ -411,21 +411,20 @@ while (<IN>) {
     $i =~ s/RMEM/MEM -128/;
     $i =~ s/MEM/m[$modes{$mod}]/;
     if ($i =~ /ADDR/) {
-	$i = 'd='.$modes{$mod}."; $i";
+	$i = 'd= '.$modes{$mod}."; $i";
 	$i =~ s/ADDR/d/g;
     }
     die "MEM:only use once:$i" if $i =~ /MEM/;
     $i =~ s/ +/ /g;
     #print "\\y $op $i\n";
 
-    $line .= $i.'; ';
+    $line .= $i."; $comment";
 
     if ($genfun) {
 	my $r = sprintf("%s(){ $i }\n", uc $mnc);
 	print ",$r";
 	$gendata{$op} = uc $mnc;
     }
-
 
     my $wid = 55;
 
@@ -434,16 +433,14 @@ while (<IN>) {
     } else { # plain
 	print $line;
     }
-    #print '----LINE TOO LONG: ', length($line), "\n" if length($line) > $wid;
 
-    if ($debuginfo) {
-	print "f='$mnc';";
-	print "q='$mod';" if $mod;
-	print "break;"
+    if (!$debuginfo) {
+	print "break; // ",uc($mnc)," $mod\n";
     } else {
-	print "break;// $mnc $mod\n";
+	print "break;\n";
     }
-    print "\n";
+
+    #print '----LINE TOO LONG: ', length($line), "\n" if length($line) > $wid;
 
 }
 
@@ -463,14 +460,14 @@ if ($shortercode) {
 
     print "    default:
       switch(mod= (op >> 2) & 7) {
-      case 0: d= op&1 ? (m[pc++] + x)& 0xff; pc++; break; q='imm/zpx';break;
-      case 1: d= m[pc++]; q='zp';break; // zp
-      case 2: d= op&1 ? pc++ : 0; q='acc/imm';break; // 1=imm 0=acc
-      case 3: d= pc; pc+= 2; q='abs';break; // abs
-      case 4: d= w(m[pc++] + y); q='zpiy';break; // zpiy
-      case 5: d= (m[pc++] + x) & 0xff; q='zpx';break; // zpx
-      case 6: d= w(pc) + y; pc+= 2; q='absy';break; // absy
-      case 7: d= w(pc) + x; pc+= 2; q='absx';break; // absx
+      case 0: q='imm';    d= op&1 ?((m[pc++] + x)& 0xff,q='zpx'): pc++;break;
+      case 1: q='zp';     d= m[pc++];                         break;
+      case 2: q='imm';    d= op&1 ? pc++ : q='';              break;
+      case 3: q='abs';    d= pc; pc+= 2;                      break;
+      case 4: q='zpiy';   d= w(m[pc++] + y);                  break;
+      case 5: q='zpx';    d= (m[pc++] + x) & 0xff;            break;
+      case 6: q='absy';   d= w(pc) + y; pc+= 2;               break;
+      case 7: q='absx';   d= w(pc) + x; pc+= 2;               break;
       }
 ";
 
@@ -493,9 +490,9 @@ if ($shortercode) {
 #	print "      // $saved{$inst}\n";
 #	print sprintf("      // if (%#2x & mod) {...\n", $saved_m{$inst});
 	if ($debuginfo) {
-	    print "      case $iiiii: $i; f='$inst'; break;\n";
+	    print "      case $iiiii: f='", uc $inst, "'; $i; break;\n";
 	} else {
-	    print "      case $iiiii: $i; break; // $inst\n";
+	    print "      case $iiiii: $i; break; // ", uc $inst, "\n";
 	}
 
 	if ($genfun) {
@@ -513,21 +510,42 @@ if ($shortercode) {
 
 # postlude
 print "    }
-
-    trace && trace(cpu, { ic, ipc, op, f, mod, add: dr, val: g} );
+    trace && trace(cpu, { ic, ipc, op, f, mod, add: d, val: g} );
   }
 }
   
 return cpu = {
-  run, flags, tracer, hex,
+  run, flags:ps, tracer, hex,
   state() { return { a, x, y, p, pc, s, m, ic}},
   last() { return { ipc, op, inst: f, addr: d, val: g}},
-  reg(n, v) { return eval(n+(typeof a?'':'='+v))},
-  consts() { return { NMI,RESET,IRQ, C,Z,I,D, B,Q,V,N}}
+  reg(n,v='') { return eval(n+(v!=''?'='+v:''))},
+  consts() { return { NMI,RESET,IRQ, C,Z,I,D, B,Q,V,N}}};
 
-}
+////////////////////////////////////////
+// optional: mini disasm and debugger
+
+function hex(n,x,r=''){for(;n--;x>>=4)r='0123456789ABCDEF'[x&0xf]+r;return r};
+function ps(i=7,v=128,r=''){for(;r+=p&v?'CZIDBQVN'[i]:' ',i--;v/=2);return r};
+
+function tracer(how,what) {
+  let line;
+  if (what == 'head') {
+    line = '= pc    op mnemonic   flags  a  x  y  s';
+  } else {
+    line = '= '+hex(4,ipc)+'  '+hex(2,op)+' '+
+      ((f?f:'???')+(q?q:'---')).padEnd(8, ' ')+
+      ps()+' '+hex(2,a)+' '+hex(2,x)+' '+hex(2,y)+' '+hex(2,s)+
+      +(d?' d='+d:'')+(g?' g='+g:'')
+  }
+
+  if (how == 'string') {
+    return line;
+  } else {
+    console.log(line);
+  }
 }
 
+} // end CPU6502
 ";
 
 if (1) {
@@ -536,6 +554,7 @@ if (1) {
 // testing
 let cpu = CPU6502();
 let m = cpu.state().m;
+let hex = cpu.hex;
 
 let dump=(a=0,n=8,l=1,i=0,r='',p='',v)=>{
   for(;i<n*l;i++){
@@ -546,16 +565,70 @@ let dump=(a=0,n=8,l=1,i=0,r='',p='',v)=>{
   return r+'  '+p;
 }
 
-
-let n = 3;
-
-while (n--) {
+if (0) {
+// run 3 times with 3 instr:s each time
+let nn = 3;
+while (nn--) {
   console.log('cpu= ', cpu);
   console.log('state= ', cpu.state());
   console.log('last= ', cpu.last());
   console.log('consts= ', cpu.consts());
-  console.log(cpu.run(1));
+  console.log(cpu.run(3, 1));
 }
+}
+
+if (1) {
+console.log('=======================');
+let start = 0x501, p = start;
+m[p++] = 0xa9; // LDA# 42
+m[p++] = 0x42;
+m[p++] = 0xa2; // LDX# fe
+m[p++] = 0xfe;
+m[p++] = 0xe8; // INX
+m[p++] = 0xd0; // BNE -1
+m[p++] = 0xff;
+m[p++] = 0xad; // LDY# 17
+m[p++] = 0x17;
+m[p++] = 0xad; // STYZP 07
+m[p++] = 0x07;
+m[p++] = 0x00; // BRK
+cpu.reg('pc', start);
+
+console.log('state= ', cpu.state());
+
+console.log(cpu.run(10, 1));
+
+dump(0);
+} else {
+console.log('=======================');
+cpu.reg('a', 0x42);
+cpu.reg('x', 0x00);
+cpu.reg('y', 0x69);
+cpu.reg('p', 0);
+console.log('state= ', cpu.state());
+
+let start = 0x501, p = start;
+m[p++] = 0x48; // PHA
+m[p++] = 0x8a; // TXA
+m[p++] = 0x48; // PHA
+m[p++] = 0x98; // TYA
+m[p++] = 0xaa; // TAX
+m[p++] = 0x68; // PLA
+m[p++] = 0xa8; // TAY
+m[p++] = 0x68; // PLA
+m[p++] = 0x00; // BRK
+
+cpu.reg('pc', start);
+
+console.log('state= ', cpu.state());
+
+console.log('SWAP X Y');
+console.log(cpu.run(10, 1));
+dump(start);
+}
+
+
+
 ";
 }
 
