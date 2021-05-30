@@ -1,3 +1,11 @@
+(BUGS:
+        (I think simulator is crap)
+        LDA# ' ' putc  (crashes)
+        LDA# 'A' putc  (gives 'a')
+        LDA# 67   
+
+)
+
 (--- .fun files
 
 I tried to find various 6502 assemblers,
@@ -495,11 +503,53 @@ https://docs.google.com/document/d/16Sv3Y-3rHPXyxT1J3zLBVq4reSPYtY2G6OSojNTm4SQ/
       $bf-$ff (- #xbf #x85) = 58 bytes 
 )
  
-   ( - data stack -)
+ ( - 9th_ play area -)
+ (0 - )
+ (1 85-86)
+   = 9TH_REGISTERS 84 ; ( offset -1 as B is 1)
+   = 9TH_REGISTERS_hi 85 ; ( offset -1 as B is 1)
+   = 9TH_B 85 ;  = 9TH_B_lo 85 ;  = 9TH_B_hi 86 ;
+   = 9TH_C 87 ;  = 9TH_B_lo 87 ;  = 9TH_B_hi 88 ;
+   = 9TH_D 89 ;  = 9TH_B_lo 89 ;  = 9TH_B_hi 8a ;
+   = 9TH_E 8b ;  = 9TH_B_lo 8b ;  = 9TH_B_hi 8c ;
+   = 9TH_F 8d ;  = 9TH_B_lo 8d ;  = 9TH_B_hi 8e ;
+   = 9TH_G 8f ;  = 9TH_B_lo 8f ;  = 9TH_B_hi 90 ;
 
+ (7 91-92 "H" LOL - used for finding tok addr)
+   = 9TH_TOK 91;= 9TH_TOK_lo 91;= 9TH_TOK_hi 92;
+
+ (8 93-94)
+   (FREE)
+
+ (9 95-96)
+   = 9TH_ARG 95;= 9TH_ARG_lo 95;= 9TH_ARG_hi 96;
+
+ (10 97-98)
+   = 9TH_SR 97 ;
+   = 9TH_IO 98 ;
+
+ (11 99-9a)
+   = 9TH_OUT 99;= 9TH_OUL_lo 99;= 9TH_OUT_hi 9a;
+
+ (12 9b-9c stack base)
+   = 9TH_DS 9b; = 9TH_DS_lo 9b; = 9TH_DS_hi 9c;
+
+ (13 9d-9e use hardware stack)
+   = 9TH_S 9d ; (not releated just using)
+   = 9TH_Y 9e ; (interpreter offset, store)
+
+ (14 9f-a0 PC)
+   = 9TH_PC 9f; = 9TH_PC_lo 9f; = 9TH_PC_hi a0;
+
+ ( <<< FREE: a1 >>> )
+
+
+ ( <<< ENDFREE: be >>> )
+
+ ( - data stack -)
    = STACKLOW bf ; (- 254 (* 32 2))
 
-   ( addr ff stores data stackpointer)
+ ( addr ff stores data stackpointer)
 
 ( ----------- zero page end -------------)
  
@@ -1644,6 +1694,8 @@ RTS
 = ZccLO 85 ;
 = ZccHI 86 ;
 
+
+
 ( efficient 32-bit DEC32
   - https://news.ycombinator.com/item?id=17275797)
 
@@ -1683,7 +1735,7 @@ RTS
 ;
 
 : printYA
-  swapAY
+  swapAY (wtf?)
   dostack
   xpushYA xprint
   endstack
@@ -2343,21 +2395,6 @@ RTS
      - data
 )  
 
-: FOO_i 
-  puts "Indulge"
-  RTS (why need?)
-;
-
-: FOO_f
-  puts "Fornicated"
-  RTS (why need?)
-;
-
-: FOO_r
-  puts "Recupriacte"
-  RTS (why need?)
-;
-
 (--------------------------------------------)
 (https://forums.nesdev.com/viewtopic.php?f=2&t=11336)
 
@@ -2409,9 +2446,116 @@ RTS
 ;
 
 (--------------------------------------------)
+(some planning for the NINTH virtual machine)
+
+: 9th_byte
+  puts "Byte..."
+;
+
+: 9th_word 
+  puts "Word..."
+;
+
+: 9th_special
+  puts "Special..."
+;
+
+: 9th_foo
+  puts "Hello_9th!>>>"
+
+  LDA# 01
+  TAX
+  LDA# 'a'
+
+  (set some data)
+  LDY# 12
+  LDA# 67
+  STYZX 9TH_REGISTERS_hi
+  STAZX 9TH_REGISTERS
+  printYA
+
+  LDY# 12
+  LDA# 67
+  STYZX 9TH_REGISTERS_hi
+  STAZX 9TH_REGISTERS
+  printYA
+
+  LDA# 01
+  LDX# 'P' (garbage)
+
+  (calculate value)
+  AND# 0f
+
+  BNE 03
+  JMPA &9th_byte
+
+  CMP# 07
+  BNE 03
+  JMPA &9th_word
+
+  BCC 03
+  JMPA &9th_special
+  
+  (ok, we now have an ordinary register)
+  PHA
+
+  (make it printable)
+  CLC
+  ADC# 41
+
+  PHA
+    puts "Register"
+  PLA putc 
+
+  PHA
+    LDA# '-' putc
+  PLA
+
+  PLA TAX PHA
+
+  LDAZX 9TH_REGISTERS
+  LDYZX 9TH_REGISTERS_hi
+  printYA
+  
+  PLA
+  CLC
+  ADC# 9TH_REGISTERS
+  TAX
+
+  (now X contains actual address in ZP)
+  (store in place for indirection)
+  LDY# 00
+  STXZ 9TH_ARG
+  STYZ 9TH_ARG_hi
+
+  (print to make sure)
+  LDAZX 00
+  LDYZX 01
+  printYA
+  
+  puts "<<<9th_Finished!"
+;
+
+(--------------------------------------------)
+: FOO_i 
+  puts "Indulge"
+  RTS (why need)
+;
+
+: FOO_f
+  puts "Fornicated"
+  RTS (why need?)
+;
+
+: FOO_r
+  puts "Recupriacte"
+  RTS (why need?)
+;
+
 : FOO_dispatch (a -)
   CMP# 'i'
   BNE 03
+(  JMPA &FOO_i)
   JMPA &FOO_i
 
   CMP# 'f'
@@ -2421,6 +2565,10 @@ RTS
   CMP# 'r'
   BNE 03
   JMPA &FOO_r
+
+  CMP# '9'
+  BNE 03
+  JMPA &9th_foo
   
   PHA
 (  puts "%% No such command: ")
