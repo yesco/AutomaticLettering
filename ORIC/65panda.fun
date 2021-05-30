@@ -19,8 +19,8 @@ Normal 6502	Simplified form
 INX		INX
 LDA #$12	LDA# 12
 STA $4711,X	STAAX 4711
-STA ($4711),X	STAIX 4711
-STA ($4711),Y   STAIX 4711
+STA ($4711),X	STAXI 4711
+STA ($4711),Y   STAXI 4711
 
 Note that 4 character values, or addresses,
 are changed to the little-endian.
@@ -106,8 +106,8 @@ https://docs.google.com/document/d/16Sv3Y-3rHPXyxT1J3zLBVq4reSPYtY2G6OSojNTm4SQ/
 (xxxA	- Address)
 (xxxX	- address + X)
 (xxxY	- address + Y)
-(xxxIX	- *[IndexedAddress + X])
-(xxxIY	- *[Indexed Address] + Y)
+(xxxXI	- *[Address + X])
+(xxxIY	- *[Address] + Y)
 
 (--- basic 6502 instructions)
 = PHP 08 ;
@@ -121,7 +121,7 @@ https://docs.google.com/document/d/16Sv3Y-3rHPXyxT1J3zLBVq4reSPYtY2G6OSojNTm4SQ/
 = LDAA ad ;
 = LDAAX bd ;
 = LDAAY b9 ;
-= LDAIX a1 ;
+= LDAXI a1 ;
 = LDAIY b1 ;
 
 = STAZ 85 ;
@@ -129,7 +129,7 @@ https://docs.google.com/document/d/16Sv3Y-3rHPXyxT1J3zLBVq4reSPYtY2G6OSojNTm4SQ/
 = STAA 8d ;
 = STAAX 9d ;
 = STAAY 99 ;
-= STAIX 81 ;
+= STAXI 81 ;
 = STAIY 91 ;
 
 = LDX# a2 ;
@@ -158,7 +158,7 @@ https://docs.google.com/document/d/16Sv3Y-3rHPXyxT1J3zLBVq4reSPYtY2G6OSojNTm4SQ/
 = CMPA cd ;
 = CMPAX dd ;
 = CMPAY d9 ;
-= CMPIX c1 ;
+= CMPXI c1 ;
 = CMPIY d1 ;
 
 = CPX# e0 ;
@@ -178,7 +178,7 @@ https://docs.google.com/document/d/16Sv3Y-3rHPXyxT1J3zLBVq4reSPYtY2G6OSojNTm4SQ/
 = ADCA 6d ;
 = ADCAX 7d ;
 = ADCAY 79 ;
-= ADCIX 61 ;
+= ADCXI 61 ;
 = ADCIY 71 ;
 
 = SBC# e9 ;
@@ -187,7 +187,7 @@ https://docs.google.com/document/d/16Sv3Y-3rHPXyxT1J3zLBVq4reSPYtY2G6OSojNTm4SQ/
 = SBCA ed ;
 = SBCAX fd ;
 = SBCAY f9 ;
-= SBCIX e1 ;
+= SBCXI e1 ;
 = SBCIY f1 ;
 
 = ASL 0a ;
@@ -276,7 +276,7 @@ https://docs.google.com/document/d/16Sv3Y-3rHPXyxT1J3zLBVq4reSPYtY2G6OSojNTm4SQ/
 = ANDA 2d ;
 = ANDAX 3d ;
 = ANDAY 39 ;
-= ANDIX 21 ;
+= ANDXI 21 ;
 = ANDIY 31 ;
 
 = ORA# 09 ;
@@ -285,7 +285,7 @@ https://docs.google.com/document/d/16Sv3Y-3rHPXyxT1J3zLBVq4reSPYtY2G6OSojNTm4SQ/
 = ORAA 0d ;
 = ORAAX 1d ;
 = ORAAY 19 ;
-= ORAIX 01 ;
+= ORAXI 01 ;
 = ORAIY 11 ;
 
 = EOR# 49 ;
@@ -294,7 +294,7 @@ https://docs.google.com/document/d/16Sv3Y-3rHPXyxT1J3zLBVq4reSPYtY2G6OSojNTm4SQ/
 = EORA 4d ;
 = EORAX 5d ;
 = EORAY 59 ;
-= EORIX 41 ;
+= EORXI 41 ;
 = EORIY 51 ;
 
 (fake instruction, fallthrough,
@@ -390,7 +390,7 @@ https://docs.google.com/document/d/16Sv3Y-3rHPXyxT1J3zLBVq4reSPYtY2G6OSojNTm4SQ/
 = LDAA ad ;
 = LDAAX bd ;
 = LDAAY b9 ;
-= LDAIX a1 ;
+= LDAXI a1 ;
 = LDAIY b1 ;
  
 )
@@ -1352,7 +1352,7 @@ RTS
  STAIY LDAIY INY DEY
 
  - using an array of base stack pointers?
- STAIX LDAIX
+ STAXI LDAXI
 )
 
 (data stack on page 0,
@@ -2343,10 +2343,104 @@ RTS
      - data
 )  
 
+: FOO_i 
+  puts "Indulge"
+  RTS (why need?)
+;
 
+: FOO_f
+  puts "Fornicated"
+  RTS (why need?)
+;
 
+: FOO_r
+  puts "Recupriacte"
+  RTS (why need?)
+;
 
 (--------------------------------------------)
+(https://forums.nesdev.com/viewtopic.php?f=2&t=11336)
+
+: div80 (common screen width)
+  LSR
+  FALLTHROUGH ;
+: div40 (common screen width)
+  LSR
+  LSR
+  FALLTHROUGH ;
+: div10 (bin/dec conversion)
+  LSR
+  FALLTHROUGH ;
+: div5 (18 bytes, 30 cycles)
+  STAZ Za
+  LSR
+  ADC# 0d
+  ADCZ Za
+  ROR
+  LSR
+  LSR
+  ADCZ Za
+  ROR
+  ADCZ Za
+  ROR
+  LSR
+  LSR
+;
+
+(useful for computers (like ORIC) with 6
+ pixels/cell)
+
+: div6 (17 bytes, 30 cycles)
+  LSR
+  FALLTHROUGH ;
+: div3 
+  STAZ Za
+  LSR
+  LSR
+  ADCZ Za
+  ROR
+  LSR
+  ADCZ Za
+  ROR
+  LSR
+  ADCZ Za
+  ROR
+  LSR
+;
+
+(--------------------------------------------)
+: FOO_dispatch (a -)
+  CMP# 'i'
+  BNE 03
+  JMPA &FOO_i
+
+  CMP# 'f'
+  BNE 03
+  JMPA &FOO_f
+  
+  CMP# 'r'
+  BNE 03
+  JMPA &FOO_r
+  
+  PHA
+(  puts "%% No such command: ")
+  PLA putc
+(  LDA# ' ' putc)
+  RTS
+;
+
+: keydispatch
+  A '>' putc
+  waitkey
+  
+  FOO_dispatch
+  A 20 putc  (A ' ' putc - crashes!!!!???)
+
+  
+  JMPA &keydispatch
+;
+
+
 : readeval
 
   (prompt)
@@ -2394,6 +2488,8 @@ RTS
 
   (panda001)
   (panda002) (crashes)
+
+  keydispatch
 
   readeval
   

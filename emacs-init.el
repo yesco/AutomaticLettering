@@ -1,5 +1,8 @@
 ;; https://stackoverflow.com/questions/17659212/dont-display-compilation-buffer-in-emacs-until-the-process-exits-with-error-o
 
+;; No frigging way!
+(setq-default indent-tabs-mode nil)
+
 ;; 
 (defun AL-check ()
   "Check AL files at save time"
@@ -11,7 +14,7 @@
 ;; this will open he file and display the compilation if there was an error
 ;; if there is no error, it'll say "moved past last error"
 (add-hook 'compilation-finish-functions
-	  'next-error)
+          'next-error)
 
 
 (add-hook 'after-save-hook 'AL-check)
@@ -32,7 +35,7 @@
      (apply orig-fun args)))
      
 (advice-add 'next-error :around
-	    #'my-next-error)
+            #'my-next-error)
 
 
 ;; dired - https://emacs.stackexchange.com/questions/35676/customize-direds-display/35685#35685

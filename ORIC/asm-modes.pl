@@ -40,7 +40,7 @@
 #   0xx 010 00 = stack            PHP PLP PHA PLA
 #
 #   xx0 110 00 = magic flags =0   CLC CLI*TYA CLD
-#   xx1 110 00 = magic flags =1   SEC SEI --- SED
+#   xx1 110 00 = magic flags =1   SEC SEI CLV SED
 #
 #   1xx 010 00 = v--transfers--> *DEY TAY INY INX
 #   1xx x10 10 = TXA TXS TAX TSX  DEX --- NOP ---
@@ -70,7 +70,7 @@
 #  (2x) 101    = zero page,X    2  4 +2/RW
 #       110    = absolute,Y     3 \4 +3/RW +1/STA
 #  (2x) 111    = absolute,X     3 / +1/p
-#              JMP              3  3 JMP 
+#              JMP              3  3 JMP +2/JMPI
 #     branch instructions       2  2 +1/true +2/p
 #       stack: PHA/PHP          1  3 +1/PLA/PLP
 #              JSR RTS RTI      3  6 +1/BRK

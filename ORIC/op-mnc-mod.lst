@@ -3,7 +3,6 @@
 69 adc imm
 6D adc abs
 71 adc zpiy
-72 adc zpi
 75 adc zpx
 79 adc absy
 7D adc absx
@@ -12,28 +11,24 @@
 29 and imm
 2D and abs
 31 and zpiy
-32 and zpi
 35 and zpx
 39 and absy
 3D and absx
 06 asl zp
-0A asl_a
 0E asl abs
 16 asl zpx
 1E asl absx
 24 bit zp
 2C bit abs
-34 bit zpx
-3C bit absx
 00 brk
 10 bpl imm
-30 bmi imm
 50 bvc imm
-70 bvs imm
 80 bra imm
 90 bcc imm
-B0 bcs imm
 D0 bne imm
+30 bmi imm
+70 bvs imm
+B0 bcs imm
 F0 beq imm
 18 clc
 58 cli
@@ -85,7 +80,6 @@ A5 lda zp
 A9 lda imm
 AD lda abs
 B1 lda zpiy
-B2 lda zpi
 B5 lda zpx
 B9 lda absy
 BD lda absx
@@ -139,7 +133,6 @@ E5 sbc zp
 E9 sbc imm
 ED sbc abs
 F1 sbc zpiy
-F2 sbc zpi
 F5 sbc zpx
 F9 sbc absy
 FD sbc absx
@@ -150,7 +143,6 @@ F8 sed
 85 sta zp
 8D sta abs
 91 sta zpiy
-92 sta zpi
 95 sta zpx
 99 sta absy
 9D sta absx
