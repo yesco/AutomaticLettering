@@ -2296,42 +2296,78 @@ BNE L1
 ;
 
 : grab (size=A bytes (0..255), ptr at zp X)
-  STAZ Za
-  LDAZ HEAP_LO
+  STAZ  Za
+  LDAZ  HEAP_LO
 
+  (subtrace A from heap pointer)
   SEC
-  SBCZ Za
-  BCS 02
-  DECZ HEAP_HI
+  SBCZ  Za
+  BCS   02
+  DECZ  HEAP_HI
   
-  STAZ HEAP_LO
+  STAZ  HEAP_LO
 
   (... or just have user copy from there?)
   STAZX 00
-  LDAZ HEAP_HI
+  LDAZ  HEAP_HI
   STAZX 01
 ;
 
+(TODO: allocate 0 bytes? lol)
+
 : malloc (size=A bytes (0..255), ptr at zp X, trashes Y)
   (Za used by grab)
-  STAZ Zb
-  STXZ Zc
+  STAZ Zb (A)
+  STXZ Zc (X)
 
   (allocate requested amount)
   grab
 
-  (allocate one byte just before)
-  X 00 A 01 grab
+  (allocate 3 bytes just before)
+  X 00 A 03 grab
 
-  (store size at that location)
+  (store [BE EF size] at that location)
+  LDAZ  Zb  Y 03  STAIY Zc
+  A     be  Y 00  STAIY Zc
+  A     ef  Y 01  STAIY Zc
+
+  (restore regs)
   LDAZ Zb
-
-  STAXI 00
-  
   LDXZ Zc
 ;
 
-: free 
+(TODO: size is one byte before... how?)
+
+: free (ptr at X, trashes A,Y)
+RTS
+(TODO:
+  (check [BE EF size] at that location)
+  LDAZ  Zb  Y 02  STAIY Zc
+  A     be  Y 00  STAIY
+  A     ef  Y 01  STAIY
+)
+
+  (subtrace 3 from heap pointer to get header)
+  (TODO: make subroutine)
+  LDAZX 00 
+  SEC
+  SBC#  03
+  BCS   02
+  DECZX 01
+  STAZX  00
+
+  (make free point to current free list)
+  TXA   TAY
+
+  LDAZ FREE_LO   STAIY 00
+  STAZ FREE_HI   STAIY 01
+
+  (put region first in free list)
+  LDAZX 00   STAZ FREE_LO
+  LDAZX 01   STAZ FREE_HI
+
+  (zero out pointer at handle X)
+  A  00   STAZX 00   STAZX 01
 ;  
 
 
@@ -2413,14 +2449,6 @@ RTS
 (stop)
   
   RTS
-;
-)
-
-(
-: malloc
-;
-
-: free
 ;
 )
 
@@ -2675,6 +2703,7 @@ RTS
     TXA
     X 06
     malloc
+    free
     
   RESTOREx
 
