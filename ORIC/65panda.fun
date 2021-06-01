@@ -2283,7 +2283,7 @@ BNE L1
   LDA# 20  fill
 ;
 
-( - stupid simple heap - )
+( ============ stupid simple heap ===========+ )
 
 : init_heap (reset the heap)
   LDA# _HEAP_TOP   STAZ HEAP_LO
@@ -2295,20 +2295,40 @@ BNE L1
   STAZ FREE_LO
 ;
 
-: malloc (size=A bytes, store ptr at zp X)
+: grab (size=A bytes (0..255), ptr at zp X)
   STAZ Za
   LDAZ HEAP_LO
 
   SEC
   SBCZ Za
-  STAZ HEAP_LO
   BCS 02
   DECZ HEAP_HI
   
+  STAZ HEAP_LO
+
   (... or just have user copy from there?)
   STAZX 00
   LDAZ HEAP_HI
   STAZX 01
+;
+
+: malloc (size=A bytes (0..255), ptr at zp X, trashes Y)
+  (Za used by grab)
+  STAZ Zb
+  STXZ Zc
+
+  (allocate requested amount)
+  grab
+
+  (allocate one byte just before)
+  X 00 A 01 grab
+
+  (store size at that location)
+  LDAZ Zb
+
+  STAXI 00
+  
+  LDXZ Zc
 ;
 
 : free 
