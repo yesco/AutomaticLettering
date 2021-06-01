@@ -572,7 +572,7 @@ https://docs.google.com/document/d/16Sv3Y-3rHPXyxT1J3zLBVq4reSPYtY2G6OSojNTm4SQ/
    ( for now use it for heap storage
      growing downwards )
 
-   = HEAP_TOP 97ff ;
+   = HEAP_TOP 9800 ;
 
 ( ?FREE $9800-$b3ff
   - ??? FREE in TEXTMODE
@@ -2283,6 +2283,38 @@ BNE L1
   LDA# 20  fill
 ;
 
+( - stupid simple heap - )
+
+: init_heap (reset the heap)
+  LDA# _HEAP_TOP   STAZ HEAP_LO
+  LDA# ^HEAP_TOP   STAZ HEAP_HI
+
+  (make sure free list empty)
+  LDA# 00
+  STAZ FREE_HI
+  STAZ FREE_LO
+;
+
+: malloc (size=A bytes, store ptr at zp X)
+  STAZ Za
+  LDAZ HEAP_LO
+
+  SEC
+  SBCZ Za
+  STAZ HEAP_LO
+  BCS 02
+  DECZ HEAP_HI
+  
+  (... or just have user copy from there?)
+  STAZX 00
+  LDAZ HEAP_HI
+  STAZX 01
+;
+
+: free 
+;  
+
+
 (--------------------------------------------)
 ( --- Heap
   A heap is defined in high memory (top)
@@ -2340,7 +2372,7 @@ BNE L1
 
 
 (
-: init_heap (reset the heap)
+: oldinit_heap (reset the heap)
 RTS
   LDA# _HEAP_TOP   STAZ HEAP_LO
   LDA# ^HEAP_TOP   STAZ HEAP_HI
@@ -2591,6 +2623,17 @@ RTS
 
 : readeval
 
+  (memory)
+  Y 00 X 00 gotoxy
+
+  puts "HEAP"
+  A 20 putc
+
+  LDAZ HEAP_LO   STAZ ZSTRLO
+  LDAZ HEAP_HI   STAZ ZSTRHI
+  puth
+
+
   (prompt)
   LDY# 10   LDX# 00   gotoxy
   LDA# '>'  putc
@@ -2606,6 +2649,13 @@ RTS
 
     (TODO:typed ALS and didn't get error!)
 
+  RESTOREx
+
+  SAVEx
+    TXA
+    X 06
+    malloc
+    
   RESTOREx
 
   ASL ASL (mul 4) TAX Y 03   printnso
@@ -2630,14 +2680,14 @@ RTS
     DEX
     endstack
 
-    (init_heap) (will crash...)
+  init_heap
 
   (main)
 
   (panda001)
   (panda002) (crashes)
 
-  keydispatch
+  (keydispatch)
 
   readeval
   
