@@ -58,8 +58,8 @@
 #   xxx mmm 10 = ASL ROL LSR ROR  STX LDX DEC INC
 #           11 = not used  / (p = page cross)
 # modes summary:           | (RW = shift INC DEC)
-#   xxx mmm cc             | bytes cycles
-#   --- --- --              \----- ------
+#   xxx mmm cc             | bytes|cycles
+#   --- --- --              \-----|------
 #       000  0 = #immediate     2  2
 #       000  1 = (zero page,X)  2  6 (STA="xpy")
 #  (2x) 001    = zero page      2  3 +2/RW

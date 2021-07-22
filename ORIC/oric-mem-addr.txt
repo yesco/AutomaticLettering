@@ -57,7 +57,7 @@ same for the Oric-1 and Atmos unless otherwise indicated. This is done by indica
 version of the computer to which the description is applicable. The version number is written at the 
 top of the screen on power up.
 ----------------------------------------
-$00-$0B scratch area (?)
+$00-$0B scratch area (12 bytes, 6 words!)
 $0C,$0D Indirect pointer for screen and Hex number construction area. 
 $0E,$0F Indirect pointer for the screen. 
 $10,$11 Address of hires cursor. 
@@ -75,8 +75,7 @@ $28 Set to #FF if dealing with strings.
 $29 Bit 7 is set if using integer variable. 
 $2A Garbage collection flag or flag for skipping through DATA 
 statements. 
-$2B Bit 7 when set inhibits the use of integers. Bit 6 when set 
-indicates STORE or RECALL commands in use. 
+$2B Bit 7 when set inhibits the use of integers. Bit 6 when set indicates STORE or RECALL commands in use.
 $2C Zero if REDOing input FROM START. 
 $2D Temporary storage for expression evaluator. 
 $2E CTRL O flag. 0 if output to screen enabled. 
@@ -105,8 +104,6 @@ $9E,$9F End of variables pointer.
 $A0,$A1 End of Arrays pointer. 
 $A2,$A3 Bottom of string area pointer. 
 $A4,$A5 Work pointer for allocating strings.
-
-
 $A6,$A7 Himem. 
 $A8,$A9 Current line number, top byte is #FF if in command mode. 
 $AA,$AB Previous line number. 

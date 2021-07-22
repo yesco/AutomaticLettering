@@ -1,9 +1,27 @@
 ;; https://stackoverflow.com/questions/17659212/dont-display-compilation-buffer-in-emacs-until-the-process-exits-with-error-o
 
+;; yeah, for long lines...
+(setq truncate-lines 'true)
+
+;; no menu
+(menu-bar-mode -1)
+
+;; show only column > 16!!!
+;; (font-lock-add-keywords nil '(("^.{0,16}" (0 '(face nil invisible t)))))
+
+
+;; colors
+
+
 ;; No frigging way!
 (setq-default indent-tabs-mode nil)
 
-;; 
+;; enable to run ./check after each save
+;; irritating as it asks to kill it if running
+; (add-hook 'after-save-hook 'AL-check)
+;; (add-hook 'after-save-hook #'AL-check)
+
+;; (AL-check)
 (defun AL-check ()
   "Check AL files at save time"
   (save-window-excursion
@@ -17,17 +35,13 @@
           'next-error)
 
 
-(add-hook 'after-save-hook 'AL-check)
-
-;; (AL-check)
-
-;; (add-hook 'after-save-hook #'AL-check)
-
 (add-hook 'after-change-major-mode-hook (lambda() (electric-indent-mode -1)))
 
 (setq c-basic-offset 2)
 (setq js-indent-level 2)
-(setq wrap-prefix "\t\t\-\\\\")
+
+;; if you want to see long lines wrapped
+;;(setq wrap-prefix "\t\t\-\\\\")
 
 (defun my-next-error
    (orig-fun &rest args)

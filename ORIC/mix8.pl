@@ -15,15 +15,51 @@ if (1) {
 
     $PIEround = 0.4; # "seems to be best"
 
-    $method = 'pie';
-    $method = 'fint16in8';
-    $method = 'double64in8';
-    $method = 'float32in8';
-    $method = 'gr';
-    $method = 'fint32in8';
-    $method = 'piesq';
+    $method = 'gr';  # bad
     $method = 'fib';
-    $method = 'twofour';
+    $method = 'piesq';
+    $method = 'float32in8'; # not practical
+    $method = 'double64in8'; # useless1 
+    $method = 'fint32in8'; # 0,1, 1.4, ... 2e9
+    $method = 'pie'; # 0, ..,1, 1.23, 74k
+
+    $method = '10-twelve-49'; # 0, 0.0001, ...,0.87, 1, 1,15, ...(10)               ~64K     ( 17 add)
+    $method = 'f32byte'; # 
+
+    $method = 'newnew'; # 
+    $method = 'f32word';
+    $method = 'f16byte'; # 
+    $method = '1e6byte'; # 
+    $method = 'tenbyte'; # goats? 0,x,1e-6,...1
+    $method = 'fbyte'; # 
+
+    # favorites
+    $method = 'fuint8in8'; # ???
+    $method = 'twofour256'; # 0..1, 1.19, 1.41 1.68 2, ... 4, ... 8, ... ... 64K # (add 12) (double every 4)
+    $method = 'twofour32'; # 0..1, 
+    $method = 'twofour16'; # 0..1, 
+    $method = 'twosixteen64'; # 0, 0.06, .. (64), ... 0.96, 1, 1,04, .(16)..14...
+    $method = 'twofour42'; # 0, 0.03 ...(42)... 0.921, 1, 1.09, ...(8)... 2, ... 1448, +inf
+    $method = 'twoten48'; # 0, 0.038 ...(48)... 0.93, 1, 1.07, ...(8)... 2, ... 222 + inf
+    $method = 'twotwelve32'; # GRAPHICS  0, 0.16 ... (32).. 0.94...1, 1,06, ...(12)... 2, ...  228, +inf ( 58 add values) 
+    $method = 'fint8in8'; # 0..1, 1.08, ... 125 # good for ADD! (39 values can)
+    $method = 'twofour'; # 0..1, 1.19, 1.41 1.68 2, ... 4, ... 8, ... ... 64K # (add 12) (double every 4)
+    $method = 'f16byte'; # 
+
+    # play
+    $method = 'piesq';
+    $method = '10-twelve-49'; # 0, 0.0001, ...,0.87, 1, 1,15, ...(10)               ~64K     ( 17 add)
+    $method = 'fuint8in8'; # ???
+    $method = 'f8byte'; # ... 255, +inf
+    $method = 'f8byte-2'; #
+
+    $method = 'f8byte-16'; #
+
+
+
+
+    # precision
+    $maxn = 128; # 1 byte signed
 
     if ($method eq 'piesq') {
 	# 0, 10^-12, ... -1 0 1 2 3 5 8 .. 10^12
@@ -60,6 +96,12 @@ if (1) {
 	# -inf -125 -0 +0 125 +inf
 	# more dense around 0..10
 	$base =  1.081;
+	$offset = 64; # 0..1
+	# TODO: new variants of add,sub,mul?
+    } elsif ($method eq 'fuint8in8') {
+	# -inf -256 -0 +0 256 +inf
+	# more dense around 0..10
+	$base =  1.10;
 	$offset = 64; # 0..1
 	# TODO: new variants of add,sub,mul?
     } elsif ($method eq 'fint32in8') {
@@ -108,6 +150,83 @@ if (1) {
 	$base =  2 ** (1/4);
 	$offset = 64; # 0..1
 	# TODO: new variants of add,sub,mul?
+    } elsif ($method eq 'twofour256') {
+	# -info(=-64K) ... -32K ... -16K ...
+	# -1 .. 0 ... 1, 1.09, .... 2 ... 4 ... 234, 256 = +inf
+        # double every 8
+        #
+        # mult : A * B   = (a-64) + (b-64) + 64 = a + b - 64
+        # div  : A / B   = (a-64) - (b-64) + 64 = a + 64 - b
+        # sqrt : sqrt(A) = (a-64)/2 + 64 = a/2 - 32 + 64 = a/2 - 32
+        # ln   : 
+        $base =  2 ** (1/8);
+	$offset = 64; # 0..1
+    } elsif ($method eq 'twofour42') {
+	# -info(=-4KK) ... ... 
+        $base =  2 ** (1/8);
+	$offset = 42; # 0..1
+    } elsif ($method eq 'twoten48') {
+	# -info(=-4KK) ... ... 
+        $base =  2 ** (1/10);
+	$offset = 48; # 0..1
+    } elsif ($method eq 'twotwelve32') {
+	# -info(=-4KK) ... ... 
+        $base =  2 ** (1/12);
+	$offset = 32; # 0..1
+    } elsif ($method eq '10-twelve-49') {
+	# -info(=-4KK) ... ... 
+        $base =  10 ** (1/16);
+	$offset = 49; # 0..1
+    } elsif ($method eq 'f8byte-2') {
+        # b ** 30 == 256
+        # b = 256^(1/30)
+        $base = 256 ** (1/64);
+	$offset = 64; # 0..1
+    } elsif ($method eq 'f8byte-16') {
+        # b ** 30 == 256
+        # b = 256^(1/30)
+	$offset = 40; # 0..1
+        $base = 256 ** (1/(128-$offset));
+    } elsif ($method eq 'f8byte') {
+        # b ** 30 == 256
+        # b = 256^(1/30)
+        $base = 255 ** (1/62);
+	$offset = 64; # 0..1
+    } elsif ($method eq 'f16byte') {
+        $base = 65536 ** (1/64);
+	$offset = 64; # 0..1
+    } elsif ($method eq 'f32byte') {
+        $base = 3.40282e+38 ** (1/64);
+	$offset = 64; # 0..1
+    } elsif ($method eq 'f32word') {
+        $maxn = 128*256; # 2 byte signed
+        $pirange = 65536/2/2;
+        #$base = 3.40282e+38 ** (1/$pirange);
+        $base = 10 ** (1/$pirange*32);
+	$offset = $pirange; # 0..1
+    } elsif ($method eq 'f48byte') {
+        $base = 1e9 ** (1/64);
+	$offset = 64; # 0..1
+    } elsif ($method eq 'fbyte') {
+        $base = 256 ** (1/64);
+	$offset = 64; # 0..1
+    } elsif ($method eq '1e6byte') {
+        $base = 1e6 ** (1/62);
+	$offset = 64; # 0..1
+    } elsif ($method eq '1e9byte') {
+        # goats?
+        $base = 1e9 ** (1/62);
+	$offset = 64; # 0..1
+    } elsif ($method eq 'tenbyte') {
+        # goats?
+        $base = 10 ** (1/6);
+	$offset = 64; # 0..1
+    } elsif ($method eq 'twosixteen64') {
+	# -info(=-4KK) ... ... 
+        $base =  2 ** (1/16);
+	$offset = 64; # 0..1
+    } else {
+        die "Method $method not found!";
     }
 
     print "======= Base-pow($base, $offset) ======\n";
@@ -188,7 +307,8 @@ if (1) {
     $b = 1;
 
     $i = 0;
-    while ($i < 256) {
+
+    while ($i < $maxn) {
 	# fib
 	$c = $a + $b; $a = $b; $b = $c;
 
