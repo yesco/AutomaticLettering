@@ -1,3 +1,7 @@
+// copy this file to
+// - ~/.emacs.d/init.el
+// (make sure no ~/.emacs)
+
 ;; https://stackoverflow.com/questions/17659212/dont-display-compilation-buffer-in-emacs-until-the-process-exits-with-error-o
 
 ;; yeah, for long lines...

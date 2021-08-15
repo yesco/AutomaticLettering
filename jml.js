@@ -1,12 +1,29 @@
-// 2020 (c) jsk@yesco.org
-// A tiny implementation of JML
+//     javascript implementation of JML
+//
+//          (<) 2020 jsk@yesco.org
+//
+//
 // Jolly Macro Language
-// - It's totally functional
-// - No variables!
-// - Everything is strings
-// - It's live extensible inside itself
-// - Only state is external
-// - Database: keyword put/get using localStorage
+// - It's functional
+// - Evaluation is eager
+// - Evaluation by substitution
+// - No variables
+// - No datatypes = just strings
+// - Facts == functions are stored in spaces
+
+// - Spaces:
+//   - a space has unique name (email/URL)
+//   - names are resolved using hSPACE (hashing)
+//   - store facts
+//   - facts don't change, but can have newer versions
+//   - spaces are append only of new versions
+//   - put/get of ID interface
+//   - spaces are replicated/backedup at best effort
+//   - offline operation on cashed data
+//   - force update
+//
+// - A user is a space
+
 
 // TODO-----------
 // 1 - facts = store
@@ -14,6 +31,7 @@
 // {SPACE:NAME VALUE} -> {hSPACE:NAME VALUE}
 // {hSPACE:NAME VALUE} -> fact(tid, n, v)
 // {fun ^a^b BODY} -> {fun ^a^b BODY}
+// {fun a b | BODY} -> {fun ^a^b BODY}
 //
 // 2 - immediate = macro pre-processor!
 // (subst #TS# (timestamp) ...) !
@@ -21,7 +39,38 @@
 // (table tbody) (td t) (tr t)
 //
 // 3 - last = future
-// [fact NAME VALUE] -> ... -> fact()
+struct itimerval old;
+struct itimerval new;
+
+void 
+catch_alarm (int sig)
+{
+  //keep_going = 0;
+  printf("Alarm event\n");
+  signal (sig, catch_alarm);
+}
+
+int
+main(void)
+{
+  signal (SIGALRM, catch_alarm);
+  new.it_interval.tv_sec = 1; 
+  new.it_interval.tv_usec = 500000; 
+  new.it_value.tv_sec = 1;
+  new.it_value.tv_usec = 500000;
+  
+  old.it_interval.tv_sec = 0;
+  old.it_interval.tv_usec = 0;
+  old.it_value.tv_sec = 0;
+  old.it_value.tv_usec = 0;
+  
+  if (setitimer (ITIMER_REAL, &new, &old) < 0)
+	  printf("timer init failed\n");
+  else 
+	  printf("timer init succeeded\n");
+  while(1) sleep(2);
+return EXIT_SUCCESS;
+}// [fact NAME VALUE] -> ... -> fact()
 //
 // - GET?
 // [NAME ...] -> [hUSER:NAME ...]
@@ -29,26 +78,38 @@
 // [SPACE:NAME ...] -> [hSPACE:NAME ...]
 // [hSPACE:NAME ...] -> getfact()
 
+// opts = string of "pass" "step" "trace" "tick"
+//   can be combined "pass,step"
 function jml(x, opts) {
-  if (typeof jml.init === 'undefined')jml_init();
+  if (typeof jml.init === 'undefined') jml_init();
+
   // TODO: if called with a dom element
   //   traverse it and run on whole TextNodes
+
+  // options
   if (opts) {
     // can't be let ;)
     var oPass = opts.match(/pass/);
     var oStep = opts.match(/step/);
     var oTrace = opts.match(/trace/);
     var oTick = opts.match(/tick/);
-    // TODO: ultimately for 'tick' we let it run about 5ms, then yielding back to the browser, thereby not blocking it's interactivity!
+    // TODO: ultimately for 'tick' we let it run about 5ms, then yielding back to the browser, thereby not blocking its interactivity!
     if (oTick) oStep = true;
   }
+
+
+  // init
+  const SPACE_HASH_LEN = 17;
   let start = Date.now();
   jml.timestamp = jml.f.timestamp(start);
 
+  // evaluate
   if (typeof x === undefined) return;
   if (typeof x !== 'string') x = '' + x;
     
   // TODO: make sure newlines are ok
+
+  // find innermost: \[....\]
   let regexp = oStep ?
       /\[([^\[\]]*?)\s*\]/ :
       /\[([^\[\]]*?)\s*\]/g ;
@@ -56,46 +117,37 @@ function jml(x, opts) {
   while (n > 0) {
     p++;
     n = 0;
+    // replace innermost(s) \[...\] with subst!
     x = x.replace(regexp, function(all, inside) {
       n++;
       // TODO: can spaces be retained?
+      //   (yes, if have function, possibly)
       let args = inside.split(/\s+/g);
       let f = args.shift();
       let fun = jml.f[f];
 
-      // not built-in/cashed
-      if (!fun && !hash.is(f) && f.length!=17) {
+// TODO: handle space/user references
+if (0) {
+      // if prefix w hash (of space) - load it!
+      let isHash = (x) => hash.is(x) && x.length==SPACE_HASH_LEN;
+      if (!fun && isHash(f)) {
 	let r = all.replace(
 	  /^(.*):/, space=>{
-	    if (hash.is(space) && space.length==17)  return space;
+	    if (isHash(space))  return space;
 	    return `[load-fact ${hash(space)}]`;
 	  });
-	if (r != all) return r; // come back
+
+        // return and have caller start over
+	if (r != all) return r;
       }
-      let ff = f;
-      // TODO: move out - too long!
-      //
-      // if no fun backtrack:
-      //     [foo-bar-fie-3 4 5]  becomes
-      //  => [foo-bar fie 3 4 5] a.s.o.
-      //  => [foo bar fie 3 4 5] a.s.o.
-      //  => [error foo-bar-fie 3 4 5] a.s.o.
-      //
-      //  if have '/' in  path, don't go past
-      //     [foo-bar/fie-fum 3 4 5]
-      //  => [foo-bar/fie fum 3 4 5]
-      //  => [error foo-bar/fie-fum 3 4 5]
-      while (!fun && ff.match(/-[\/]*$/)) {
-	ff = ff.replace(/-([^\-\/]*)$/, (a)=>{
-	  args.unshift(a);
-	  return '';
-	});
-	console.error(`%%FUN: ${f} ${ff}`);
-	fun = jml.f[ff];
-      }
+}
+
+      fun = fun || findfun(f);
       if (!fun) return '[error ' + inside + ']';
       if (typeof fun !== 'function')
-	console.error('jml:fun not function:', fun);;
+	console.error('jml:fun not function:', fun);
+
+      // finaly replace with evaulation!
       return '' + fun.apply(undefined, args);
     });
     if (oTrace) console.info(n, '!', x);
@@ -104,7 +156,39 @@ function jml(x, opts) {
   }
 
   return x;
+
+
+  // NOTE: modifies by moving args into it
+  function findfun(f) {
+    let fun, ff = f;
+    // if no fun backtrack:
+    //     [foo-bar-fie-3 4 5]  becomes
+    //  => [foo-bar fie 3 4 5] a.s.o.
+    //  => [foo bar fie 3 4 5] a.s.o.
+    //  => [error foo-bar-fie 3 4 5] a.s.o.
+    //
+    //  if have '/' in  path, don't go past
+    //     [foo-bar/fie-fum 3 4 5]
+    //  => [foo-bar/fie fum 3 4 5]
+    //  => [error foo-bar/fie-fum 3 4 5]
+    while (!fun && ff.match(/-[\/]*$/)) {
+      // remove last
+      ff = ff.replace(/-([^\-\/]*)$/, (a)=>{
+	args.unshift(a);
+	return '';
+      });
+      console.error(`%%FUN: ${f} ${ff}`);
+      fun = jml.f[ff];
+    }
+
+    return fun;
+  }
+
 }
+
+
+////////////////////////////////////////
+// Testing
 
 function x(x, test) {
   let xr = x.match(/^(pass: |fail: )(.*?) -> (.*?)(| (expected:) (.*?))$/);
@@ -221,6 +305,14 @@ x('[or 0 0 1]', '1');
 x('[or 1 1 1]', '0');
 }
 
+
+
+
+////////////////////////////////////////
+// Command line function
+
+jml();
+
 // if run from nodejs make it interactive
 if (typeof require !== 'undefined') {
     var readline = require('readline');
@@ -246,9 +338,25 @@ function jml_init() {
   jml.logdb = [];
   jml.init = true;
 
-  // methods
+  // basics
+  jml.f.ignore = _=>'';
+  jml.f.identity= (...args)=>args.join(' ');
 
-  // primitives
+  // system
+  jml.f.timestamp = timestamp;
+  
+  function error(f, args) {
+    let r = '<%%ERROR:' + f + ' ' + args + '%%>';
+    console.error('JML:', r);
+    return r;
+  }
+  jml.f.error = function(f, ...args) {
+    error(f, args);
+  };
+
+  jml.f.fun = (n)=>'<pre style="text-align:let;">'+quoteHTML(''+jml.f[n])+'</pre>';
+
+  // primitives math/logic
   jml.f.plus = (...args)=>args.reduce((a,x)=>(+a)+(+x), 0);
   jml.f.minus = (a,b)=>(+a)-(+b);
   jml.f.times = (...args)=>args.reduce((a,x)=>(+a)*(+x), 1);
@@ -278,21 +386,15 @@ function jml_init() {
   jml.f.or = (...args)=>`[not [not ${args.join(' ')}]]`;
   jml.f.mor = ()=>`[not [not ${this}]]`;
 
-  jml.f['en'] = (x, y)=>`[en-word-${x} ${y}]`;
-  jml.f['en-word-3'] = (y)=>'three:'+y;
-  jml.f['en-word-2'] = (y)=>'two'+y;
-  jml.f['en-word-1'] = (y)=>'one'+y;
-  jml.f['en-word'] = (x, y)=>'NO: '+y;
-
-  function mkArray(n, func) {
-    return [...Array(n)].map(func);
-  }
-  
   function quoteHTML(h) {
     return h.replace(/([<>\[\]])/g, x=>`&#${x.charCodeAt(0)};`);
   }
 
   // html
+  function mkArray(n, func) {
+    return [...Array(n)].map(func);
+  }
+
   jml.f['make-table'] = (rows, cols, func, ...data)=>{
     // DOC: makes a table each call defined by [func r c ...data]
     // EX: [make-table 6 6 times]
@@ -308,13 +410,16 @@ function jml_init() {
     '</td></tr></table>';
   };
 
-  // IO
+  ////////////////////////////////////////
+  // Input/OutputO
 
-  // TOOO: make better
+  // TODO: use?
   function qqq(s) {
+    // TOOO: make better
     return s.replace(/\s/g, '+')
       .replace(/"/g, '\\"');
   }
+
 
   // TODO: make it take a hash
   jml.f['server']=hSPACE_=>'http://192.168.44.1:8080';
@@ -343,6 +448,8 @@ function jml_init() {
   //jml.f.get = (n)=>`[isendjsonp t0 http://192.168.44.1:8080/get?id=${n}]`;
   //jml.f.put = (n,...v)=>`[isendjsonp t0 http://192.168.44.1:8080/put?id=${n}&data=${qqq(v.join(' '))}]`;
   //jml.f.list = ()=>`[isendjsonp t0 http://192.168.44.1:8080/list?]`;
+
+
 
 
   // TODO: same/similar function inside ALd/index.html
@@ -629,10 +736,9 @@ function jml_init() {
     return `[ignore UPDATEFACTS ${names.join(' ')}]`;
   }
 
-  // -- library
-  jml.f.ignore = _=>'';
-  jml.f.identity= (...args)=>args.join(' ');
-  
+  ////////////////////////////////////////
+  // Encryption
+
   // https://www.movable-type.co.uk/scripts/tea.html
   // © 2000-2005 Chris Veness
   // Extended TEA: this is the 1997 revised version of Needham & Wheeler's algorithm
@@ -722,25 +828,27 @@ function jml_init() {
   }
 
   function unescCtrlCh(str) {
-    return str.replace(/!\d\d?\d?!/g, function(c) { return String.fromCharCode(c.slice(1,-1)); });
+    return str.replace(/!\d\d?\d?!/g, c=>
+      String.fromCharCode(c.slice(1,-1)));
   }
   // END: xtea
 
   // returns a hash of 16 (or optPrecision) hex chars, prefixed by 'h'
-  function hash(s, optPrecision) {
-    optPrecision = (optPrecision || 16);
-    // we're good to a few millon values.. lol
-    // at 4 billion => 40% chance of collision
-    // https://www.johndcook.com/blog/2017/01/10/probability-of-secure-hash-collisions/#:~:text=As%20a%20rule%20of%20thumb,or%20about%204%20billion%20items.
+  // len * 4 == number of bits in hash
+  // 16: we're good to a few millon values.
+  // At 4 billion => 40% chance of collision
+  // https://www.johndcook.com/blog/2017/01/10/probability-of-secure-hash-collisions/#:~:text=As%20a%20rule%20of%20thumb,or%20about%204%20billion%20items.
+  function hash(s, len = 16) {
     let h = jml.f.encrypt('HASHhash#$@4hsaH', s);
-    console.error('H>'+h+'<');
-    return 'h' + h.substr(-optPrecision).padStart(optPrecision, '0');;
+    //console.error('H>'+h+'<');
+    return 'h' + h.substr(-len).padStart(len, '0');
   }
   hash.is = h=>{
     if (h.length<=4 || h[0]!='h') return false;
     return !!h.match(/^h[0-9A-Za-z]{4,}$/);
   }
   jml.f.hash = (...s)=>hash(s.join(' '));
+  jml.f.nhash = (n, ...s)=>hash(s.join(' '), n);
 
   // inspiration https://stackoverflow.com/questions/13865302/how-to-convert-a-string-containing-utf8-hex-codes-to-a-javascript-string
   function text2hex(s) {
@@ -767,20 +875,18 @@ function jml_init() {
   jml.f.encrypt = (pass,...txt)=>text2hex(encrypt(txt.join(' '), pass));
   jml.f.decrypt = (pass,txt)=>decrypt(hex2text(txt), pass);
   
-  
-  jml.f.timestamp = timestamp;
-  
-  function error(f, args) {
-    let r = '<%%ERROR:' + f + ' ' + args + '%%>';
-    console.error('JML:', r);
-    return r;
-  }
-  jml.f.error = function(f, ...args) {
-    error(f, args);
-  };
+  ////////////////////////////////////////
+  // Other library
 
-  jml.f.fun = (n)=>'<pre style="text-align:let;">'+quoteHTML(''+jml.f[n])+'</pre>';
 }
 
-// cold start
-jml();
+
+
+If (0) {
+  // Testing Fallback?
+  jml.f['en'] = (x, y)=>`[en-word-${x} ${y}]`;
+  jml.f['en-word-3'] = (y)=>'three:'+y;
+  jml.f['en-word-2'] = (y)=>'two'+y;
+  jml.f['en-word-1'] = (y)=>'one'+y;
+  jml.f['en-word'] = (x, y)=>'NO: '+y;
+}
